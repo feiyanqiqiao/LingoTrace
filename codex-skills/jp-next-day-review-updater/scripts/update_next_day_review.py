@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from dataclasses import dataclass
@@ -9,14 +10,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Iterable
 
-TRACK_ROOTS = (
-    "学习系统/课堂复习",
-    "学习系统/生活口语/句库",
-    "学习系统/听力",
-    "学习系统/发音/练习",
-    "学习系统/发音/アクセント",
-    "学习系统/发音/音素",
-)
+DEFAULT_PATHS_CONFIG = Path("学习系统/系统配置/paths.json")
 
 TRACK_LABELS = {
     "class_review": "课堂复习",
@@ -84,13 +78,69 @@ class PendingWrite:
     text: str
 
 
+@dataclass(frozen=True)
+class PathsConfig:
+    managed_review_roots: tuple[Path, ...]
+    base_vocab_root: Path
+    daily_notes_root: Path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Update next-day review items in the Japanese learning vault.")
     parser.add_argument("--vault-root", required=True, help="Absolute path to the vault root.")
     parser.add_argument("--date", help="Run date in YYYY-MM-DD format. Defaults to today.")
     parser.add_argument("--dry-run", action="store_true", help="Show planned updates without writing files.")
     parser.add_argument("--note-path", help="Override the target daily note path.")
+    parser.add_argument(
+        "--paths-config",
+        default=str(DEFAULT_PATHS_CONFIG),
+        help="Vault-relative or absolute JSON file containing managed path roles.",
+    )
     return parser.parse_args()
+
+
+def resolve_vault_path(vault_root: Path, raw_path: str | Path, field_name: str) -> Path:
+    path = Path(raw_path)
+    if path.is_absolute():
+        raise ReviewUpdateError(f"{field_name} must be vault-relative, got absolute path {path}")
+    if ".." in path.parts:
+        raise ReviewUpdateError(f"{field_name} must stay inside the vault, got {path}")
+    return vault_root / path
+
+
+def load_paths_config(vault_root: Path, raw_config_path: str) -> PathsConfig:
+    config_path = Path(raw_config_path).expanduser()
+    if not config_path.is_absolute():
+        config_path = vault_root / config_path
+    try:
+        raw_config = json.loads(config_path.read_text())
+    except OSError as exc:
+        raise ReviewUpdateError(f"unable to read paths config {config_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ReviewUpdateError(f"invalid paths config JSON {config_path}: {exc}") from exc
+
+    try:
+        managed_roots = raw_config["managed_review_roots"]
+        base_vocab_root = raw_config["base_vocab_root"]
+        daily_notes_root = raw_config["daily_notes_root"]
+    except KeyError as exc:
+        raise ReviewUpdateError(f"paths config {config_path} is missing {exc.args[0]!r}") from exc
+
+    if not isinstance(managed_roots, list) or not all(isinstance(root, str) for root in managed_roots):
+        raise ReviewUpdateError(f"paths config {config_path}: managed_review_roots must be a list of strings")
+    if not isinstance(base_vocab_root, str) or not isinstance(daily_notes_root, str):
+        raise ReviewUpdateError(f"paths config {config_path}: base_vocab_root and daily_notes_root must be strings")
+    if not managed_roots:
+        raise ReviewUpdateError(f"paths config {config_path}: managed_review_roots must not be empty")
+
+    return PathsConfig(
+        managed_review_roots=tuple(
+            resolve_vault_path(vault_root, root, f"managed_review_roots[{index}]")
+            for index, root in enumerate(managed_roots)
+        ),
+        base_vocab_root=resolve_vault_path(vault_root, base_vocab_root, "base_vocab_root"),
+        daily_notes_root=resolve_vault_path(vault_root, daily_notes_root, "daily_notes_root"),
+    )
 
 
 def parse_iso_date(raw: str, field_name: str, path: Path) -> date:
@@ -275,6 +325,7 @@ def render_base_note(
     note_title: str,
     headword: str,
     reading: str,
+    accent_display: str,
     meaning_zh: str,
     source_notes: list[str],
     first_seen: date,
@@ -290,12 +341,14 @@ def render_base_note(
         tags.append("jp/kanji_diff")
     tag_lines = "\n".join(f"- {tag}" for tag in tags)
     kanji_diff_pair_lines = "\n".join(format_frontmatter_list("kanji_diff_pairs", kanji_diff_pairs))
+    accent_line = f"accent_display: {accent_display}\n" if accent_display else ""
     return (
         "---\n"
         f"headword: {headword}\n"
         "aliases:\n"
         f"- {yaml_quote(headword)}\n"
         f"reading: {reading}\n"
+        f"{accent_line}"
         f"meaning_zh: {meaning_zh}\n"
         "source_notes:\n"
         f"{source_lines}\n"
@@ -323,10 +376,9 @@ def extract_label(text: str, path: Path) -> str:
     return path.stem
 
 
-def load_items(vault_root: Path) -> list[ItemState]:
+def load_items(paths_config: PathsConfig) -> list[ItemState]:
     items: list[ItemState] = []
-    for root in TRACK_ROOTS:
-        root_path = vault_root / root
+    for root_path in paths_config.managed_review_roots:
         if not root_path.exists():
             raise ReviewUpdateError(f"Managed root is missing: {root_path}")
         for path in sorted(root_path.rglob("*.md")):
@@ -372,14 +424,15 @@ def load_items(vault_root: Path) -> list[ItemState]:
 
 
 def is_focus_vocab(item: ItemState) -> bool:
-    return item.track == "class_review" and item.item_type == "vocab" and "/课堂复习/词汇/" in item.path.as_posix()
+    return item.track == "class_review" and item.item_type == "vocab"
 
 
-def build_base_note_write(vault_root: Path, item: ItemState) -> PendingWrite:
+def build_base_note_write(base_vocab_root: Path, item: ItemState) -> PendingWrite:
     if item.new_text is None:
         raise ReviewUpdateError(f"{item.path}: missing updated text for sink operation")
     headword = get_field(item.new_text, "headword", item.path).strip('"')
     reading = get_field(item.new_text, "reading", item.path).strip('"')
+    accent_display = get_field(item.new_text, "accent_display", item.path, required=False).strip().strip('"')
     meaning_zh = get_field(item.new_text, "meaning_zh", item.path).strip('"')
     source_notes = extract_list_field(item.new_text, "source_notes", item.path)
     first_seen = parse_iso_date(get_field(item.new_text, "first_seen", item.path).strip('"'), "first_seen", item.path)
@@ -388,7 +441,7 @@ def build_base_note_write(vault_root: Path, item: ItemState) -> PendingWrite:
     incoming_kanji_diff = get_bool_field_or_default(item.new_text, "kanji_diff", item.path)
     incoming_kanji_diff_pairs = extract_optional_list_field(item.new_text, "kanji_diff_pairs", item.path)
     note_title = item.path.stem
-    base_path = vault_root / "学习系统/词库/基础词汇" / f"{note_title}.md"
+    base_path = base_vocab_root / f"{note_title}.md"
     if not base_path.exists():
         return PendingWrite(
             path=base_path,
@@ -396,6 +449,7 @@ def build_base_note_write(vault_root: Path, item: ItemState) -> PendingWrite:
                 note_title,
                 headword,
                 reading,
+                accent_display,
                 meaning_zh,
                 source_notes,
                 first_seen,
@@ -418,6 +472,8 @@ def build_base_note_write(vault_root: Path, item: ItemState) -> PendingWrite:
     merged_kanji_diff_pairs = merge_unique(existing_kanji_diff_pairs, incoming_kanji_diff_pairs)
     updated_text = base_text
     updated_text = replace_field(updated_text, "reading", reading, base_path)
+    if accent_display:
+        updated_text = replace_or_insert_frontmatter_scalar(updated_text, "accent_display", accent_display, base_path)
     updated_text = replace_field(updated_text, "meaning_zh", meaning_zh, base_path)
     updated_text = replace_field(updated_text, "first_seen", min(existing_first_seen, first_seen).isoformat(), base_path)
     updated_text = replace_field(updated_text, "last_seen", max(existing_last_seen, last_seen).isoformat(), base_path)
@@ -437,7 +493,7 @@ def build_base_note_write(vault_root: Path, item: ItemState) -> PendingWrite:
 
 
 def prepare_item_updates(
-    items: Iterable[ItemState], run_date: date, vault_root: Path
+    items: Iterable[ItemState], run_date: date, paths_config: PathsConfig
 ) -> tuple[list[ItemState], dict[str, int], dict[str, int], int, int, list[PendingWrite]]:
     processed: list[ItemState] = []
     stage_counts: dict[str, int] = {}
@@ -480,7 +536,7 @@ def prepare_item_updates(
             track_counts[item.track] += 1
             if is_focus_vocab(item):
                 mastered_vocab_count += 1
-                base_writes.append(build_base_note_write(vault_root, item))
+                base_writes.append(build_base_note_write(paths_config.base_vocab_root, item))
             continue
 
         offset_days = STAGE_DAYS[next_stage] if should_advance else allowed_delay
@@ -666,13 +722,13 @@ def build_checklist_section(
     return original_text.rstrip() + "\n\n" + body
 
 
-def default_note_path(vault_root: Path, run_date: date) -> Path:
-    return vault_root / f"daily-notes/{run_date.year}.{run_date.month}/{run_date.year}.{run_date.month}.{run_date.day}.md"
+def default_note_path(paths_config: PathsConfig, run_date: date) -> Path:
+    return paths_config.daily_notes_root / f"{run_date.year}.{run_date.month}" / f"{run_date.year}.{run_date.month}.{run_date.day}.md"
 
 
-def resolve_note_path(vault_root: Path, run_date: date, raw_note_path: str | None) -> Path:
+def resolve_note_path(vault_root: Path, paths_config: PathsConfig, run_date: date, raw_note_path: str | None) -> Path:
     if not raw_note_path:
-        return default_note_path(vault_root, run_date)
+        return default_note_path(paths_config, run_date)
     note_path = Path(raw_note_path)
     return note_path if note_path.is_absolute() else vault_root / note_path
 
@@ -681,12 +737,13 @@ def main() -> int:
     args = parse_args()
     vault_root = Path(args.vault_root).expanduser().resolve()
     run_date = parse_iso_date(args.date, "date", Path("--date")) if args.date else date.today()
-    note_path = resolve_note_path(vault_root, run_date, args.note_path)
     note_missing = False
 
     try:
-        items = load_items(vault_root)
-        processed, stage_counts, track_counts, mastered_vocab_count, delayed_count, base_writes = prepare_item_updates(items, run_date, vault_root)
+        paths_config = load_paths_config(vault_root, args.paths_config)
+        note_path = resolve_note_path(vault_root, paths_config, run_date, args.note_path)
+        items = load_items(paths_config)
+        processed, stage_counts, track_counts, mastered_vocab_count, delayed_count, base_writes = prepare_item_updates(items, run_date, paths_config)
         new_note: str | None = None
         if note_path.exists():
             original_note = note_path.read_text()

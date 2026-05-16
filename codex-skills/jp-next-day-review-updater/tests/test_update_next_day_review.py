@@ -15,10 +15,16 @@ SPEC.loader.exec_module(MODULE)
 
 
 class UpdateNextDayReviewTests(unittest.TestCase):
+    def base_vocab_root(self, vault_root: Path) -> Path:
+        return vault_root / "base-vocab"
+
+    def focus_vocab_path(self, vault_root: Path, name: str) -> Path:
+        return vault_root / "focus-vocab" / name
+
     def test_base_note_path_uses_focus_card_stem_not_raw_headword(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             vault_root = Path(tmp_dir)
-            focus_path = vault_root / "学习系统/课堂复习/词汇/廢棄與處理.md"
+            focus_path = self.focus_vocab_path(vault_root, "廢棄與處理.md")
             new_text = "\n".join(
                 [
                     "---",
@@ -31,7 +37,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                     "reading: すてる / はいき / しょぶん",
                     "meaning_zh: 丢弃、废弃、处理",
                     "source_notes:",
-                    '  - "[[daily-notes/example]]"',
+                    '  - "[[笔记/2026.4/2026.4.28]]"',
                     "first_seen: 2026-04-28",
                     "last_seen: 2026-04-29",
                     "seen_count: 3",
@@ -62,11 +68,11 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                 new_text=new_text,
             )
 
-            pending = MODULE.build_base_note_write(vault_root, item)
+            pending = MODULE.build_base_note_write(self.base_vocab_root(vault_root), item)
 
         self.assertEqual(
             pending.path,
-            vault_root / "学习系统/词库/基础词汇/廢棄與處理.md",
+            vault_root / "base-vocab/廢棄與處理.md",
         )
         self.assertIn("headword: 廢棄與處理 (捨てる / 廃棄 / 処分)", pending.text)
         self.assertIn("aliases:\n- \"廢棄與處理 (捨てる / 廃棄 / 処分)\"", pending.text)
@@ -75,7 +81,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
     def test_existing_base_note_empty_aliases_gets_headword_alias(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             vault_root = Path(tmp_dir)
-            base_path = vault_root / "学习系统/词库/基础词汇/廢棄與處理.md"
+            base_path = self.base_vocab_root(vault_root) / "廢棄與處理.md"
             base_path.parent.mkdir(parents=True)
             base_path.write_text(
                 "\n".join(
@@ -86,7 +92,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                         "reading: はいき",
                         "meaning_zh: 废弃",
                         "source_notes:",
-                        '  - "[[daily-notes/example]]"',
+                        '  - "[[笔记/2026.4/2026.4.14]]"',
                         "first_seen: 2026-04-14",
                         "last_seen: 2026-04-14",
                         "seen_count: 1",
@@ -100,12 +106,12 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                         "",
                         "## 来源",
                         "",
-                        "- [[daily-notes/example]]",
+                        "- [[笔记/2026.4/2026.4.14]]",
                         "",
                     ]
                 )
             )
-            focus_path = vault_root / "学习系统/课堂复习/词汇/廢棄與處理.md"
+            focus_path = self.focus_vocab_path(vault_root, "廢棄與處理.md")
             new_text = "\n".join(
                 [
                     "---",
@@ -113,7 +119,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                     "reading: すてる / はいき / しょぶん",
                     "meaning_zh: 丢弃、废弃、处理",
                     "source_notes:",
-                    '  - "[[daily-notes/example]]"',
+                    '  - "[[笔记/2026.4/2026.4.28]]"',
                     "first_seen: 2026-04-28",
                     "last_seen: 2026-04-29",
                     "seen_count: 3",
@@ -136,7 +142,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                 new_text=new_text,
             )
 
-            pending = MODULE.build_base_note_write(vault_root, item)
+            pending = MODULE.build_base_note_write(self.base_vocab_root(vault_root), item)
 
         self.assertIn("aliases:\n- \"廢棄與處理 (捨てる / 廃棄 / 処分)\"", pending.text)
         self.assertNotIn("aliases: []", pending.text)
@@ -144,7 +150,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
     def test_base_note_sink_preserves_kanji_diff_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             vault_root = Path(tmp_dir)
-            focus_path = vault_root / "学习系统/课堂复习/词汇/江戸.md"
+            focus_path = self.focus_vocab_path(vault_root, "江戸.md")
             new_text = "\n".join(
                 [
                     "---",
@@ -156,7 +162,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                     "reading: えど",
                     "meaning_zh: 江户",
                     "source_notes:",
-                    '  - "[[daily-notes/example]]"',
+                    '  - "[[笔记/2026.4/2026.4.28]]"',
                     "first_seen: 2026-04-28",
                     "last_seen: 2026-04-29",
                     "seen_count: 2",
@@ -189,7 +195,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                 new_text=new_text,
             )
 
-            pending = MODULE.build_base_note_write(vault_root, item)
+            pending = MODULE.build_base_note_write(self.base_vocab_root(vault_root), item)
 
         self.assertIn("kanji_diff: true", pending.text)
         self.assertIn("kanji_diff_pairs:\n- 戸/户", pending.text)
@@ -220,7 +226,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
         )
 
         updated = MODULE.build_checklist_section(
-            Path("daily-notes/2026.4/2026.4.27.md"),
+            Path("笔记/2026.4/2026.4.27.md"),
             original,
             [],
             [],
@@ -246,7 +252,7 @@ class UpdateNextDayReviewTests(unittest.TestCase):
                 "",
                 "## 来源",
                 "",
-                "- [[daily-notes/example]]",
+                "- [[笔记/2026.4/2026.4.14]]",
                 "",
                 "## 来源摘录",
                 "",
@@ -262,12 +268,12 @@ class UpdateNextDayReviewTests(unittest.TestCase):
         updated = MODULE.update_body_sources(
             original,
             [
-                "[[daily-notes/example]]",
-                "[[daily-notes/example]]",
+                "[[笔记/2026.4/2026.4.14]]",
+                "[[笔记/2026.4/2026.4.28]]",
             ],
         )
 
-        self.assertIn("- [[daily-notes/example]]", updated)
+        self.assertIn("- [[笔记/2026.4/2026.4.28]]", updated)
         self.assertIn("## 来源摘录", updated)
         self.assertIn("- 人工整理した例文。", updated)
         self.assertIn("## 核心", updated)

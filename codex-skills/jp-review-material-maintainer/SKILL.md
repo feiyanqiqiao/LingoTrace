@@ -1,25 +1,27 @@
 ---
-name: jp-vocab-maintainer
-description: Maintain the Japanese vocabulary system in this Obsidian vault by extracting words from notes, deduplicating against the dual-layer vocab structure, and deciding whether to keep a word in the base lexicon or promote it into focus review cards.
+name: jp-review-material-maintainer
+description: Use when creating or updating Japanese review materials in this Obsidian vault, such as vocabulary, grammar, pronunciation, error cards, or daily study checklist entries. Do not use for listening transcription, flexible source notes from media or transcripts, or end-of-day review rollover.
 ---
 
-# JP Vocab Maintainer
+# JP Review Material Maintainer
 
-Use this skill when the task is to extract, create, update, merge, or promote Japanese vocabulary notes in this vault.
+Use this skill when the task is to extract, create, update, merge, or promote review material in this vault, including vocabulary notes, grammar cards, pronunciation cards, error cards, and daily study checklist entries.
+
+Do not use this skill for listening transcription, flexible study source notes from media or transcripts, or end-of-day review rollover. Use `jp-listening-script-generator`, `jp-source-note-generator`, or `jp-next-day-review-updater` for those tasks.
 
 ## Maintenance Source Of Truth
 
 The project copy is the source of truth:
 
-- source: `codex-skills/jp-vocab-maintainer/`
-- installed copy: `~/.codex/skills/jp-vocab-maintainer/`
+- source: `codex-skills/jp-review-material-maintainer/`
+- installed copy: `~/.codex/skills/jp-review-material-maintainer/`
 
 Edit the project copy first, then sync it to the global skill directory.
 
 Default sync command:
 
 ```bash
-zsh codex-skills/jp-vocab-maintainer/scripts/sync-to-global.sh
+zsh codex-skills/jp-review-material-maintainer/scripts/sync-to-global.sh
 ```
 
 ## Tool Preferences
@@ -40,7 +42,7 @@ When using `obsidian-cli`, prefer targeted actions:
 
 ## Session Output Convention
 
-When the task touches daily study notes or asks to update the day's study checklist in `daily-notes/YYYY.M/YYYY.M.D.md`, use this structure by default and do not invent a broader daily dashboard unless the user explicitly asks for it.
+When the task touches daily study notes or asks to update the day's study checklist in `笔记/YYYY.M/YYYY.M.D.md`, use this structure by default and do not invent a broader daily dashboard unless the user explicitly asks for it.
 
 Default section name:
 
@@ -64,12 +66,12 @@ Rules:
 
 ## Standard Obsidian CLI Patterns
 
-Use these patterns as the default starting point. Adjust only the query text, path, or property values that the current task needs.
+Use these patterns as the default starting point. Resolve role roots from `学习系统/系统配置/paths.json` before substituting `path=...`; do not treat the example paths below as hard-coded system truth.
 
 ### 1. Search focus review cards first
 
 ```bash
-obsidian search query="抱く" path="学习系统/课堂复习/词汇" limit=10
+obsidian search query="抱く" path="<focus_vocab_root>" limit=10
 ```
 
 Use this before opening files. If a clear match exists here, treat the word as a focus-card update task.
@@ -77,7 +79,7 @@ Use this before opening files. If a clear match exists here, treat the word as a
 ### 2. Search the base lexicon second
 
 ```bash
-obsidian search query="抱く" path="学习系统/词库/基础词汇" limit=10
+obsidian search query="抱く" path="<base_vocab_root>" limit=10
 ```
 
 Use this only if the focus-card search did not find a match.
@@ -85,7 +87,7 @@ Use this only if the focus-card search did not find a match.
 ### 3. Read the source classroom note by exact path
 
 ```bash
-obsidian read path="daily-notes/2026.4/2026.4.14.md"
+obsidian read path="笔记/2026.4/2026.4.14.md"
 ```
 
 Prefer exact `path=` for dated notes and structured folders.
@@ -93,8 +95,8 @@ Prefer exact `path=` for dated notes and structured folders.
 ### 4. Read a matched vocab note by exact path
 
 ```bash
-obsidian read path="学习系统/词库/基础词汇/抱く.md"
-obsidian read path="学习系统/课堂复习/词汇/抱く.md"
+obsidian read path="<base_vocab_root>/抱く.md"
+obsidian read path="<focus_vocab_root>/抱く.md"
 ```
 
 Open only the matched note plus the source note. Do not open large batches unless the task explicitly requires a broader audit.
@@ -102,8 +104,8 @@ Open only the matched note plus the source note. Do not open large batches unles
 ### 5. Update a property directly
 
 ```bash
-obsidian property:set path="学习系统/课堂复习/词汇/抱く.md" name="last_seen" value="2026-04-14"
-obsidian property:set path="学习系统/课堂复习/词汇/抱く.md" name="status" value="active"
+obsidian property:set path="<focus_vocab_root>/抱く.md" name="last_seen" value="2026-04-14"
+obsidian property:set path="<focus_vocab_root>/抱く.md" name="status" value="active"
 ```
 
 Prefer direct property updates for single-field changes instead of rewriting the whole file.
@@ -111,7 +113,7 @@ Prefer direct property updates for single-field changes instead of rewriting the
 ### 6. Create a new note in the correct layer
 
 ```bash
-obsidian create path="学习系统/课堂复习/词汇/新出単語.md" content="---\ntrack: class_review\nitem_type: vocab\nstatus: active\npriority: normal\ndone_today: false\nheadword: 新出単語\nreading:\nmeaning_zh:\nsource_notes:\n  - \"[[daily-notes/example]]\"\nfirst_seen: 2026-04-14\nlast_seen: 2026-04-14\nseen_count: 1\nerror_count: 0\nreview_stage: day0\nnext_review: 2026-04-14\nlast_reviewed: \"\"\nconfusable_with: []\ntags:\n  - jp/vocab\n  - jp/class_review\n---\n\n# 新出単語\n\n## 核心\n\n## 来源\n"
+obsidian create path="<focus_vocab_root>/新出単語.md" content="---\ntrack: class_review\nitem_type: vocab\nstatus: active\npriority: normal\ndone_today: false\nheadword: 新出単語\nreading:\nmeaning_zh:\nsource_notes:\n  - \"[[笔记/2026.4/2026.4.14]]\"\nfirst_seen: 2026-04-14\nlast_seen: 2026-04-14\nseen_count: 1\nerror_count: 0\nreview_stage: day0\nnext_review: 2026-04-14\nlast_reviewed: \"\"\nconfusable_with: []\ntags:\n  - jp/vocab\n  - jp/class_review\n---\n\n# 新出単語\n\n## 核心\n\n## 来源\n"
 ```
 
 Use this for classroom-note vocabulary creation. Only create a base-lexicon note when a word has completed the focus-review cycle and is being sunk into long-term storage.
@@ -127,10 +129,10 @@ Prefer `path=` when the note name could exist in both layers.
 
 ## Scope
 
-This vault uses a dual-layer vocabulary system:
+This vault uses a dual-layer vocabulary system. Resolve concrete roots from `学习系统/系统配置/paths.json` and role-specific local guidance:
 
-- Focus review cards: `学习系统/课堂复习/词汇`
-- Base lexicon: `学习系统/词库/基础词汇`
+- Focus review cards: `<focus_vocab_root>`
+- Base lexicon: `<base_vocab_root>`
 
 Only vocabulary uses the dual-layer model. Grammar and error cards stay in `学习系统/课堂复习/语法` and `学习系统/课堂复习/错题`.
 
@@ -159,16 +161,16 @@ For entries without a kanji-difference need, keep:
 
 For every candidate word, search in this order:
 
-1. `学习系统/课堂复习/词汇`
-2. `学习系统/词库/基础词汇`
+1. `<focus_vocab_root>`
+2. `<base_vocab_root>`
 3. create a new note only if neither layer has a match
 
 Do not create duplicates because the source note is different.
 
 Operationally:
 
-1. use `obsidian-cli` or an equivalent fast search to check `学习系统/课堂复习/词汇`
-2. if no match, check `学习系统/词库/基础词汇`
+1. use `obsidian-cli` or an equivalent fast search to check `<focus_vocab_root>`
+2. if no match, check `<base_vocab_root>`
 3. open only the matched files plus the source note
 4. create a new note only if neither layer has a match
 
@@ -185,7 +187,7 @@ Operationally:
 
 For vocabulary extracted from classroom notes or daily study notes, default to the focus review layer first:
 
-- create or update `学习系统/课堂复习/词汇` as the primary learning card
+- create or update `<focus_vocab_root>` as the primary learning card
 - initialize new focus cards at `status: active`, `review_stage: day0`, `next_review: today`
 - keep the word in focus review until it finishes the full `day0 / day1 / day3 / day7 / day14 / day30 / day90 / day180` cycle
 
@@ -205,12 +207,13 @@ If a word already exists in the base lexicon but appears again in a classroom no
 
 ### Base Lexicon
 
-Path: `学习系统/词库/基础词汇/<headword>.md`
+Path: `<base_vocab_root>/<headword>.md`
 
 Required properties:
 
 - `headword`
 - `reading`
+- `accent_display` when the accent is known
 - `meaning_zh`
 - `source_notes`
 - `first_seen`
@@ -232,7 +235,7 @@ Expected tags:
 
 ### Focus Review Card
 
-Path: `学习系统/课堂复习/词汇/<headword>.md`
+Path: `<focus_vocab_root>/<headword>.md`
 
 Required properties:
 
@@ -243,6 +246,7 @@ Required properties:
 - `done_today`
 - `headword`
 - `reading`
+- `accent_display` when the accent is known
 - `meaning_zh`
 - `source_notes`
 - `first_seen`
@@ -269,6 +273,32 @@ Linking rule for vocab cards:
 - only link high-value comparisons: confusable pairs, near-synonyms, opposite-choice traps, repeated classroom contrasts
 - do not add links just to increase graph density
 - add `jp/kanji_diff` when `kanji_diff: true`
+
+Accent display rule for vocabulary cards:
+
+- keep `headword` as the clean written headword and `reading` as the clean kana reading; do not append accent marks to either field
+- when a reliable accent is known, store it in `accent_display` as kana plus accent, such as `しあい⓪`, `じてんしゃ②／⓪`, or `はる⓪・はる①`
+- mirror the same value visibly in the body under `## 核心` as `- 重音：<accent_display>`
+- for multi-item cards, keep `accent_display` order aligned with `headword`; leave it blank when the accent is uncertain instead of guessing
+- accent contrast cards still belong under `学习系统/发音/アクセント`; ordinary vocab cards only keep the word's own accent cue
+
+Offline dictionary accent candidates for vocabulary cards:
+
+- before creating a new vocabulary card without `accent_display`, check whether the local offline dictionary is ready with `python3 tools/listening-transcribe-official/setup_offline_dictionary.py --check`
+- the check must show sample accent candidates such as `公園⓪`; tokenization-only output is not enough for accent-card work
+- use the same default cache as listening notes: `~/Library/Caches/jp-listening-dicts`, overrideable with `JP_LISTENING_DICT_DIR`
+- if an existing card already has `accent_display`, preserve it and do not replace it with an offline dictionary candidate
+- if the offline dictionary returns one reliable candidate for the exact headword/base form, fill `accent_display` on the new vocab card and mirror it in `## 核心`
+- do not fill `accent_display` from offline data when the lookup is a multi-candidate accent, an inflected fragment, or a substring inside a larger compound
+- do not label offline candidates as NHK-confirmed or human-confirmed; they are useful starting hints, not audited accent facts
+- if accent uncertainty is the study target, create or update an accent-practice card under `学习系统/发音/アクセント/` instead of overloading the ordinary vocabulary card
+
+When applying a full-vault accent audit, use the generated CSV as the review ledger. Only rows with `nhk_status: confirmed` may be written back. Prefer the safe writer:
+
+```bash
+python3 codex-skills/jp-review-material-maintainer/scripts/apply-accent-confirmations.py "学习系统/词库/重音标注全量草稿.csv"
+python3 codex-skills/jp-review-material-maintainer/scripts/apply-accent-confirmations.py "学习系统/词库/重音标注全量草稿.csv" --write
+```
 
 ### Grammar Card
 
@@ -395,7 +425,7 @@ Also keep the base lexicon note and mark it as promoted:
 
 When a classroom word is first extracted and neither layer exists:
 
-1. create the focus note under `学习系统/课堂复习/词汇`
+1. create the focus note under `<focus_vocab_root>`
 2. initialize focus fields:
    - `status: active`
    - `priority: normal` unless risk is obvious
@@ -410,8 +440,9 @@ When a classroom word is first extracted and neither layer exists:
 
 When a focus review card finishes `day180` and is ready to sink:
 
-1. create or update the base note under `学习系统/词库/基础词汇`
+1. create or update the base note under `<base_vocab_root>`
 2. copy over `headword`, `reading`, `meaning_zh`, `source_notes`, `first_seen`, `last_seen`, and `seen_count`
+   - also copy `accent_display` when present
 3. set the base note to `status: promoted`
 4. include tag `jp/promoted`
 5. switch the focus card to `status: mastered`

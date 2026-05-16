@@ -1,10 +1,37 @@
+# Default to private: ignore everything unless explicitly allowlisted below.
+*
+
+# Public repository metadata.
+!.gitignore
+!AGENTS.md
+!README.md
+!LICENSE
+
+# Public documentation.
+!docs/
+!docs/**
+
+# Public Codex skills.
+!codex-skills/
+!codex-skills/**
+
+# Public listening tooling.
+!tools/
+!tools/listening-transcribe-official/
+!tools/listening-transcribe-official/**
+
+# Always keep local/editor/cache/media/private material out of Git.
 .DS_Store
+**/.DS_Store
 .obsidian/
 tmp/
-work/
+学习系统/
+笔记/
 __pycache__/
-*.pyc
+**/__pycache__/
 .pytest_cache/
+*.pyc
+*.pyo
 *.mp3
 *.m4a
 *.wav
@@ -17,4 +44,3 @@ __pycache__/
 *.jpeg
 *.png
 *.heic
-

@@ -2,24 +2,31 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+from urllib.parse import parse_qs, urlparse
 from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
 COMMON_SECTION_PLACEHOLDER = (
-    "二阶段待编辑：请基于完整脚本，用大模型或人工判断，挑选 0-5 句真正值得背、可迁移的表达，并同步更新 frontmatter 的 "
-    "`daily_use_sentences`；宁缺勿滥。"
+    "二阶段待编辑：请基于完整脚本，用大模型或人工判断，挑选 0-5 句真正值得背、可迁移的表达；宁缺勿滥。\n\n"
+    "- 原句：\n"
+    "  可替换骨架：\n"
+    "  使用场景：\n"
+    "  选入理由：\n\n"
+    "不要添加中文翻译字段。完成后同步更新 frontmatter 的 `daily_use_sentences`，只放日文原句或核心句。"
 )
-DEFAULT_MATERIAL_NOTE = "这条音频由本地 Apple Speech (`SpeechAnalyzer` + `SpeechTranscriber`) 自动转写生成。建议人工复核题号、教材抬头和少量长句切分，再决定是否继续精修。"
+DEFAULT_MATERIAL_NOTE = "这条音频由 ListenKit 自动生成转写稿。建议人工复核题号、教材抬头、专有名词和少量长句切分，再决定是否继续精修。"
 SHORT_CHOICE_MATERIAL_NOTE = "这条音频按短句应答题模式处理：脚本会优先保留题号与选项结构，必要时自动尝试慢速副本重转。仍建议人工顺耳确认题干与错误选项。"
-FASTER_WHISPER_MATERIAL_NOTE = "这条音频由本地 faster-whisper small (`cpu` + `int8`) 自动转写生成。它通常比 Apple Speech 更适合清晰教材对话，但仍需人工复核同音词、姓名、楼层等上下文词。"
+FASTER_WHISPER_MATERIAL_NOTE = "这条音频由 ListenKit 的 faster-whisper 路线自动转写生成。仍需人工复核同音词、姓名、楼层等上下文词。"
 DEFAULT_FASTER_WHISPER_MODEL = "small"
 DEFAULT_FASTER_WHISPER_COMPUTE_TYPE = "int8"
 DIALOGUE_MATERIAL_NOTE_SUFFIX = "本稿按对话型精听内容整理；仅在文本呈现出明显问答或应答轮替时，保守标注 A：/B：。"
@@ -88,16 +95,178 @@ class ScriptBlock:
     text: str | None = None
 
 
+class OfflineDictionaryError(RuntimeError):
+    pass
+
+
+CIRCLED_ACCENT_MARKS = "⓪①②③④⑤⑥⑦⑧⑨"
+ACCENT_TYPE_TO_MARK = {str(index): mark for index, mark in enumerate(CIRCLED_ACCENT_MARKS)}
+KANJI_CHAR_RE = re.compile(r"[\u3400-\u9fff々〆ヵヶ]")
+
+
+def accent_marks_from_type(value: str) -> str | None:
+    marks = [
+        ACCENT_TYPE_TO_MARK[item]
+        for item in re.findall(r"\d+", value or "")
+        if item in ACCENT_TYPE_TO_MARK
+    ]
+    if not marks:
+        return None
+    return "/".join(dedupe_preserve_order(marks))
+
+
+def term_replacement_pattern(term: str) -> str:
+    prefix = r"(?<![\u3400-\u9fff々〆ヵヶ])" if KANJI_CHAR_RE.match(term[0]) else ""
+    suffix = r"(?![\u3400-\u9fff々〆ヵヶ⓪①②③④⑤⑥⑦⑧⑨])" if KANJI_CHAR_RE.match(term[-1]) else rf"(?![{CIRCLED_ACCENT_MARKS}])"
+    return prefix + re.escape(term) + suffix
+
+
+def is_inflected_content_fragment(feature) -> bool:
+    pos1 = str(getattr(feature, "pos1", "") or "")
+    if pos1 not in {"動詞", "形容詞"}:
+        return False
+    form = str(getattr(feature, "cForm", "") or "")
+    return form not in {"終止形-一般", "連体形-一般"}
+
+
+class StaticAccentDictionary:
+    def __init__(self, entries: dict[str, str] | None = None) -> None:
+        self.entries = entries or {}
+
+    def lookup(self, term: str) -> str | None:
+        return self.entries.get(term)
+
+    def known_terms(self) -> list[str]:
+        return sorted(self.entries, key=lambda item: (-len(item), item))
+
+    def tokenize_terms(self, sentence: str) -> list[str]:
+        return []
+
+
+class OfflineAccentDictionary(StaticAccentDictionary):
+    def __init__(self, cache_dir: Path) -> None:
+        self.cache_dir = cache_dir
+        entries = load_static_accent_entries(cache_dir)
+        super().__init__(entries)
+        self._tagger = None
+        self._tagger_error: Exception | None = None
+        self._lookup_cache: dict[str, str | None] = {}
+
+    def lookup(self, term: str) -> str | None:
+        static_entry = super().lookup(term)
+        if static_entry:
+            return static_entry
+        if term in self._lookup_cache:
+            return self._lookup_cache[term]
+        value = self._lookup_unidic_accent(term)
+        self._lookup_cache[term] = value
+        return value
+
+    def _load_tagger(self):
+        if self._tagger is not None or self._tagger_error is not None:
+            return self._tagger
+        python_dir = self.cache_dir / "python"
+        if python_dir.exists():
+            sys.path.insert(0, str(python_dir))
+        try:
+            import fugashi  # type: ignore
+            import unidic_lite  # type: ignore
+
+            self._tagger = fugashi.Tagger(f"-d {unidic_lite.DICDIR}")
+        except Exception as exc:  # pragma: no cover - depends on optional local packages
+            self._tagger_error = exc
+            self._tagger = None
+        return self._tagger
+
+    def tokenize_terms(self, sentence: str) -> list[str]:
+        tagger = self._load_tagger()
+        if tagger is None:
+            return []
+        terms: list[str] = []
+        for word in tagger(sentence):
+            surface = str(word.surface).strip()
+            if is_focus_term(surface) and not is_inflected_content_fragment(word.feature):
+                terms.append(surface)
+        return dedupe_preserve_order(terms)
+
+    def _lookup_unidic_accent(self, term: str) -> str | None:
+        tagger = self._load_tagger()
+        if tagger is None:
+            return None
+        words = list(tagger(term))
+        if len(words) != 1:
+            return None
+        word = words[0]
+        feature = word.feature
+        known_forms = {
+            str(getattr(word, "surface", "") or ""),
+            str(getattr(feature, "lemma", "") or ""),
+            str(getattr(feature, "orth", "") or ""),
+            str(getattr(feature, "orthBase", "") or ""),
+        }
+        if term not in known_forms:
+            return None
+        if is_inflected_content_fragment(feature):
+            return None
+        marks = accent_marks_from_type(str(getattr(feature, "aType", "") or ""))
+        if not marks:
+            return None
+        reading = (
+            str(getattr(feature, "kana", "") or "")
+            or str(getattr(feature, "kanaBase", "") or "")
+            or str(getattr(feature, "pron", "") or "")
+            or term
+        )
+        return f"{reading}{marks}"
+
+
+def default_dictionary_cache_dir() -> Path:
+    override = os.environ.get("JP_LISTENING_DICT_DIR")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / "Library" / "Caches" / "jp-listening-dicts"
+
+
+def load_static_accent_entries(cache_dir: Path) -> dict[str, str]:
+    path = cache_dir / "accent_map.json"
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise OfflineDictionaryError(f"Offline dictionary accent map must be a JSON object: {path}")
+    return {str(key): str(value) for key, value in payload.items() if str(key).strip() and str(value).strip()}
+
+
+def offline_dictionary_ready(cache_dir: Path) -> bool:
+    return (cache_dir / "accent_map.json").exists() or (cache_dir / "python").exists()
+
+
+def load_offline_dictionary(required: bool = True) -> StaticAccentDictionary:
+    cache_dir = default_dictionary_cache_dir()
+    if not offline_dictionary_ready(cache_dir):
+        if required:
+            raise OfflineDictionaryError(
+                "Offline dictionary is not ready. Run "
+                "`python3 tools/listening-transcribe-official/setup_offline_dictionary.py --install` "
+                f"or set JP_LISTENING_DICT_DIR to a prepared cache. Checked: {cache_dir}"
+            )
+        return StaticAccentDictionary({})
+    return OfflineAccentDictionary(cache_dir)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="transcribe-listening",
-        description="Generate a Japanese listening Markdown note with Apple Speech or faster-whisper.",
+        description="Generate a Japanese listening Markdown note from ListenKit transcript artifacts.",
     )
     parser.add_argument("audio_path", nargs="?")
+    parser.add_argument("--url")
+    parser.add_argument("--output-dir")
     parser.add_argument("--note-path")
     parser.add_argument("--locale", default="ja-JP")
     parser.add_argument("--title")
     parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper"], default="auto")
+    parser.add_argument("--format", choices=["mp3", "m4a", "wav", "flac"], default="m4a")
     parser.add_argument("--faster-whisper-python")
     parser.add_argument("--faster-whisper-model", default=DEFAULT_FASTER_WHISPER_MODEL)
     parser.add_argument("--faster-whisper-compute-type", default=DEFAULT_FASTER_WHISPER_COMPUTE_TYPE)
@@ -113,59 +282,120 @@ def listenkit_root() -> Path:
     return Path(__file__).resolve().parents[3] / "ListenKit"
 
 
-def listenkit_transcribe_script_path() -> Path:
-    return listenkit_root() / "cli" / "transcribe-audio.sh"
+def listenkit_generate_markdown_script_path() -> Path:
+    return listenkit_root() / "cli" / "generate-markdown.sh"
 
 
-def invoke_listenkit(audio_path: Path, locale: str, engine: str, env_overrides: dict[str, str] | None = None) -> dict:
-    script_path = listenkit_transcribe_script_path()
-    env = os.environ.copy()
-    if env_overrides:
-        env.update(env_overrides)
-    result = subprocess.run(
-        [
-            "/bin/bash",
-            str(script_path),
-            "--audio-path",
-            str(audio_path),
-            "--locale",
-            locale,
-            "--engine",
-            engine,
-        ],
-        check=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-    )
-    stdout = result.stdout.strip()
-    if result.returncode != 0 or not stdout:
-        stderr = result.stderr.strip() or stdout or f"ListenKit {engine} backend returned no output."
-        raise RuntimeError(stderr)
+def slugify_stem(value: str) -> str:
+    cleaned = re.sub(r'[\\/:*?"<>|]', "", value).strip()
+    cleaned = re.sub(r"\s+", "_", cleaned)
+    cleaned = re.sub(r"_+", "_", cleaned)
+    return cleaned.strip("._") or "listenkit_source"
 
-    payload = json.loads(stdout)
+
+def infer_stem_from_url(url: str, forced_title: str | None = None) -> str:
+    if forced_title:
+        return slugify_stem(forced_title)
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    if parsed.netloc.endswith("youtu.be") and parsed.path.strip("/"):
+        base = parsed.path.strip("/").split("/")[0]
+    elif "youtube" in parsed.netloc and query.get("v"):
+        base = f"youtube_{query['v'][0]}"
+    else:
+        path_name = Path(parsed.path).stem if parsed.path else ""
+        base = path_name or parsed.netloc or "listenkit_source"
+    digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:8]
+    return slugify_stem(f"{base}_{digest}")
+
+
+def language_label_for_locale(locale: str) -> str:
+    normalized = locale.lower()
+    if normalized.startswith("ja"):
+        return "Japanese"
+    if normalized.startswith("en"):
+        return "English"
+    if normalized.startswith("zh"):
+        return "Chinese"
+    if normalized.startswith("ko"):
+        return "Korean"
+    return locale
+
+
+def load_listenkit_json(path: Path) -> dict:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"ListenKit transcript JSON is invalid: {path}: {exc}") from exc
     if payload.get("error"):
         error = payload["error"]
-        raise RuntimeError(f'{error.get("type", "error")}: {error.get("message", f"ListenKit {engine} backend failed.")}')
+        if isinstance(error, dict):
+            raise RuntimeError(f'{error.get("type", "error")}: {error.get("message", "ListenKit transcription failed.")}')
+        raise RuntimeError(str(error))
     return payload
 
 
-def invoke_helper(audio_path: Path, locale: str) -> dict:
-    return invoke_listenkit(audio_path, locale, "apple")
-
-
-def invoke_faster_whisper(
-    audio_path: Path,
+def invoke_listenkit(
+    source: Path | str,
     locale: str,
-    python_path: str | None = None,
-    model_name: str = DEFAULT_FASTER_WHISPER_MODEL,
-    compute_type: str = DEFAULT_FASTER_WHISPER_COMPUTE_TYPE,
+    engine: str = "auto",
+    env_overrides: dict[str, str] | None = None,
+    source_kind: str = "input",
+    output_stem: str | None = None,
+    output_dir: Path | None = None,
+    audio_format: str = "m4a",
 ) -> dict:
-    env_overrides = {}
-    if python_path:
-        env_overrides["FASTER_WHISPER_PYTHON"] = str(Path(python_path).expanduser())
-    return invoke_listenkit(audio_path, locale, "faster-whisper", env_overrides)
+    script_path = listenkit_generate_markdown_script_path()
+    env = os.environ.copy()
+    if env_overrides:
+        env.update(env_overrides)
+    with tempfile.TemporaryDirectory(prefix="listenkit-transcript-") as tmpdir:
+        if output_stem is None:
+            output_stem = source.stem if isinstance(source, Path) else infer_stem_from_url(source)
+        output_path = Path(tmpdir) / f"{output_stem}.md"
+        command = [
+            "/bin/bash",
+            str(script_path),
+            f"--{source_kind}",
+            str(source),
+            "--language",
+            language_label_for_locale(locale),
+            "--locale",
+            locale,
+            "--output",
+            str(output_path),
+            "--format",
+            audio_format,
+        ]
+        if engine != "auto":
+            command.extend(["--engine", engine])
+        if engine != "apple":
+            command.append("--auto-init")
+        result = subprocess.run(
+            command,
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip() or result.stdout.strip() or "ListenKit transcript generation failed."
+            raise RuntimeError(stderr)
+        transcript_json = output_path.with_suffix(".json")
+        if not transcript_json.exists():
+            raise RuntimeError(f"ListenKit did not create expected transcript JSON: {transcript_json}")
+        payload = load_listenkit_json(transcript_json)
+        if output_dir is not None:
+            imported_audio = output_path.parent / "audio" / f"{output_path.stem}.{audio_format}"
+            if not imported_audio.exists():
+                raise RuntimeError(f"ListenKit did not create expected audio file: {imported_audio}")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            final_audio = output_dir / imported_audio.name
+            if imported_audio.resolve() != final_audio.resolve():
+                shutil.move(str(imported_audio), final_audio)
+            payload["_listenkit_final_audio_path"] = str(final_audio)
+        return payload
 
 
 def run_ffmpeg(args: list[str]) -> None:
@@ -624,31 +854,31 @@ def build_candidate(
     audio_path: Path,
     locale: str,
     route_label: str,
-    engine: str = "apple",
+    engine: str = "auto",
     faster_whisper_python: str | None = None,
     faster_whisper_model: str = DEFAULT_FASTER_WHISPER_MODEL,
     faster_whisper_compute_type: str = DEFAULT_FASTER_WHISPER_COMPUTE_TYPE,
 ) -> TranscriptionCandidate:
-    if engine == "faster-whisper":
-        payload = invoke_faster_whisper(
-            audio_path,
-            locale,
-            faster_whisper_python,
-            faster_whisper_model,
-            faster_whisper_compute_type,
-        )
-        if is_shadowing_path(audio_path):
-            payload = normalize_payload_for_shadowing(payload)
-        segments = raw_segments_to_chunks(payload.get("segments", []))
-        if is_shadowing_path(audio_path):
-            sentences = chunks_to_shadowing_lines(segments)
-            full_text = "\n".join(sentences)
-        else:
-            full_text = clean_transcript_text(str(payload.get("full_text", "")))
-            sentences = chunks_to_sentences(segments)
-    else:
-        payload = invoke_helper(audio_path, locale)
+    env_overrides = {}
+    if faster_whisper_python:
+        env_overrides["FASTER_WHISPER_PYTHON"] = str(Path(faster_whisper_python).expanduser())
+    payload = invoke_listenkit(audio_path, locale, engine, env_overrides or None)
+    return candidate_from_payload(audio_path, payload, route_label)
+
+
+def candidate_from_payload(audio_path: Path, payload: dict, route_label: str) -> TranscriptionCandidate:
+    if is_shadowing_path(audio_path):
+        payload = normalize_payload_for_shadowing(payload)
+
+    if str(payload.get("engine", "")) == "apple" and not is_shadowing_path(audio_path):
         segments = merge_chunks(payload.get("segments", []))
+    else:
+        segments = raw_segments_to_chunks(payload.get("segments", []))
+
+    if is_shadowing_path(audio_path):
+        sentences = chunks_to_shadowing_lines(segments)
+        full_text = "\n".join(sentences)
+    else:
         full_text = clean_transcript_text(str(payload.get("full_text", "")))
         sentences = chunks_to_sentences(segments)
     if not sentences and full_text:
@@ -690,33 +920,33 @@ def transcribe_with_heuristics(
     faster_whisper_model: str = DEFAULT_FASTER_WHISPER_MODEL,
     faster_whisper_compute_type: str = DEFAULT_FASTER_WHISPER_COMPUTE_TYPE,
 ) -> tuple[TranscriptionCandidate, str]:
-    selected_engine = "faster-whisper" if engine == "auto" and is_shadowing_path(audio_path) else engine
-    if selected_engine == "faster-whisper":
-        try:
-            candidate = build_candidate(
-                audio_path,
-                locale,
-                "faster-whisper",
-                "faster-whisper",
-                faster_whisper_python,
-                faster_whisper_model,
-                faster_whisper_compute_type,
-            )
-        except RuntimeError as exc:
-            raise RuntimeError(
-                "faster-whisper small route failed. Install faster-whisper in a venv and set FASTER_WHISPER_PYTHON, "
-                "or rerun with --engine apple to force the Apple Speech route. "
-                f"Original error: {exc}"
-            ) from exc
-        return candidate, "faster-whisper"
+    try:
+        base_candidate = build_candidate(
+            audio_path,
+            locale,
+            "base",
+            engine,
+            faster_whisper_python,
+            faster_whisper_model,
+            faster_whisper_compute_type,
+        )
+    except RuntimeError as exc:
+        raise RuntimeError(f"ListenKit transcript generation failed. Original error: {exc}") from exc
 
-    base_candidate = build_candidate(audio_path, locale, "base", "apple")
     if not is_short_choice_mode(audio_path):
-        return base_candidate, "base"
+        return base_candidate, str(base_candidate.payload.get("engine", "base"))
 
     slow_path = build_slow_copy(audio_path)
     try:
-        slow_candidate = build_candidate(slow_path, locale, "slow", "apple")
+        slow_candidate = build_candidate(
+            slow_path,
+            locale,
+            "slow",
+            engine,
+            faster_whisper_python,
+            faster_whisper_model,
+            faster_whisper_compute_type,
+        )
     finally:
         try:
             slow_path.unlink(missing_ok=True)
@@ -725,7 +955,7 @@ def transcribe_with_heuristics(
 
     if slow_candidate.score > base_candidate.score:
         return slow_candidate, "slow"
-    return base_candidate, "base"
+    return base_candidate, str(base_candidate.payload.get("engine", "base"))
 
 
 def infer_title(audio_stem: str, forced_title: str | None, sentences: list[str]) -> str:
@@ -888,6 +1118,253 @@ def group_paragraphs(sentences: list[str], limit: int = 70) -> list[str]:
     return ["".join(items) for items in paragraphs]
 
 
+def dedupe_preserve_order(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        item = value.strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def is_focus_term(term: str) -> bool:
+    cleaned = term.strip("。、！？?「」『』（）()")
+    if len(cleaned) < 2:
+        return False
+    if re.fullmatch(r"[ぁ-ん]+", cleaned) and cleaned not in {"少し", "かなり", "ちょうど", "いっぱい"}:
+        return False
+    if cleaned in {"です", "ます", "でした", "ました", "ください", "あります", "います", "する", "した"}:
+        return False
+    return bool(re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", cleaned))
+
+
+def strip_term_inflection(term: str) -> str:
+    cleaned = term.strip("。、！？?「」『』（）()")
+    for suffix in ["します", "しました", "している", "しています", "する", "した", "しますね"]:
+        if cleaned.endswith(suffix) and len(cleaned) > len(suffix) + 1:
+            cleaned = cleaned[: -len(suffix)]
+            break
+    if cleaned.startswith("少し") and len(cleaned) > 2:
+        return "少し"
+    return cleaned
+
+
+def rough_extract_focus_terms(sentence: str) -> list[str]:
+    parts = re.split(r"(?:を|が|は|に|で|へ|と|も|から|まで|より|や|、|。|！|？|\?)", sentence)
+    terms: list[str] = []
+    for part in parts:
+        cleaned = strip_term_inflection(part)
+        if is_focus_term(cleaned):
+            terms.append(cleaned)
+    return dedupe_preserve_order(terms)
+
+
+def select_focus_terms(
+    sentence: str,
+    confirmed_accent_index: dict[str, str],
+    offline_dictionary: StaticAccentDictionary,
+    limit: int = 5,
+) -> list[str]:
+    candidates: list[str] = []
+    for term in sorted(confirmed_accent_index, key=lambda item: (-len(item), item)):
+        if term and term in sentence:
+            candidates.append(term)
+    for term in offline_dictionary.known_terms():
+        if term in sentence:
+            candidates.append(term)
+    candidates.extend(offline_dictionary.tokenize_terms(sentence))
+    candidates.extend(rough_extract_focus_terms(sentence))
+    return [term for term in dedupe_preserve_order(candidates) if is_focus_term(term)][:limit]
+
+
+def render_follow_along_split(sentence: str) -> str:
+    normalized = sentence.strip()
+    match = re.match(r"^(.+?[をがはにでへと])(.+)$", normalized)
+    if match and len(match.group(2)) >= 2:
+        return f"{match.group(1)} / {match.group(2)}"
+    if "、" in normalized:
+        return normalized.replace("、", "、 / ", 1)
+    return normalized
+
+
+def render_accent_lines(
+    terms: list[str],
+    confirmed_accent_index: dict[str, str],
+    offline_dictionary: StaticAccentDictionary,
+) -> list[str]:
+    if not terms:
+        return ["- 重点词なし"]
+    lines: list[str] = []
+    for term in terms:
+        confirmed = confirmed_accent_index.get(term)
+        if confirmed:
+            lines.append(f"- {term}：{confirmed}（已确认）")
+            continue
+        candidate = offline_dictionary.lookup(term)
+        if candidate:
+            lines.append(f"- {term}：{candidate}（本地候选）")
+            continue
+        lines.append(f"- {term}：待确认")
+    return lines
+
+
+ACCENT_MARK_RE = re.compile(rf"[{CIRCLED_ACCENT_MARKS}]")
+
+
+def accent_mark_from_display(value: str) -> str | None:
+    match = ACCENT_MARK_RE.search(value)
+    if match:
+        return match.group(0)
+    return None
+
+
+def resolve_accent_note(
+    term: str,
+    confirmed_accent_index: dict[str, str],
+    offline_dictionary: StaticAccentDictionary,
+) -> tuple[str | None, str]:
+    confirmed = confirmed_accent_index.get(term)
+    if confirmed:
+        mark = accent_mark_from_display(confirmed)
+        if mark:
+            return mark, f"{term}{mark}（已确认）"
+        return None, f"{term}：{confirmed}（已确认）"
+
+    candidate = offline_dictionary.lookup(term)
+    if candidate:
+        mark = accent_mark_from_display(candidate)
+        if mark:
+            return mark, f"{term}{mark}（本地候选）"
+        return None, f"{term}：{candidate}（本地候选）"
+
+    return None, f"{term}：待确认"
+
+
+def inline_accent_marks(
+    sentence: str,
+    terms: list[str],
+    confirmed_accent_index: dict[str, str],
+    offline_dictionary: StaticAccentDictionary,
+) -> tuple[str, list[str]]:
+    rendered = sentence
+    notes: list[str] = []
+    replacements: list[tuple[str, str]] = []
+    for term in terms:
+        mark, note = resolve_accent_note(term, confirmed_accent_index, offline_dictionary)
+        notes.append(note)
+        if mark:
+            replacements.append((term, f"{term}{mark}"))
+
+    replacement_terms = [term for term, _ in replacements]
+    replacements = [
+        (term, replacement)
+        for term, replacement in replacements
+        if not any(term != other and term in other for other in replacement_terms)
+    ]
+    for term, replacement in sorted(replacements, key=lambda item: (-len(item[0]), item[0])):
+        rendered = re.sub(term_replacement_pattern(term), replacement, rendered)
+    return rendered, notes
+
+
+def render_audio_slice_line(audio_slice_ref: str | None) -> str:
+    if audio_slice_ref:
+        return f"![[{audio_slice_ref}]]"
+    return "（语音切片待生成）"
+
+
+def build_learning_package(
+    sentences: list[str],
+    confirmed_accent_index: dict[str, str],
+    offline_dictionary: StaticAccentDictionary,
+    audio_slice_refs: list[str | None] | None = None,
+) -> str:
+    blocks: list[str] = []
+    for idx, sentence in enumerate(sentences, start=1):
+        terms = select_focus_terms(sentence, confirmed_accent_index, offline_dictionary)
+        accented_sentence, _accent_notes = inline_accent_marks(
+            sentence,
+            terms,
+            confirmed_accent_index,
+            offline_dictionary,
+        )
+        audio_slice_ref = audio_slice_refs[idx - 1] if audio_slice_refs and idx - 1 < len(audio_slice_refs) else None
+        blocks.append(
+            "\n".join(
+                [
+                    f"### S{idx:02d}",
+                    "",
+                    accented_sentence,
+                    "",
+                    render_audio_slice_line(audio_slice_ref),
+                ]
+            )
+        )
+    return "\n\n".join(blocks) if blocks else "当前未能生成逐句学习包，请先确认脚本内容。"
+
+
+def reliable_sentence_chunks(sentences: list[str], chunks: list[Chunk]) -> list[Chunk] | None:
+    if len(sentences) != len(chunks):
+        return None
+    for sentence, chunk in zip(sentences, chunks):
+        if chunk.start is None or chunk.end is None or chunk.end <= chunk.start:
+            return None
+        if clean_transcript_text(sentence) != clean_transcript_text(chunk.text):
+            return None
+    return chunks
+
+
+def slice_attach_dir(audio_path: Path) -> Path:
+    if audio_path.parent.name == "attach":
+        return audio_path.parent
+    return audio_path.parent / "attach"
+
+
+def export_sentence_audio_slices(
+    audio_path: Path,
+    sentence_chunks: list[Chunk],
+    attach_dir: Path,
+    audio_stem: str,
+) -> list[str | None]:
+    if not audio_path.exists() or audio_path.stat().st_size <= 0:
+        return [None for _ in sentence_chunks]
+    attach_dir.mkdir(parents=True, exist_ok=True)
+    refs: list[str | None] = []
+    for idx, chunk in enumerate(sentence_chunks, start=1):
+        if chunk.start is None or chunk.end is None or chunk.end <= chunk.start:
+            refs.append(None)
+            continue
+        filename = f"{audio_stem}_S{idx:02d}.m4a"
+        output_path = attach_dir / filename
+        try:
+            run_ffmpeg(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-ss",
+                    str(chunk.start),
+                    "-to",
+                    str(chunk.end),
+                    "-i",
+                    str(audio_path),
+                    "-vn",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "128k",
+                    str(output_path),
+                ]
+            )
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            refs.append(None)
+            continue
+        refs.append(filename)
+    return refs
+
+
 def format_timestamp(value: float | None) -> str:
     if value is None:
         return "??:??.??"
@@ -912,6 +1389,51 @@ def parse_sections(body: str) -> list[tuple[str, str]]:
     if current_heading is not None:
         sections.append((current_heading, "\n".join(current_lines).strip()))
     return sections
+
+
+def find_vault_root_from_path(path: Path) -> Path:
+    current = path.resolve().parent
+    while current != current.parent:
+        if (current / "学习系统").exists() and (current / "codex-skills").exists():
+            return current
+        current = current.parent
+    return path.resolve().parent
+
+
+def frontmatter_value(lines: list[str], key: str) -> str:
+    prefix = f"{key}:"
+    for line in lines:
+        if line.startswith(prefix):
+            return line.removeprefix(prefix).strip().strip('"')
+    return ""
+
+
+def load_confirmed_accent_index(vault_root: Path) -> dict[str, str]:
+    roots = [
+        vault_root / "学习系统" / "课堂复习" / "词汇",
+        vault_root / "学习系统" / "词库" / "基础词汇",
+        vault_root / "学习系统" / "发音",
+    ]
+    index: dict[str, str] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*.md"):
+            try:
+                frontmatter, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, UnicodeDecodeError):
+                continue
+            accent = frontmatter_value(frontmatter, "accent_display")
+            if not accent:
+                continue
+            for key in [
+                frontmatter_value(frontmatter, "headword"),
+                frontmatter_value(frontmatter, "reading"),
+                path.stem,
+            ]:
+                if key and key not in index:
+                    index[key] = accent
+    return index
 
 
 def choose_material_section(preserved_sections: dict[str, str], material_note: str) -> str:
@@ -941,10 +1463,13 @@ def build_body(
     material_note: str = DEFAULT_MATERIAL_NOTE,
     short_choice_mode: bool = False,
     structured_dialogue_mode: bool = False,
+    confirmed_accent_index: dict[str, str] | None = None,
+    offline_dictionary: StaticAccentDictionary | None = None,
+    audio_slice_refs: list[str | None] | None = None,
 ) -> tuple[str, bool]:
     script_section, dialogue_content_mode = render_dialogue_script_section(sentences, chunks, structured_dialogue_mode)
     existing_sections = parse_sections(existing_body or "")
-    known_headings = {"脚本", "可直接背的常用句", "素材说明"}
+    known_headings = {"精听学习包", "脚本", "可直接背的常用句", "素材说明"}
     preserved_sections = {heading: content for heading, content in existing_sections}
     if short_choice_mode:
         script_section = choose_short_choice_script(
@@ -960,11 +1485,21 @@ def build_body(
     material_section = (
         choose_material_section(preserved_sections, decorate_material_note(material_note, dialogue_content_mode))
     )
+    learning_package = build_learning_package(
+        sentences,
+        confirmed_accent_index or {},
+        offline_dictionary or StaticAccentDictionary({}),
+        audio_slice_refs,
+    )
 
     lines = [
         f"# {title}",
         "",
         f"![[{audio_name}]]",
+        "",
+        "## 精听学习包",
+        "",
+        learning_package,
         "",
         "## 脚本",
         "",
@@ -1003,15 +1538,21 @@ def process_one(
     faster_whisper_python: str | None = None,
     faster_whisper_model: str = DEFAULT_FASTER_WHISPER_MODEL,
     faster_whisper_compute_type: str = DEFAULT_FASTER_WHISPER_COMPUTE_TYPE,
+    candidate_route: tuple[TranscriptionCandidate, str] | None = None,
+    source_url: str | None = None,
+    offline_dictionary: StaticAccentDictionary | None = None,
 ) -> str:
-    candidate, route_label = transcribe_with_heuristics(
-        audio_path,
-        locale,
-        engine,
-        faster_whisper_python,
-        faster_whisper_model,
-        faster_whisper_compute_type,
-    )
+    if candidate_route is None:
+        candidate, route_label = transcribe_with_heuristics(
+            audio_path,
+            locale,
+            engine,
+            faster_whisper_python,
+            faster_whisper_model,
+            faster_whisper_compute_type,
+        )
+    else:
+        candidate, route_label = candidate_route
     sentences = candidate.sentences
     short_choice_mode = is_short_choice_mode(audio_path)
     structured_dialogue_mode = is_shadowing_path(audio_path)
@@ -1047,6 +1588,8 @@ def process_one(
         material_note = SHORT_CHOICE_MATERIAL_NOTE if short_choice_mode else DEFAULT_MATERIAL_NOTE
     if short_choice_mode and route_label == "slow":
         material_note += " 本次已自动采用慢速副本作为较优转写结果。"
+    if source_url:
+        material_note += f"\n\n来源 URL：<{source_url}>"
 
     existing_body: str | None
     if read_note_path is not None and read_note_path.exists():
@@ -1061,6 +1604,15 @@ def process_one(
         write_note_path.parent.mkdir(parents=True, exist_ok=True)
         frontmatter_lines = []
         existing_body = None
+    sentence_chunks = reliable_sentence_chunks(sentences, candidate.segments)
+    audio_slice_refs = None
+    if sentence_chunks is not None and not dry_run:
+        audio_slice_refs = export_sentence_audio_slices(
+            audio_path,
+            sentence_chunks,
+            slice_attach_dir(audio_path),
+            audio_path.stem,
+        )
     body, dialogue_content_mode = build_body(
         title,
         audio_path.name,
@@ -1071,6 +1623,9 @@ def process_one(
         material_note,
         short_choice_mode,
         structured_dialogue_mode,
+        load_confirmed_accent_index(find_vault_root_from_path(audio_path)),
+        offline_dictionary or load_offline_dictionary(required=False),
+        audio_slice_refs,
     )
     if not frontmatter_lines:
         frontmatter_lines = build_default_frontmatter(audio_path, len(sentences), short_choice_mode, dialogue_content_mode)
@@ -1080,6 +1635,55 @@ def process_one(
     write_note_path.write_text(rendered, encoding="utf-8")
     verb = "Updated" if existed else "Created"
     return f"{verb} {write_note_path}"
+
+
+def process_url(
+    url: str,
+    output_dir: Path,
+    note_override: str | None,
+    locale: str,
+    forced_title: str | None,
+    dry_run: bool,
+    engine: str = "auto",
+    faster_whisper_python: str | None = None,
+    audio_format: str = "m4a",
+    offline_dictionary: StaticAccentDictionary | None = None,
+) -> str:
+    output_stem = infer_stem_from_url(url)
+    env_overrides = {}
+    if faster_whisper_python:
+        env_overrides["FASTER_WHISPER_PYTHON"] = str(Path(faster_whisper_python).expanduser())
+    payload = invoke_listenkit(
+        url,
+        locale,
+        engine,
+        env_overrides or None,
+        source_kind="url",
+        output_stem=output_stem,
+        output_dir=output_dir,
+        audio_format=audio_format,
+    )
+    final_audio_value = payload.get("_listenkit_final_audio_path")
+    if not final_audio_value:
+        raise RuntimeError("ListenKit URL workflow did not return a finalized audio path.")
+    final_audio_path = Path(str(final_audio_value))
+    route_label = str(payload.get("engine", "base"))
+    candidate = candidate_from_payload(final_audio_path, payload, route_label)
+    result = process_one(
+        final_audio_path,
+        note_override,
+        locale,
+        forced_title,
+        dry_run,
+        engine,
+        faster_whisper_python,
+        candidate_route=(candidate, route_label),
+        source_url=url,
+        offline_dictionary=offline_dictionary,
+    )
+    if dry_run:
+        return f"Source URL: {url}\nFinal audio: {final_audio_path}\n{result}"
+    return f"Source URL: {url}\nFinal audio: {final_audio_path}\n{result}"
 
 
 def scan_audio_files(directory: Path) -> list[Path]:
@@ -1092,16 +1696,43 @@ def scan_audio_files(directory: Path) -> list[Path]:
 
 def main() -> int:
     args = parse_args()
-    if not args.audio_path and not args.scan_dir:
-        print("Provide either <audio_path> or --scan-dir.", file=sys.stderr)
+    source_count = sum(1 for value in [args.audio_path, args.url, args.scan_dir] if value)
+    if source_count == 0:
+        print("Provide one of <audio_path>, --url, or --scan-dir.", file=sys.stderr)
         return 1
-    if args.audio_path and args.scan_dir:
-        print("Use either a single audio path or --scan-dir, not both.", file=sys.stderr)
+    if source_count > 1:
+        print("Use only one of <audio_path>, --url, or --scan-dir.", file=sys.stderr)
         return 1
 
     if args.scan_dir:
-        print("Batch scan mode is not supported in the current Apple Speech helper route.", file=sys.stderr)
+        print("Batch scan mode is not supported in the current single-item workflow.", file=sys.stderr)
         return 1
+
+    if args.url and not args.output_dir:
+        print("--output-dir is required when using --url.", file=sys.stderr)
+        return 1
+
+    try:
+        offline_dictionary = load_offline_dictionary(required=True)
+    except OfflineDictionaryError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    if args.url:
+        result = process_url(
+            args.url,
+            Path(args.output_dir),
+            args.note_path,
+            args.locale,
+            args.title,
+            args.dry_run,
+            args.engine,
+            args.faster_whisper_python,
+            args.format,
+            offline_dictionary,
+        )
+        print(result)
+        return 0
 
     if args.audio_path:
         result = process_one(
@@ -1114,6 +1745,7 @@ def main() -> int:
             args.faster_whisper_python,
             args.faster_whisper_model,
             args.faster_whisper_compute_type,
+            offline_dictionary=offline_dictionary,
         )
         print(result)
         return 0

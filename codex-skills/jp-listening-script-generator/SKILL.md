@@ -1,11 +1,13 @@
 ---
 name: jp-listening-script-generator
-description: Generate Japanese listening practice notes in this Obsidian vault by transcribing one audio file at a time through the sibling ListenKit CLI and rendering the existing 精听稿 Markdown format.
+description: Use when turning one local audio file or media URL into this vault's fixed Japanese 精听稿 listening-practice note format. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
 ---
 
 # JP Listening Script Generator
 
-Use this skill when the task is to turn one listening audio file in this vault into the existing 精听稿 Markdown note format. Generic ASR is delegated to the sibling `../ListenKit` CLI; this skill keeps only the Obsidian Japanese-learning workflow and note rendering rules.
+Use this skill when the task is to turn one local listening audio file or media URL into the existing 精听稿 Markdown note format. Generic ASR and media acquisition are delegated to the sibling `../ListenKit` CLI; this skill keeps only the Obsidian Japanese-learning workflow and note rendering rules.
+
+Do not use this skill for flexible source notes or general study notes from transcripts, audio, or video; use `jp-source-note-generator` for those. Do not use it for review card creation or maintenance; use `jp-review-material-maintainer`.
 
 ## Maintenance Source Of Truth
 
@@ -26,10 +28,13 @@ zsh codex-skills/jp-listening-script-generator/scripts/sync-to-global.sh
 
 Prefer single-item processing first. The main path is:
 
-1. identify one audio file under `学习系统/听力` or any of its child folders
+1. identify one local audio file under `学习系统/听力`, or one URL plus a target output directory under `学习系统/听力`
 2. locate the matching note, or create a new note when none exists yet
 3. run the transcription pipeline
 4. render the Markdown draft note
+   - the CLI requires a prepared offline dictionary cache for `## 精听学习包`; if it is missing, run the setup script described below
+   - the note includes `## 精听学习包` before the plain `## 脚本`
+   - each learning block uses only `### SNN`, the accent-marked sentence, and the sentence audio embed
 5. unless the user explicitly asked for `--dry-run`, immediately enter a second editing phase:
    - read the generated `## 脚本`
    - use model judgment to choose `0-5` truly reusable sentences
@@ -54,22 +59,22 @@ For short-choice listening materials such as `実力アップ/29番-32番.mp3`, 
 
 When there is any uncertainty about title quality or recognition stability, use `--dry-run` first.
 
-## Model Route
+## ListenKit Route
 
-The generator delegates transcription to `../ListenKit/cli/transcribe-audio.sh` and then applies vault-specific rendering. Set `LISTENKIT_ROOT` only when the sibling repo is not at `../ListenKit`.
+The generator delegates transcript acquisition to ListenKit's Markdown workflow and then applies vault-specific 精听稿 rendering. Set `LISTENKIT_ROOT` only when the sibling repo is not at `../ListenKit`.
 
-- `--engine auto` is the default
-- ordinary materials use ListenKit's bundled Apple Speech helper
-- `Shadowing_*` path materials currently default to ListenKit's `faster-whisper small` on CPU with `int8` compute because Apple Speech tends to overfit short textbook prompts and misrecognize simple dialogue
-- `--engine apple` forces the ListenKit Apple Speech route
-- `--engine faster-whisper` forces the ListenKit faster-whisper route
+- `--engine auto` is the default and lets ListenKit choose its default engine
+- `--engine apple` explicitly requests ListenKit's Apple Speech route
+- `--engine faster-whisper` explicitly requests ListenKit's faster-whisper route
+- URL input writes the finalized audio into the chosen output directory and generates the 精听稿 next to that audio
 
-For faster-whisper, use a Python environment with `faster-whisper` installed and set it explicitly when needed:
+The vault wrapper passes ListenKit's `--auto-init` flag for the default/faster-whisper route. On first use, ListenKit may create `../ListenKit/.venv` and install faster-whisper; do not create `.venv` manually from the vault parent directory.
 
 ```bash
-FASTER_WHISPER_PYTHON=/tmp/faster-whisper-small-test/bin/python \
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/Shadowing_初中級/Unit1/04.mp3" --engine faster-whisper --locale ja-JP --dry-run
 ```
+
+Set `FASTER_WHISPER_PYTHON=/path/to/python` only when intentionally overriding ListenKit's repo-local environment.
 
 The current local test setup uses:
 
@@ -80,10 +85,41 @@ The current local test setup uses:
 
 ## CLI Entry Point
 
-The skill does not implement generic ASR itself. Always call the local Markdown generator through the wrapper; that generator calls ListenKit for transcription:
+The skill does not implement generic ASR itself. Always call the local Markdown generator through the wrapper; that generator consumes ListenKit's generated transcript artifacts:
 
 ```bash
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/manabo_cz16.mp3"
+```
+
+## Offline Dictionary Setup
+
+The 精听学习包 uses a local dictionary cache for word selection, reading, and accent candidates. The default cache is outside the vault:
+
+- default: `~/Library/Caches/jp-listening-dicts`
+- override: `JP_LISTENING_DICT_DIR=/path/to/cache`
+
+Check the cache before first use:
+
+```bash
+python3 tools/listening-transcribe-official/setup_offline_dictionary.py --check
+```
+
+The check output should include both sample tokens and sample accent candidates such as `公園⓪`; tokenization alone is not enough to prove accent lookup is wired into the generator.
+
+Install the offline dictionary packages when the check says the cache is not ready:
+
+```bash
+python3 tools/listening-transcribe-official/setup_offline_dictionary.py --install
+```
+
+The installer writes Python packages such as `fugashi` and `unidic-lite` under the cache directory, not inside the Obsidian vault or the skill folder. The generator must fail clearly when the cache is missing; do not silently generate guessed accent data.
+
+For URL input, choose the target listening directory explicitly:
+
+```bash
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh \
+  --url "https://example.com/video" \
+  --output-dir "学习系统/听力/来源名"
 ```
 
 Useful variants:
@@ -92,21 +128,22 @@ Useful variants:
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/manabo_cz16.mp3"
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/N2/202212/example.mp3" --locale ja-JP
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/Shadowing_初中級/Unit1/04.mp3" --engine auto --locale ja-JP
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh --url "https://example.com/video" --output-dir "学习系统/听力/自学素材" --title "素材标题"
 ```
 
-The Apple Speech helper and generic ASR routing live in ListenKit. Do not reintroduce vault-local Apple Speech or faster-whisper helpers; update `../ListenKit` instead.
+The generic transcript workflow lives in ListenKit. Vault code only converts the generated transcript artifacts into the local 精听稿 format.
 
 ## Sandbox And Approval
 
-The Apple Speech route launches ListenKit's local macOS helper app through `/usr/bin/open`. In Codex, that should be treated as a GUI launch, not as a normal sandbox-safe shell command.
+The explicit Apple Speech route may launch a macOS permission flow through ListenKit. In Codex, that should be treated as a GUI launch, not as a normal sandbox-safe shell command.
 
-- when using Apple Speech, do not probe this route in the sandbox first
+- when explicitly using Apple Speech, do not probe this route in the sandbox first
 - request escalated execution on the first Apple Speech invocation of `zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh ...`
 - when the approval UI appears, prefer saving a persistent prefix approval for `["zsh", "codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh"]`
 
 That combination avoids the usual retry pattern of “sandbox run fails first, then ask for approval”.
 
-The faster-whisper route is a normal ListenKit CLI subprocess. It does not launch a GUI helper, but it needs the model files to be present locally or downloadable by the configured Python environment.
+The default/faster-whisper route is a normal ListenKit CLI subprocess. It does not launch a GUI permission flow, but first use can install Python packages into `../ListenKit/.venv` and later download model files through faster-whisper/Hugging Face caches.
 
 ## Output Contract
 
@@ -116,12 +153,30 @@ The generated note should follow the existing `manabo_cz15_私の町.md` shape:
 - set `transcript_status: full`
 - set `transcript_ref: in-note`
 - keep the audio embed
+- render `## 精听学习包`
 - render `## 脚本`
 - render `## 可直接背的常用句`
 - render `## 素材说明`
 - prefer a topic-bearing filename such as `manabo_cz18_土用の丑の日とうなぎ.md`, not a generic `识别稿`
 - do not rely on rule-based extraction for `可直接背的常用句`; use model judgment after the script is generated
+- in `## 精听学习包`, render each sentence as a minimal block: `### SNN`, blank line, the sentence, blank line, then the sentence audio embed
+- inline known accent marks directly after the word, such as `相撲取り⓪`; do not inline or list `待确认` items in the learning package
+- embed the sentence audio clip as `![[audio_stem_SNN.m4a]]`; when there is no reliable timestamp, write only `（语音切片待生成）`
+- do not show `已确认`, `本地候选`, or `待确认` source labels inside the learning package; use those labels only for internal selection and separate accent-review work
+- for accent data, prefer the vault's existing confirmed `accent_display`; otherwise use offline dictionary candidates and label them `本地候选`; unknown items must be `待确认`
+- export sentence clips only when reliable start/end timestamps are available; do not fabricate clips from uncertain alignment
+- do not write `本地候选` accent values back into vocabulary cards as confirmed data
 - for `可直接背的常用句`, prefer quality over quantity: 0-5 items is acceptable, and long sentences are allowed when the pattern is worth memorizing
+- render each selected common sentence in this structured format, without a Chinese translation field:
+
+```md
+- 原句：
+  可替换骨架：
+  使用场景：
+  选入理由：
+```
+
+- fixed question/answer exchanges may be merged into one `原句`, such as `日本は初めてですか？いいえ、3回目です。`
 - overly generic patterns such as `〜は〜です` should usually be rejected
 - if nothing is genuinely worth memorizing, leaving the section empty is better than forcing filler content
 
@@ -131,7 +186,7 @@ For dialogue-type listening content, apply a dialogue template layer on top of t
 - when the transcript clearly shows short question/answer or response turn-taking, render `## 脚本` with speaker labels such as `A：` and `B：`
 - use a conservative rule: only add `A：/B：` when the alternation is clearly visible from the text
 - if the transcript is ambiguous, monologic, list-like, or otherwise unstable, fall back to normal non-speaker formatting
-- do not invent `C：` or multi-speaker labels because the current ListenKit transcript payload has no speaker metadata
+- do not invent `C：` or multi-speaker labels unless the ListenKit transcript artifact provides reliable speaker metadata
 - in dialogue-type notes, prefer `可直接背的常用句` selections that are reusable question templates, response templates, and social or situational exchanges
 
 ## Second-Phase Editing Rules
@@ -139,12 +194,31 @@ For dialogue-type listening content, apply a dialogue template layer on top of t
 After the draft note exists, the skill should treat common-sentence curation as a required second phase, not as an optional extra.
 
 - first prefer sentences that have reusable contrast, cause-effect, requirement, trend, evaluation, or question patterns
-- for dialogue-type notes, prefer reusable question templates, response templates, social formulas, and scene-specific inquiries before long expository sentences
+- for dialogue-type notes, prefer reusable question templates, response templates, greetings, requests, confirmations, refusals, social formulas, and scene-specific inquiries before long expository sentences
 - avoid sentences that are only useful because of one specific noun unless the structure itself is broadly reusable
+- reject sentences when ASR is unstable or the phrasing is not natural enough to memorize directly
 - long sentences are acceptable when their pattern is worth memorizing
-- if a sentence is selected, keep frontmatter `daily_use_sentences` aligned with the final section
+- if a sentence is selected, keep frontmatter `daily_use_sentences` aligned with the final section, but include only Japanese original/core sentences there
 - if no sentence is selected, keep `daily_use_sentences: []`
+
+## Shadowing To Survival Speaking
+
+For `Shadowing_*` notes, `## 可直接背的常用句` is only a candidate pool for survival-speaking cards. Do not automatically convert freshly generated or unreviewed common-sentence selections into `学习系统/生活口语/句库`.
+
+Convert Shadowing common sentences to survival-speaking notes only when one of these is true:
+
+- the user explicitly asks to convert the current manually reviewed common sentences
+- the note already has a clearly hand-edited `## 可直接背的常用句` section and the task is about promoting those sentences
+
+When converting, keep the rule conservative:
+
+- prefer real-life sentences that the learner can directly say or must quickly understand
+- require a clear scene, speaker role, practical meaning, and natural reply
+- reject textbook drill, overly generic grammar frames, one-off nouns, and any sentence with unresolved transcription or naturalness doubts
+- create one focused `track: survival_speaking` note per core sentence or fixed exchange under `学习系统/生活口语/句库`
+- use the current survival-speaking template in `学习系统/模板/录入模板索引.md`; do not add the old repeated `fallback_phrase` frontmatter field
+- add `source_notes` back to the Shadowing note and keep the existing listening note unchanged unless the user asked to edit it
 
 ## Batch Mode
 
-Batch mode is intentionally disabled in the current Apple Speech helper route.
+Batch mode is intentionally disabled in the current single-item workflow.

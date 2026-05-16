@@ -1,11 +1,13 @@
 ---
 name: jp-next-day-review-updater
-description: Close out the Japanese next-day review workflow with a deterministic local script: advance done_today items through the fixed review stages, clear done_today, sink mastered classroom vocab into the base lexicon, and rewrite the current day's 每日学习清单 section without using model judgment for the state updates.
+description: Use when closing out the day's Japanese review workflow, advancing done_today items, updating next_review dates, or running the scheduled review rollover. Do not use for creating new cards, manual vocabulary organization, transcription, or source-note creation.
 ---
 
 # JP Next-Day Review Updater
 
 Use this skill when the task is to run the end-of-day review rollover for this Japanese learning vault, either manually or from the scheduled automation.
+
+Do not use this skill to create new review cards, manually organize vocabulary, generate listening notes, or create flexible source notes. Use `jp-review-material-maintainer`, `jp-listening-script-generator`, or `jp-source-note-generator` for those tasks.
 
 ## Maintenance Source Of Truth
 
@@ -33,16 +35,9 @@ This skill is intentionally deterministic. Do not replace its state updates with
 
 ## Review Scope
 
-The script only manages these folders:
+The script only manages roots listed in `学习系统/系统配置/paths.json` under `managed_review_roots`.
 
-- `学习系统/课堂复习`
-- `学习系统/生活口语/句库`
-- `学习系统/听力`
-- `学习系统/发音/练习`
-- `学习系统/发音/アクセント`
-- `学习系统/发音/音素`
-
-It can write to `学习系统/词库/基础词汇` only when a classroom vocab card finishes the full review cycle and needs to be sunk into the base lexicon.
+It can write to the configured `base_vocab_root` only when a classroom vocab card finishes the full review cycle and needs to be sunk into the base lexicon.
 
 ## Stage Chain
 
@@ -57,7 +52,7 @@ The fixed review stages are:
 - `day90 -> day180` (`+180 days`)
 - `day180 -> mastered`
 
-Vocabulary cards under `学习系统/课堂复习/词汇` are special-cased at the end of the chain:
+Vocabulary focus cards are special-cased at the end of the chain:
 
 - `day180 + done_today + item_type: vocab -> sink to 基础词汇`
 - the focus card becomes `status: mastered`
@@ -91,7 +86,7 @@ zsh codex-skills/jp-next-day-review-updater/scripts/run-next-day-review-update.s
 
 zsh codex-skills/jp-next-day-review-updater/scripts/run-next-day-review-update.sh \
   --date 2026-04-22 \
-  --note-path "daily-notes/2026.4/2026.4.22.md"
+  --note-path "笔记/2026.4/2026.4.22.md"
 ```
 
 ## Output Contract
@@ -99,7 +94,7 @@ zsh codex-skills/jp-next-day-review-updater/scripts/run-next-day-review-update.s
 The script should:
 
 - update `last_reviewed`, `review_stage`, `next_review`, and `done_today` only for completed items
-- sink classroom vocab cards that finish `day180` into `学习系统/词库/基础词汇`
+- sink classroom vocab cards that finish `day180` into the configured base vocabulary root
 - mark sunk focus vocab cards as `status: mastered` and clear their active scheduling
 - leave same-day extracted but unreviewed items in the current round
 - rewrite only the `## 每日学习清单` tail section of the target daily note when that note exists
