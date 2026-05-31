@@ -10,10 +10,10 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_PATHS_CONFIG = Path("学习系统/系统配置/paths.json")
+DEFAULT_PATHS_CONFIG = Path("系统配置/paths.json")
 
 TRACK_LABELS = {
-    "class_review": "课堂复习",
+    "class_review": "重点复习",
     "survival_speaking": "生活口语",
     "listening": "听力",
     "pronunciation": "发音",

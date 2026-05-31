@@ -30,6 +30,7 @@ FASTER_WHISPER_MATERIAL_NOTE = "这条音频由 ListenKit 的 faster-whisper 路
 DEFAULT_FASTER_WHISPER_MODEL = "small"
 DEFAULT_FASTER_WHISPER_COMPUTE_TYPE = "int8"
 DIALOGUE_MATERIAL_NOTE_SUFFIX = "本稿按对话型精听内容整理；仅在文本呈现出明显问答或应答轮替时，保守标注 A：/B：。"
+LISTENING_MODES = {"intensive", "extensive"}
 
 QUESTION_CUES = (
     "ですか",
@@ -270,6 +271,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--faster-whisper-python")
     parser.add_argument("--faster-whisper-model", default=DEFAULT_FASTER_WHISPER_MODEL)
     parser.add_argument("--faster-whisper-compute-type", default=DEFAULT_FASTER_WHISPER_COMPUTE_TYPE)
+    parser.add_argument("--listening-mode", choices=sorted(LISTENING_MODES))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--scan-dir")
     return parser.parse_args()
@@ -322,6 +324,33 @@ def language_label_for_locale(locale: str) -> str:
     return locale
 
 
+def huggingface_hub_cache_dir() -> Path:
+    explicit_cache = os.environ.get("HF_HUB_CACHE")
+    if explicit_cache:
+        return Path(explicit_cache).expanduser()
+    hf_home = os.environ.get("HF_HOME")
+    if hf_home:
+        return Path(hf_home).expanduser() / "hub"
+    return Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def faster_whisper_model_is_cached(model: str) -> bool:
+    cache_name = f"models--Systran--faster-whisper-{model}"
+    model_root = huggingface_hub_cache_dir() / cache_name / "snapshots"
+    if not model_root.exists():
+        return False
+    return any(path.is_file() for path in model_root.glob("*/model.bin"))
+
+
+def apply_cached_faster_whisper_offline_env(env: dict[str, str], engine: str) -> None:
+    if engine == "apple":
+        return
+    if not faster_whisper_model_is_cached(DEFAULT_FASTER_WHISPER_MODEL):
+        return
+    env.setdefault("HF_HUB_OFFLINE", "1")
+    env.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+
 def load_listenkit_json(path: Path) -> dict:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -349,6 +378,7 @@ def invoke_listenkit(
     env = os.environ.copy()
     if env_overrides:
         env.update(env_overrides)
+    apply_cached_faster_whisper_offline_env(env, engine)
     with tempfile.TemporaryDirectory(prefix="listenkit-transcript-") as tmpdir:
         if output_stem is None:
             output_stem = source.stem if isinstance(source, Path) else infer_stem_from_url(source)
@@ -390,10 +420,15 @@ def invoke_listenkit(
             imported_audio = output_path.parent / "audio" / f"{output_path.stem}.{audio_format}"
             if not imported_audio.exists():
                 raise RuntimeError(f"ListenKit did not create expected audio file: {imported_audio}")
-            output_dir.mkdir(parents=True, exist_ok=True)
-            final_audio = output_dir / imported_audio.name
+            attach_dir = output_dir / "attach"
+            artifact_dir = output_dir / "artifacts"
+            attach_dir.mkdir(parents=True, exist_ok=True)
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            final_audio = attach_dir / imported_audio.name
             if imported_audio.resolve() != final_audio.resolve():
                 shutil.move(str(imported_audio), final_audio)
+            shutil.move(str(output_path), artifact_dir / f"{output_path.stem}.listenkit.md")
+            shutil.move(str(transcript_json), artifact_dir / f"{output_path.stem}.listenkit.json")
             payload["_listenkit_final_audio_path"] = str(final_audio)
         return payload
 
@@ -411,11 +446,23 @@ def run_ffmpeg(args: list[str]) -> None:
         raise RuntimeError(stderr)
 
 
+def material_dir_for_audio(audio_path: Path) -> Path:
+    if audio_path.parent.name == "attach":
+        return audio_path.parent.parent
+    return audio_path.parent
+
+
+def audio_ref_for_note(audio_path: Path) -> str:
+    if audio_path.parent.name == "attach":
+        return f"attach/{audio_path.name}"
+    return audio_path.name
+
+
 def resolve_note_path(audio_path: Path, note_override: str | None) -> Path | None:
     if note_override:
         return Path(note_override)
 
-    candidates = sorted(audio_path.parent.glob(f"{audio_path.stem}_*.md"))
+    candidates = sorted(material_dir_for_audio(audio_path).glob(f"{audio_path.stem}_*.md"))
     for candidate in candidates:
         if "_无文本待补.md" in candidate.name:
             return candidate
@@ -1024,7 +1071,7 @@ def slugify_note_title(value: str) -> str:
 
 
 def desired_note_path(audio_path: Path, title: str) -> Path:
-    return audio_path.parent / f"{audio_path.stem}_{slugify_note_title(title.split(' ', 1)[1])}.md"
+    return material_dir_for_audio(audio_path) / f"{audio_path.stem}_{slugify_note_title(title.split(' ', 1)[1])}.md"
 
 
 def should_rename_generated_note(note_path: Path) -> bool:
@@ -1052,6 +1099,7 @@ def build_default_frontmatter(
     sentence_count: int,
     short_choice_mode: bool,
     dialogue_content_mode: bool = False,
+    listening_mode: str = "extensive",
 ) -> list[str]:
     today = date.today().isoformat()
     difficulty = "3" if sentence_count >= 8 else "2"
@@ -1078,9 +1126,10 @@ def build_default_frontmatter(
         "status: active",
         "priority: high",
         "done_today: false",
-        f"audio_ref: {audio_path.name}",
+        f"audio_ref: {audio_ref_for_note(audio_path)}",
         "transcript_status: full",
         "transcript_ref: in-note",
+        f"listening_mode: {listening_mode}",
         f"difficulty: {difficulty}",
         f"segment_count: {sentence_count}",
     ]
@@ -1305,6 +1354,30 @@ def build_learning_package(
     return "\n\n".join(blocks) if blocks else "当前未能生成逐句学习包，请先确认脚本内容。"
 
 
+def accent_script_section(
+    script_section: str,
+    confirmed_accent_index: dict[str, str],
+    offline_dictionary: StaticAccentDictionary,
+) -> str:
+    rendered_lines: list[str] = []
+    for line in script_section.splitlines():
+        if not line.strip():
+            rendered_lines.append(line)
+            continue
+        if re.fullmatch(r"(セクション|第)?\s*\d+", line.strip()):
+            rendered_lines.append(line)
+            continue
+        terms = select_focus_terms(line, confirmed_accent_index, offline_dictionary)
+        accented_line, _accent_notes = inline_accent_marks(
+            line,
+            terms,
+            confirmed_accent_index,
+            offline_dictionary,
+        )
+        rendered_lines.append(accented_line)
+    return "\n".join(rendered_lines)
+
+
 def reliable_sentence_chunks(sentences: list[str], chunks: list[Chunk]) -> list[Chunk] | None:
     if len(sentences) != len(chunks):
         return None
@@ -1317,9 +1390,7 @@ def reliable_sentence_chunks(sentences: list[str], chunks: list[Chunk]) -> list[
 
 
 def slice_attach_dir(audio_path: Path) -> Path:
-    if audio_path.parent.name == "attach":
-        return audio_path.parent
-    return audio_path.parent / "attach"
+    return material_dir_for_audio(audio_path) / "attach"
 
 
 def export_sentence_audio_slices(
@@ -1361,7 +1432,7 @@ def export_sentence_audio_slices(
             output_path.unlink(missing_ok=True)
             refs.append(None)
             continue
-        refs.append(filename)
+        refs.append(f"attach/{filename}")
     return refs
 
 
@@ -1408,10 +1479,38 @@ def frontmatter_value(lines: list[str], key: str) -> str:
     return ""
 
 
+def resolve_listening_mode(forced_mode: str | None, frontmatter_lines: list[str], existing_body: str) -> str:
+    if forced_mode:
+        return forced_mode
+    frontmatter_mode = frontmatter_value(frontmatter_lines, "listening_mode")
+    if frontmatter_mode in LISTENING_MODES:
+        return frontmatter_mode
+    if "## 精听学习包" in existing_body:
+        return "intensive"
+    return "extensive"
+
+
+def load_vault_path_roles(vault_root: Path) -> dict[str, str]:
+    for relative in (
+        "系统配置/paths.json",
+        "学习系统/系统/配置/paths.json",  # legacy fallback
+        "学习系统/系统配置/paths.json",  # legacy fallback
+    ):
+        path = vault_root / relative
+        if not path.is_file():
+            continue
+        try:
+            return json.loads(path.read_text(encoding="utf-8")).get("roles", {})
+        except (OSError, json.JSONDecodeError):
+            return {}
+    return {}
+
+
 def load_confirmed_accent_index(vault_root: Path) -> dict[str, str]:
+    roles = load_vault_path_roles(vault_root)
     roots = [
-        vault_root / "学习系统" / "课堂复习" / "词汇",
-        vault_root / "学习系统" / "词库" / "基础词汇",
+        vault_root / roles.get("focus_vocab_root", "学习系统/词库/重点词汇"),
+        vault_root / roles.get("base_vocab_root", "学习系统/词库/基础词汇"),
         vault_root / "学习系统" / "发音",
     ]
     index: dict[str, str] = {}
@@ -1466,6 +1565,7 @@ def build_body(
     confirmed_accent_index: dict[str, str] | None = None,
     offline_dictionary: StaticAccentDictionary | None = None,
     audio_slice_refs: list[str | None] | None = None,
+    listening_mode: str = "intensive",
 ) -> tuple[str, bool]:
     script_section, dialogue_content_mode = render_dialogue_script_section(sentences, chunks, structured_dialogue_mode)
     existing_sections = parse_sections(existing_body or "")
@@ -1485,21 +1585,23 @@ def build_body(
     material_section = (
         choose_material_section(preserved_sections, decorate_material_note(material_note, dialogue_content_mode))
     )
-    learning_package = build_learning_package(
-        sentences,
-        confirmed_accent_index or {},
-        offline_dictionary or StaticAccentDictionary({}),
-        audio_slice_refs,
-    )
+    accent_index = confirmed_accent_index or {}
+    dictionary = offline_dictionary or StaticAccentDictionary({})
+    if listening_mode == "extensive":
+        script_section = accent_script_section(script_section, accent_index, dictionary)
+        learning_package = None
+    else:
+        learning_package = build_learning_package(
+            sentences,
+            accent_index,
+            dictionary,
+            audio_slice_refs,
+        )
 
     lines = [
         f"# {title}",
         "",
         f"![[{audio_name}]]",
-        "",
-        "## 精听学习包",
-        "",
-        learning_package,
         "",
         "## 脚本",
         "",
@@ -1513,6 +1615,13 @@ def build_body(
         "",
         material_section,
     ]
+    if learning_package is not None:
+        lines[3:3] = [
+            "",
+            "## 精听学习包",
+            "",
+            learning_package,
+        ]
 
     for heading, content in existing_sections:
         if heading in known_headings:
@@ -1541,6 +1650,7 @@ def process_one(
     candidate_route: tuple[TranscriptionCandidate, str] | None = None,
     source_url: str | None = None,
     offline_dictionary: StaticAccentDictionary | None = None,
+    listening_mode: str | None = None,
 ) -> str:
     if candidate_route is None:
         candidate, route_label = transcribe_with_heuristics(
@@ -1604,9 +1714,12 @@ def process_one(
         write_note_path.parent.mkdir(parents=True, exist_ok=True)
         frontmatter_lines = []
         existing_body = None
+    resolved_listening_mode = resolve_listening_mode(listening_mode, frontmatter_lines, existing_body or "")
+    if frontmatter_lines:
+        set_scalar(frontmatter_lines, "listening_mode", resolved_listening_mode)
     sentence_chunks = reliable_sentence_chunks(sentences, candidate.segments)
     audio_slice_refs = None
-    if sentence_chunks is not None and not dry_run:
+    if resolved_listening_mode == "intensive" and sentence_chunks is not None and not dry_run:
         audio_slice_refs = export_sentence_audio_slices(
             audio_path,
             sentence_chunks,
@@ -1615,7 +1728,7 @@ def process_one(
         )
     body, dialogue_content_mode = build_body(
         title,
-        audio_path.name,
+        audio_ref_for_note(audio_path),
         sentences,
         candidate.segments,
         audio_path,
@@ -1626,9 +1739,16 @@ def process_one(
         load_confirmed_accent_index(find_vault_root_from_path(audio_path)),
         offline_dictionary or load_offline_dictionary(required=False),
         audio_slice_refs,
+        resolved_listening_mode,
     )
     if not frontmatter_lines:
-        frontmatter_lines = build_default_frontmatter(audio_path, len(sentences), short_choice_mode, dialogue_content_mode)
+        frontmatter_lines = build_default_frontmatter(
+            audio_path,
+            len(sentences),
+            short_choice_mode,
+            dialogue_content_mode,
+            resolved_listening_mode,
+        )
     rendered = render_note(frontmatter_lines, body)
     if dry_run:
         return f"=== {write_note_path} ===\n{rendered}"
@@ -1648,6 +1768,7 @@ def process_url(
     faster_whisper_python: str | None = None,
     audio_format: str = "m4a",
     offline_dictionary: StaticAccentDictionary | None = None,
+    listening_mode: str | None = None,
 ) -> str:
     output_stem = infer_stem_from_url(url)
     env_overrides = {}
@@ -1680,6 +1801,7 @@ def process_url(
         candidate_route=(candidate, route_label),
         source_url=url,
         offline_dictionary=offline_dictionary,
+        listening_mode=listening_mode,
     )
     if dry_run:
         return f"Source URL: {url}\nFinal audio: {final_audio_path}\n{result}"
@@ -1730,6 +1852,7 @@ def main() -> int:
             args.faster_whisper_python,
             args.format,
             offline_dictionary,
+            args.listening_mode,
         )
         print(result)
         return 0
@@ -1746,6 +1869,7 @@ def main() -> int:
             args.faster_whisper_model,
             args.faster_whisper_compute_type,
             offline_dictionary=offline_dictionary,
+            listening_mode=args.listening_mode,
         )
         print(result)
         return 0

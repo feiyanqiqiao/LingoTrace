@@ -1,11 +1,11 @@
 ---
 name: jp-listening-script-generator
-description: Use when turning one local audio file or media URL into this vault's fixed Japanese 精听稿 listening-practice note format. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
+description: Use when turning one local audio file or media URL into this vault's fixed Japanese listening-practice note format, including 泛听 and 精听 variants. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
 ---
 
 # JP Listening Script Generator
 
-Use this skill when the task is to turn one local listening audio file or media URL into the existing 精听稿 Markdown note format. Generic ASR and media acquisition are delegated to the sibling `../ListenKit` CLI; this skill keeps only the Obsidian Japanese-learning workflow and note rendering rules.
+Use this skill when the task is to turn one local listening audio file or media URL into the existing listening-practice Markdown note format. Generic ASR and media acquisition are delegated to the sibling `../ListenKit` CLI; this skill keeps only the Obsidian Japanese-learning workflow and note rendering rules.
 
 Do not use this skill for flexible source notes or general study notes from transcripts, audio, or video; use `jp-source-note-generator` for those. Do not use it for review card creation or maintenance; use `jp-review-material-maintainer`.
 
@@ -28,13 +28,14 @@ zsh codex-skills/jp-listening-script-generator/scripts/sync-to-global.sh
 
 Prefer single-item processing first. The main path is:
 
-1. identify one local audio file under `学习系统/听力`, or one URL plus a target output directory under `学习系统/听力`
+1. identify one local audio file under a listening material directory's `attach/`, or one URL plus a target material directory under `学习系统/听力`
 2. locate the matching note, or create a new note when none exists yet
 3. run the transcription pipeline
 4. render the Markdown draft note
-   - the CLI requires a prepared offline dictionary cache for `## 精听学习包`; if it is missing, run the setup script described below
-   - the note includes `## 精听学习包` before the plain `## 脚本`
-   - each learning block uses only `### SNN`, the accent-marked sentence, and the sentence audio embed
+   - the CLI requires a prepared offline dictionary cache for inline accent candidates; if it is missing, run the setup script described below
+   - default mode is `extensive` 泛听: the note has an accent-marked `## 脚本` but no `## 精听学习包` and no sentence slices
+   - use `--listening-mode intensive` for 精听: the note includes `## 精听学习包` before the plain `## 脚本`
+   - each intensive learning block uses only `### SNN`, the accent-marked sentence, and the sentence audio embed
 5. unless the user explicitly asked for `--dry-run`, immediately enter a second editing phase:
    - read the generated `## 脚本`
    - use model judgment to choose `0-5` truly reusable sentences
@@ -49,7 +50,7 @@ Context-budget rule for this skill:
 - only inspect an existing note when the generated result is clearly unstable or ambiguous
 - when inspection is needed, prefer one nearest sample note and stop there unless the first sample still leaves the issue unresolved
 
-When rerunning transcription for an existing note, preserve the already curated `## 可直接背的常用句`, `daily_use_sentences`, and any extra manual sections unless the user explicitly asks to reset them.
+When rerunning transcription for an existing note, preserve the already curated `## 可直接背的常用句`, `daily_use_sentences`, and any extra manual sections unless the user explicitly asks to reset them. Existing notes with `listening_mode` keep that mode; legacy notes that already contain `## 精听学习包` are treated as `intensive`; otherwise unmarked materials default to `extensive`.
 
 For short-choice listening materials such as `実力アップ/29番-32番.mp3`, the generator now switches into a short-choice mode automatically:
 
@@ -61,17 +62,19 @@ When there is any uncertainty about title quality or recognition stability, use 
 
 ## ListenKit Route
 
-The generator delegates transcript acquisition to ListenKit's Markdown workflow and then applies vault-specific 精听稿 rendering. Set `LISTENKIT_ROOT` only when the sibling repo is not at `../ListenKit`.
+The generator delegates transcript acquisition to ListenKit's Markdown workflow and then applies vault-specific listening-note rendering. Set `LISTENKIT_ROOT` only when the sibling repo is not at `../ListenKit`.
 
 - `--engine auto` is the default and lets ListenKit choose its default engine
 - `--engine apple` explicitly requests ListenKit's Apple Speech route
 - `--engine faster-whisper` explicitly requests ListenKit's faster-whisper route
-- URL input writes the finalized audio into the chosen output directory and generates the 精听稿 next to that audio
+- URL input treats `--output-dir` as the material directory: finalized audio goes into its `attach/`, raw ListenKit `.listenkit.md/.json` artifacts go into `artifacts/`, and the learning note stays at the material-directory root
+- local audio under `attach/` also generates or updates the learning note at the parent material-directory root; legacy root-level local audio input remains readable during migration
 
 The vault wrapper passes ListenKit's `--auto-init` flag for the default/faster-whisper route. On first use, ListenKit may create `../ListenKit/.venv` and install faster-whisper; do not create `.venv` manually from the vault parent directory.
 
 ```bash
-zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/Shadowing_初中級/Unit1/04.mp3" --engine faster-whisper --locale ja-JP --dry-run
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/Shadowing_初中級/Unit1/attach/04.mp3" --engine faster-whisper --locale ja-JP --dry-run
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/attach/manabo_cz22.mp3" --listening-mode intensive --dry-run
 ```
 
 Set `FASTER_WHISPER_PYTHON=/path/to/python` only when intentionally overriding ListenKit's repo-local environment.
@@ -88,12 +91,12 @@ The current local test setup uses:
 The skill does not implement generic ASR itself. Always call the local Markdown generator through the wrapper; that generator consumes ListenKit's generated transcript artifacts:
 
 ```bash
-zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/manabo_cz16.mp3"
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/attach/manabo_cz16.mp3"
 ```
 
 ## Offline Dictionary Setup
 
-The 精听学习包 uses a local dictionary cache for word selection, reading, and accent candidates. The default cache is outside the vault:
+The listening note renderer uses a local dictionary cache for word selection, reading, and accent candidates. The default cache is outside the vault:
 
 - default: `~/Library/Caches/jp-listening-dicts`
 - override: `JP_LISTENING_DICT_DIR=/path/to/cache`
@@ -125,13 +128,13 @@ zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.
 Useful variants:
 
 ```bash
-zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/manabo_cz16.mp3"
-zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/N2/202212/example.mp3" --locale ja-JP
-zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/Shadowing_初中級/Unit1/04.mp3" --engine auto --locale ja-JP
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/中級を学ぼう/attach/manabo_cz16.mp3"
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/N2/202212/attach/example.mp3" --locale ja-JP
+zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/Shadowing_初中級/Unit1/attach/04.mp3" --engine auto --locale ja-JP
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh --url "https://example.com/video" --output-dir "学习系统/听力/自学素材" --title "素材标题"
 ```
 
-The generic transcript workflow lives in ListenKit. Vault code only converts the generated transcript artifacts into the local 精听稿 format.
+The generic transcript workflow lives in ListenKit. Vault code only converts the generated transcript artifacts into the local listening-note format.
 
 ## Sandbox And Approval
 
@@ -147,22 +150,23 @@ The default/faster-whisper route is a normal ListenKit CLI subprocess. It does n
 
 ## Output Contract
 
-The generated note should follow the existing `manabo_cz15_私の町.md` shape:
+The generated note has two modes. Default is `extensive`; use `--listening-mode intensive` only when the user explicitly wants逐句精听.
 
 - preserve the existing frontmatter as much as possible
 - set `transcript_status: full`
 - set `transcript_ref: in-note`
-- keep the audio embed
-- render `## 精听学习包`
+- set `listening_mode: extensive` or `listening_mode: intensive`
+- keep the source-audio embed as `![[attach/audio_name.ext]]`
 - render `## 脚本`
 - render `## 可直接背的常用句`
 - render `## 素材说明`
 - prefer a topic-bearing filename such as `manabo_cz18_土用の丑の日とうなぎ.md`, not a generic `识别稿`
 - do not rely on rule-based extraction for `可直接背的常用句`; use model judgment after the script is generated
-- in `## 精听学习包`, render each sentence as a minimal block: `### SNN`, blank line, the sentence, blank line, then the sentence audio embed
-- inline known accent marks directly after the word, such as `相撲取り⓪`; do not inline or list `待确认` items in the learning package
-- embed the sentence audio clip as `![[audio_stem_SNN.m4a]]`; when there is no reliable timestamp, write only `（语音切片待生成）`
-- do not show `已确认`, `本地候选`, or `待确认` source labels inside the learning package; use those labels only for internal selection and separate accent-review work
+- in `extensive`, do not render `## 精听学习包`, do not generate sentence slices, and inline known accent marks directly in `## 脚本`
+- in `intensive`, render `## 精听学习包`; each block is `### SNN`, blank line, the accent-marked sentence, blank line, then the sentence audio embed
+- in `intensive`, keep `## 脚本` as the plain script without forced accent marks
+- in `intensive`, embed the sentence audio clip as `![[attach/audio_stem_SNN.m4a]]`; when there is no reliable timestamp, write only `（语音切片待生成）`
+- do not show `已确认`, `本地候选`, or `待确认` source labels inside the note body; use those labels only for internal selection and separate accent-review work
 - for accent data, prefer the vault's existing confirmed `accent_display`; otherwise use offline dictionary candidates and label them `本地候选`; unknown items must be `待确认`
 - export sentence clips only when reliable start/end timestamps are available; do not fabricate clips from uncertain alignment
 - do not write `本地候选` accent values back into vocabulary cards as confirmed data
@@ -205,19 +209,7 @@ After the draft note exists, the skill should treat common-sentence curation as 
 
 For `Shadowing_*` notes, `## 可直接背的常用句` is only a candidate pool for survival-speaking cards. Do not automatically convert freshly generated or unreviewed common-sentence selections into `学习系统/生活口语/句库`.
 
-Convert Shadowing common sentences to survival-speaking notes only when one of these is true:
-
-- the user explicitly asks to convert the current manually reviewed common sentences
-- the note already has a clearly hand-edited `## 可直接背的常用句` section and the task is about promoting those sentences
-
-When converting, keep the rule conservative:
-
-- prefer real-life sentences that the learner can directly say or must quickly understand
-- require a clear scene, speaker role, practical meaning, and natural reply
-- reject textbook drill, overly generic grammar frames, one-off nouns, and any sentence with unresolved transcription or naturalness doubts
-- create one focused `track: survival_speaking` note per core sentence or fixed exchange under `学习系统/生活口语/句库`
-- use the current survival-speaking template in `学习系统/模板/录入模板索引.md`; do not add the old repeated `fallback_phrase` frontmatter field
-- add `source_notes` back to the Shadowing note and keep the existing listening note unchanged unless the user asked to edit it
+Only promote Shadowing common sentences when the user explicitly asks for speaking-card conversion. Hand that task off to `jp-survival-speaking-card-generator`, which owns conservative selection, deduplication, scene placement, backlinks, and optional source-slice embeds.
 
 ## Batch Mode
 

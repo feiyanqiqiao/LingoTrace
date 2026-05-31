@@ -7,18 +7,19 @@
 !README.md
 !LICENSE
 
-# Public documentation.
-!docs/
-!docs/**
-
 # Public Codex skills.
 !codex-skills/
 !codex-skills/**
 
 # Public listening tooling.
 !tools/
+!tools/README.md
 !tools/listening-transcribe-official/
 !tools/listening-transcribe-official/**
+!tools/vault-structure/
+!tools/vault-structure/**
+tools/vault-structure/**/__pycache__/
+tools/vault-structure/**/*.pyc
 
 # Always keep local/editor/cache/media/private material out of Git.
 .DS_Store

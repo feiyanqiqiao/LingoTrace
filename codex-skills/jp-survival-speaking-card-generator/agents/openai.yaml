@@ -1,0 +1,8 @@
+interface:
+  display_name: "JP Survival Speaking Card Generator"
+  short_description: "Create and maintain conservative daily-life Japanese speaking cards."
+  default_prompt: >-
+    Use $jp-survival-speaking-card-generator to create, update, merge, or promote short survival-speaking cards in the Japanese-learning vault. Accept manually reviewed Shadowing common sentences, user-provided daily-life phrases, or explicit existing-card maintenance requests. Read the current speaking-card template first, recursively search for duplicate or mergeable cards before writing, preserve existing review state when updating, and initialize genuinely new cards at day0. Keep only natural high-fit phrases with a clear real-life scene and likely reply. Store cards under the closest existing scene-category subdirectory. Preserve real source_notes backlinks, do not invent provenance, and add an optional direct source-slice embed only when the audio match is reliable. Do not generate long scene guides, audio slices, or review rollover updates. Run the bundled read-only validator after edits.
+
+policy:
+  allow_implicit_invocation: true

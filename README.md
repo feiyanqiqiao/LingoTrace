@@ -2,13 +2,12 @@
 
 An Obsidian-based Japanese learning system framework.
 
-This repository publishes the reusable automation, Codex skills, and implementation notes from a personal Japanese learning vault. It is not a full vault backup and does not include private notes, commercial textbook audio, full textbook transcripts, or local Obsidian workspace state.
+This repository publishes the reusable automation and Codex skills from a personal Japanese learning vault. It is not a full vault backup and does not include private notes, commercial textbook audio, full textbook transcripts, or local Obsidian workspace state.
 
 ## What It Contains
 
 - reusable Codex skills under `codex-skills/`
 - vault-specific listening-note renderer under `tools/`
-- documentation under `docs/`
 
 ## What It Does Not Contain
 
@@ -26,7 +25,6 @@ Generic audio import and ASR are handled by the sibling [ListenKit](https://gith
 ```text
 codex-skills/       Local Codex skills for maintaining the learning system
 tools/              Vault-specific automation helpers and tests
-docs/               Implementation notes and system boundaries
 ```
 
 ## Using The Framework

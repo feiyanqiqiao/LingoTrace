@@ -35,9 +35,9 @@ This skill is intentionally deterministic. Do not replace its state updates with
 
 ## Review Scope
 
-The script only manages roots listed in `学习系统/系统配置/paths.json` under `managed_review_roots`.
+The script only manages roots listed in `系统配置/paths.json` under `managed_review_roots`.
 
-It can write to the configured `base_vocab_root` only when a classroom vocab card finishes the full review cycle and needs to be sunk into the base lexicon.
+It can write to the configured `base_vocab_root` only when a focus vocab card finishes the full review cycle and needs to be sunk into the base lexicon.
 
 ## Stage Chain
 
@@ -94,7 +94,7 @@ zsh codex-skills/jp-next-day-review-updater/scripts/run-next-day-review-update.s
 The script should:
 
 - update `last_reviewed`, `review_stage`, `next_review`, and `done_today` only for completed items
-- sink classroom vocab cards that finish `day180` into the configured base vocabulary root
+- sink focus vocab cards that finish `day180` into the configured base vocabulary root
 - mark sunk focus vocab cards as `status: mastered` and clear their active scheduling
 - leave same-day extracted but unreviewed items in the current round
 - rewrite only the `## 每日学习清单` tail section of the target daily note when that note exists

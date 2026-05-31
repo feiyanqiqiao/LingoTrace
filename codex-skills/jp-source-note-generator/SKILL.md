@@ -9,7 +9,7 @@ Use this skill when the task is to turn a raw transcript, ListenKit Markdown tra
 
 For ordinary listening practice notes under the existing 精听稿 contract, use `jp-listening-script-generator`.
 
-Do not use this skill for automatic vocabulary, grammar, pronunciation, or error-card maintenance; use `jp-review-material-maintainer` when the requested output is review material.
+Do not use this skill for automatic vocabulary, grammar, pronunciation, or error-card maintenance; use `jp-review-material-maintainer` when the requested output is review material. Use `jp-survival-speaking-card-generator` when the requested output is daily-life speaking cards.
 
 ## Maintenance Source Of Truth
 
@@ -31,12 +31,12 @@ zsh codex-skills/jp-source-note-generator/scripts/sync-to-global.sh
 This skill fixes the workflow and provenance requirements, not the note structure.
 
 - do not create a new universal note directory
-- do not update `学习系统/系统配置/paths.json`
+- do not update `系统配置/paths.json`
 - do not impose a fixed Markdown section layout
 - before writing the final note, read enough material to propose the likely note direction and confirm the user's choices
 - default to one learning note; create multiple notes only when the user chooses that split
 - default to a learning note, not review cards
-- if the user asks to create review cards, hand off to the matching workflow, especially `jp-review-material-maintainer` for review material and vocabulary deduplication
+- if the user asks to create review cards, hand off to the matching workflow: use `jp-survival-speaking-card-generator` for daily-life speaking cards and `jp-review-material-maintainer` for vocabulary, grammar, pronunciation, error cards, and vocabulary deduplication
 
 Every generated note must embed source provenance, regardless of the final structure:
 

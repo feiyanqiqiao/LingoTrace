@@ -15,6 +15,9 @@ SPEC.loader.exec_module(MODULE)
 
 
 class UpdateNextDayReviewTests(unittest.TestCase):
+    def test_class_review_track_is_presented_as_focus_review(self) -> None:
+        self.assertEqual(MODULE.TRACK_LABELS["class_review"], "重点复习")
+
     def base_vocab_root(self, vault_root: Path) -> Path:
         return vault_root / "base-vocab"
 
