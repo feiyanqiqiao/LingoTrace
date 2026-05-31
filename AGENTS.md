@@ -33,8 +33,10 @@ Do not treat folder paths in prose as the source of truth. System-managed path r
 ## Git Workflow
 
 - Treat `main` as the protected public branch for `feiyanqiqiao/JapanLearning`.
-- For normal repository updates, create a topic branch, commit there, push the branch, and merge through a pull request or explicit merge step.
-- Do not push directly to `main` unless the user explicitly requests it for a small, low-risk documentation or allowlisted tooling change.
+- For every public repository update, including documentation-only changes, create a topic branch, commit there, push the branch, and merge through a pull request.
+- Do not commit or push directly to `main`.
+- Keep the topic branch while its pull request is open so review follow-up commits can be added safely.
+- After a pull request is merged, switch the local checkout back to `main`, run `git pull --ff-only origin main`, then delete the merged local topic branch and its remote branch.
 - Before committing or merging, review the staged file list and confirm it only contains public allowlisted files. Private notes, Obsidian state, audio, images, PDFs, and temporary transcription artifacts must stay untracked or ignored.
 
 ## Verification
