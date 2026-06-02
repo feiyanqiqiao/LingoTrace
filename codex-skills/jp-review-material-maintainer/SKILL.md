@@ -113,7 +113,7 @@ Prefer direct property updates for single-field changes instead of rewriting the
 ### 6. Create a new note in the correct layer
 
 ```bash
-obsidian create path="<focus_vocab_root>/新出単語.md" content="---\ntrack: class_review\nitem_type: vocab\nstatus: active\npriority: normal\ndone_today: false\nheadword: 新出単語\nreading:\nmeaning_zh:\nsource_notes:\n  - \"[[笔记/2026.4/2026.4.14]]\"\nfirst_seen: 2026-04-14\nlast_seen: 2026-04-14\nseen_count: 1\nerror_count: 0\nreview_stage: day0\nnext_review: 2026-04-14\nlast_reviewed: \"\"\nconfusable_with: []\ntags:\n  - jp/vocab\n  - jp/class_review\n---\n\n# 新出単語\n\n## 核心\n\n## 来源\n"
+obsidian create path="<focus_vocab_root>/新出単語.md" content="---\ntrack: class_review\nitem_type: vocab\nstatus: active\npriority: normal\ndone_today: false\nheadword: 新出単語\nreading:\naccent_display:\nmeaning_zh:\nsource_notes:\n  - \"[[笔记/2026.4/2026.4.14]]\"\nfirst_seen: 2026-04-14\nlast_seen: 2026-04-14\nseen_count: 1\nerror_count: 0\nreview_stage: day0\nnext_review: 2026-04-14\nlast_reviewed: \"\"\nconfusable_with: []\ntags:\n  - jp/vocab\n  - jp/class_review\n---\n\n# 新出単語\n\n## 核心\n\n## 来源\n"
 ```
 
 Use this for classroom-note vocabulary creation. Only create a base-lexicon note when a word has completed the focus-review cycle and is being sunk into long-term storage.
@@ -225,7 +225,7 @@ Required properties:
 
 - `headword`
 - `reading`
-- `accent_display` when the accent is known
+- `accent_display` (leave blank when the accent is unknown)
 - `meaning_zh`
 - `source_notes`
 - `first_seen`
@@ -258,7 +258,7 @@ Required properties:
 - `done_today`
 - `headword`
 - `reading`
-- `accent_display` when the accent is known
+- `accent_display` (leave blank when the accent is unknown)
 - `meaning_zh`
 - `source_notes`
 - `first_seen`
@@ -289,6 +289,7 @@ Linking rule for vocab cards:
 Accent display rule for vocabulary cards:
 
 - keep `headword` as the clean written headword and `reading` as the clean kana reading; do not append accent marks to either field
+- always create the `accent_display` property on vocabulary cards; leave it blank when the accent is unknown so it can be filled later
 - when a reliable accent is known, store it in `accent_display` as kana plus accent, such as `しあい⓪`, `じてんしゃ②／⓪`, or `はる⓪・はる①`
 - mirror the same value visibly in the body under `## 核心` as `- 重音：<accent_display>`
 - for multi-item cards, keep `accent_display` order aligned with `headword`; leave it blank when the accent is uncertain instead of guessing
@@ -296,7 +297,7 @@ Accent display rule for vocabulary cards:
 
 Offline dictionary accent candidates for vocabulary cards:
 
-- before creating a new vocabulary card without `accent_display`, check whether the local offline dictionary is ready with `python3 tools/listening-transcribe-official/setup_offline_dictionary.py --check`
+- before creating a new vocabulary card with blank `accent_display`, check whether the local offline dictionary is ready with `python3 tools/listening-transcribe-official/setup_offline_dictionary.py --check`
 - the check must show sample accent candidates such as `公園⓪`; tokenization-only output is not enough for accent-card work
 - use the same default cache as listening notes: `~/Library/Caches/jp-listening-dicts`, overrideable with `JP_LISTENING_DICT_DIR`
 - if an existing card already has `accent_display`, preserve it and do not replace it with an offline dictionary candidate
@@ -454,7 +455,7 @@ When a focus review card finishes `day180` and is ready to sink:
 
 1. create or update the base note under `<base_vocab_root>`
 2. copy over `headword`, `reading`, `meaning_zh`, `source_notes`, `first_seen`, `last_seen`, and `seen_count`
-   - also copy `accent_display` when present
+   - also copy `accent_display`, including a blank placeholder when the accent is unknown
 3. set the base note to `status: promoted`
 4. include tag `jp/promoted`
 5. switch the focus card to `status: mastered`
