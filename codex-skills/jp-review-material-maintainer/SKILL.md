@@ -113,7 +113,7 @@ Prefer direct property updates for single-field changes instead of rewriting the
 ### 6. Create a new note in the correct layer
 
 ```bash
-obsidian create path="<focus_vocab_root>/新出単語.md" content="---\ntrack: class_review\nitem_type: vocab\nstatus: active\npriority: normal\ndone_today: false\nheadword: 新出単語\nreading:\naccent_display:\nmeaning_zh:\nsource_notes:\n  - \"[[笔记/2026.4/2026.4.14]]\"\nfirst_seen: 2026-04-14\nlast_seen: 2026-04-14\nseen_count: 1\nerror_count: 0\nreview_stage: day0\nnext_review: 2026-04-14\nlast_reviewed: \"\"\nconfusable_with: []\ntags:\n  - jp/vocab\n  - jp/class_review\n---\n\n# 新出単語\n\n## 核心\n\n## 来源\n"
+obsidian create path="<focus_vocab_root>/新出単語.md" content="---\ntrack: class_review\nitem_type: vocab\nstatus: active\npriority: normal\ndone_today: false\nheadword: 新出単語\nreading:\naccent_display:\nmeaning_zh:\nsource_notes:\n  - \"[[笔记/2026.4/2026.4.14]]\"\nfirst_seen: 2026-04-14\nlast_seen: 2026-04-14\nseen_count: 1\nerror_count: 0\nreview_stage: day0\nnext_review: 2026-04-14\nlast_reviewed: \"\"\nconfusable_with: []\nkanji_diff: false\nkanji_diff_pairs: []\ntags:\n  - jp/vocab\n  - jp/class_review\n---\n\n# 新出単語（reading）\n\n## 快速复习\n\n- 中文：\n- 读音：\n- 常用搭配：\n\n## 核心\n\n- 重音：\n\n## 常用搭配与例句\n\n- 搭配：\n  - 例句：\n\n## 易错 / 易混\n\n## 来源\n\n- [[笔记/2026.4/2026.4.14]]\n"
 ```
 
 Use this for classroom-note vocabulary creation. Only create a base-lexicon note when a word has completed the focus-review cycle and is being sunk into long-term storage.
@@ -217,6 +217,13 @@ If a word already exists in the base lexicon but appears again in a classroom no
 
 ## Required Schemas
 
+### Vocabulary Card Templates
+
+Template source of truth:
+
+- read `系统配置/模板/单词卡模板.md` before creating or substantially rewriting a vocabulary card
+- keep the complete classroom and base vocabulary-card templates in that local Obsidian note; this skill only stores the non-negotiable generation rules
+
 ### Base Lexicon
 
 Path: `<base_vocab_root>/<headword>.md`
@@ -284,7 +291,38 @@ Linking rule for vocab cards:
 - also add Obsidian wikilinks in `## 核心` or `## 易错 / 易混` so the comparison is visible while reviewing
 - only link high-value comparisons: confusable pairs, near-synonyms, opposite-choice traps, repeated classroom contrasts
 - do not add links just to increase graph density
+- when a useful comparison card does not exist, list its name as plain text under `## 待补卡`; do not add a dangling wikilink or populate `confusable_with`
 - add `jp/kanji_diff` when `kanji_diff: true`
+
+Body shape for classroom focus vocab cards:
+
+- `# <词头>（<reading>）`
+- `## 快速复习`
+- `## 核心`
+- `## 常用搭配与例句`
+- `## 易错 / 易混`
+- optional `## 待补卡`
+- optional `## 待确认`
+- `## 来源`
+
+Body shape for base lexicon cards:
+
+- `# <词头>（<reading>）`
+- `## 核心`
+- `## 常用搭配与例句`
+- optional `## 待补卡`
+- optional `## 待确认`
+- `## 来源`
+
+Collocation and example rules for vocabulary cards:
+
+- default to 2-4 high-frequency collocations per card
+- expand examples from those collocations instead of writing isolated example sentences
+- for verbs, prioritize particle frames such as `Nを預ける` or `Nに向かう`
+- for nouns, prioritize common verb collocations such as `荷物を預ける`, `荷物を受け取る`, or `荷物を送る`
+- for adjectives, prioritize common modified nouns or sentence frames such as `濃い味` or `Nが濃い`
+- if reliable collocations are not available, write fewer collocations or use `## 待确认`; do not invent plausible-looking collocations
+- if the core meaning, reading, or headword is uncertain, stop and ask the user before creating the card
 
 Accent display rule for vocabulary cards:
 
@@ -557,14 +595,15 @@ When splitting a classroom note:
 2. collect explicit text vocabulary items first, then inspect images embedded inside `## 単語` and collect clearly readable image-backed items
 3. normalize obvious variants before searching
 4. for each word, follow the canonical search order
-5. default classroom vocabulary to focus review first, then only touch the base lexicon when restoring prior history or sinking a mastered word
-6. collect explicit grammar items from `文法`, read `系统配置/模板/课堂语法卡模板.md`, search exact-name and comparison candidates, then route them to grammar cards
-7. split `間違えた問題` into:
+5. read `系统配置/模板/单词卡模板.md` before creating or substantially rewriting vocabulary cards
+6. default classroom vocabulary to focus review first, then only touch the base lexicon when restoring prior history or sinking a mastered word
+7. collect explicit grammar items from `文法`, read `系统配置/模板/课堂语法卡模板.md`, search exact-name and comparison candidates, then route them to grammar cards
+8. split `間違えた問題` into:
    - grammar-card updates when the mistake strengthens an existing pattern card
    - error-card creation or updates for the concrete misunderstanding itself
-8. create or update notes with valid Obsidian frontmatter and wikilinks
-9. keep examples or confusion notes short and source-backed
-10. when comparison clearly improves memory, add both metadata links (`contrast_with` / `confusable_with`) and body wikilinks to the counterpart card
+9. create or update notes with valid Obsidian frontmatter and wikilinks
+10. keep examples or confusion notes short and source-backed
+11. when comparison clearly improves memory, add both metadata links (`contrast_with` / `confusable_with`) and body wikilinks to the counterpart card
 
 Do not scan the entire vault if targeted search is enough.
 
@@ -587,6 +626,7 @@ For a note-splitting task, report:
 After edits:
 
 - check that frontmatter keys match the intended layer
+- check that newly created or substantially rewritten vocabulary cards follow `系统配置/模板/单词卡模板.md`, keep `## 常用搭配与例句`, mirror known `accent_display` under `## 核心`, and do not add dangling comparison links
 - check that focus-card words also exist in the base lexicon as `promoted`
 - check that grammar cards keep `pattern` as the naming anchor
 - check that newly created or substantially rewritten grammar cards follow `系统配置/模板/课堂语法卡模板.md`, use a YAML list for `formation`, and do not add dangling comparison links

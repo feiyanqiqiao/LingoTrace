@@ -1,6 +1,6 @@
 ---
 name: jp-listening-script-generator
-description: Use when turning one local audio file or media URL into this vault's fixed Japanese listening-practice note format, including 泛听 and 精听 variants. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
+description: Use when turning one local audio file or media URL into this vault's fixed Japanese listening-practice note format, including 泛听, 精听, and Shadowing dialogue-group rebuilds with missing slices. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
 ---
 
 # JP Listening Script Generator
@@ -42,6 +42,8 @@ Prefer single-item processing first. The main path is:
    - write the final `## 可直接背的常用句`
    - sync frontmatter `daily_use_sentences`
 6. only then treat the note as complete
+
+For `Shadowing_初中級` intensive notes, completion also requires real dialogue-group audio files. A Markdown draft with `（语音切片待生成）` placeholders is an intermediate artifact, not a finished note. Follow the Shadowing fallback procedure below whenever automatic export does not create every requested slice.
 
 Context-budget rule for this skill:
 
@@ -192,6 +194,38 @@ For dialogue-type listening content, apply a dialogue template layer on top of t
 - if the transcript is ambiguous, monologic, list-like, or otherwise unstable, fall back to normal non-speaker formatting
 - do not invent `C：` or multi-speaker labels unless the ListenKit transcript artifact provides reliable speaker metadata
 - in dialogue-type notes, prefer `可直接背的常用句` selections that are reusable question templates, response templates, and social or situational exchanges
+
+## Shadowing Dialogue-Group Intensive Fallback
+
+For intensive notes under `学习系统/听力/Shadowing_初中級`, treat each complete dialogue group as the slice unit. Do not assume one ASR chunk equals one study slice. A group may contain several alternating turns.
+
+Use this fallback whenever the user asks for `每組對話一個切片`, or when the draft contains `（语音切片待生成）`, missing embeds, or the wrong `segment_count`:
+
+1. Run the normal transcription wrapper with `--listening-mode intensive`.
+2. Open the generated ListenKit JSON artifact and inspect the timestamped chunks.
+3. Rebuild the intended dialogue groups from the transcript structure. Exclude section labels and group-number announcements from the spoken dialogue text, while using their timestamps as boundaries when useful.
+4. Derive one reliable start/end range per dialogue group from the underlying chunks.
+5. Export one real clip per group into the note's sibling `attach/` directory:
+
+```bash
+ffmpeg -hide_banner -loglevel error -y \
+  -ss START_SECONDS -to END_SECONDS \
+  -i "attach/audio.mp3" \
+  -c:a aac -b:a 128k "attach/audio_S01.m4a"
+```
+
+6. Replace every placeholder with the matching embed:
+
+```md
+![[attach/audio_S01.m4a]]
+```
+
+7. Verify all three counts match before treating the note as complete:
+   - frontmatter `segment_count`
+   - number of `### SNN` blocks and embeds
+   - number of real `attach/audio_SNN.m4a` files
+
+Do not stop after generating a polished Markdown note. If reliable group boundaries cannot be recovered from the transcript timestamps, keep the placeholders and explicitly report that the intensive note remains incomplete.
 
 ## Second-Phase Editing Rules
 
