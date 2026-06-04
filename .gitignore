@@ -18,6 +18,8 @@
 !tools/listening-transcribe-official/**
 !tools/vault-structure/
 !tools/vault-structure/**
+!tools/git/
+!tools/git/**
 tools/vault-structure/**/__pycache__/
 tools/vault-structure/**/*.pyc
 

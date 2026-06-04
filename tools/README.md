@@ -113,6 +113,32 @@ python3 tools/listening-transcribe-official/setup_offline_dictionary.py --instal
 python3 -m unittest tools/listening-transcribe-official/tests/test_transcribe_listening.py
 ```
 
+## Git Workflow Checks
+
+目錄：`tools/git/`
+
+這組工具用於降低公開倉庫提交時混入私有 Vault 內容的風險。
+
+### `check-public-staged-files.sh`
+
+用途：
+
+- 檢查 staged 文件是否只包含公開 allowlist 路徑。
+- 阻止筆記、Obsidian 狀態、音訊、圖片、PDF、暫存轉寫產物等私有內容進入提交。
+- 可在 GitHub Actions 中檢查 PR diff 或 `main` push diff。
+
+本地提交前執行：
+
+```bash
+bash tools/git/check-public-staged-files.sh
+```
+
+檢查某個 Git diff 範圍：
+
+```bash
+bash tools/git/check-public-staged-files.sh --range origin/main...HEAD
+```
+
 ## Vault Structure
 
 目錄：`tools/vault-structure/`
