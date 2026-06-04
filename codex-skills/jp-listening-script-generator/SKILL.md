@@ -1,6 +1,6 @@
 ---
 name: jp-listening-script-generator
-description: Use when turning one local audio file or media URL into this vault's fixed Japanese listening-practice note format, including 泛听, 精听 learning blocks, and missing-slice repair. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
+description: Use when turning one local audio file or media URL into this vault's fixed Japanese listening-practice note format, including 泛听, 精听 learning blocks, Shadowing dialogue-group slices, and missing-slice repair. Do not use for flexible source notes, general study notes from transcripts, or review card creation and maintenance.
 ---
 
 # JP Listening Script Generator
@@ -43,6 +43,8 @@ Prefer single-item processing first. The main path is:
    - sync frontmatter `daily_use_sentences`
 6. for `intensive`, verify that `segment_count`, `### SNN` blocks, embeds, and real non-empty slice files all match
 7. only then treat the note as complete
+
+For `Shadowing_初中級` intensive notes, completion also requires real dialogue-group audio files. A Markdown draft with `（语音切片待生成）` placeholders is an intermediate artifact, not a finished note. Follow the Shadowing fallback procedure below whenever automatic export does not create every requested slice.
 
 Context-budget rule for this skill:
 
