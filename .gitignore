@@ -7,6 +7,10 @@
 !README.md
 !LICENSE
 
+# Public docs.
+!docs/
+!docs/**
+
 # Public Codex skills.
 !codex-skills/
 !codex-skills/**

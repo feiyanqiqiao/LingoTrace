@@ -1,48 +1,50 @@
-# JapanLearning
+# LingoTrace
 
-An Obsidian-based Japanese learning system framework.
+LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自动化的**外语学习工作流引擎（当前深度适配日语）**。
 
-This repository publishes the reusable automation and Codex skills from a personal Japanese learning vault. It is not a full vault backup and does not include private notes, commercial textbook audio, full textbook transcripts, or local Obsidian workspace state.
+它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**
 
-## What It Contains
+本仓库开源了维持这套闭环系统运行的自动化脚本与 AI Agent（基于大模型驱动的）核心技能配置。
 
-- reusable Codex skills under `codex-skills/`
-- vault-specific listening-note renderer under `tools/`
+---
 
-## What It Does Not Contain
+## 🚀 核心工作流与模块
 
-- `.obsidian/` workspace files
-- daily private notes
-- textbook audio or video files
-- commercial listening transcripts
-- PDFs, screenshots, course schedules, or temporary files
-- the generic ASR/audio import implementation
+本项目包含五个高度内聚的 Agent Skills（详见 `codex-skills/` 目录），覆盖了外语学习“输入 -> 内化 -> 复习 -> 输出”的全生命周期：
 
-Generic audio import and ASR are handled by the sibling [ListenKit](https://github.com/feiyanqiqiao/ListenKit) project. This repository keeps only the Japanese-learning system and Obsidian note-generation logic.
+1. **听力脚本生成器 (`jp-listening-script-generator`)**：处理特定听力材料，生成带有重音标注的全文脚本，或基于切片生成逐句影子跟读（Shadowing）学习包，并强制提炼“常用句”。
+2. **来源笔记生成器 (`jp-source-note-generator`)**：处理广泛的音视频输入（YouTube、播客等），通过大模型自由萃取语法、词汇、表达，并确保完整的出处追溯（Provenance）。
+3. **复习材料维护器 (`jp-review-material-maintainer`)**：独创的双层词汇架构（Focus 焦点复习区 / Base 基础长时图谱），严格防重防漏地自动化维护用户的词汇、语法和错题关联网络。
+4. **生存口语卡生成器 (`jp-survival-speaking-card-generator`)**：将被动输入的“常用句”升维成基于特定真实生活场景（Scene）的口语输出卡片，并绑定发音切片。
+5. **次日复习更新引擎 (`jp-next-day-review-updater`)**：Obsidian 本地内建的间隔重复系统（SRS），负责时间衰减推算与卡片状态流转，处理词汇在 180 天后的“下沉归档”。
 
-## Repository Layout
+---
 
-```text
-codex-skills/       Local Codex skills for maintaining the learning system
-tools/              Vault-specific automation helpers and tests
-```
+## 📚 深度阅读与白皮书文档
 
-## Using The Framework
+为了更好地了解本系统的产品哲学、架构约束与适用人群，请参阅 `docs/` 目录下的详细分析报告：
 
-1. Install or adapt the skills in `codex-skills/`.
-2. Place `ListenKit` next to this repository if you want the listening transcription workflow.
-3. Add your own notes and learning content in a private vault. Do not reuse copyrighted textbook audio or transcripts unless you have the right to do so.
+- 📖 **[功能模块与用户旅程审计报告](docs/lingotrace_audit_report.md)**：将外语学习的实际痛点场景映射到 LingoTrace 系统工作流中的全周期拆解。
+- 🏗️ **[产品需求与架构白皮书](docs/lingotrace_product_document.md)**：包含详细的业务流转逻辑、双层词库架构分析和元数据（Frontmatter）字典级约束。
+- 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
+- 🔮 **[多语种与多 Agent 终端演进方案](docs/lingotrace_multilingual_multiagent_design.md)**：探讨项目后续如何解耦和演进，以平滑适配法语、英语等不同语种，并无缝接入如 Antigravity、Claude Code、Trae SOLO 等通用 Agent 产品。
 
-## ListenKit Dependency
+---
 
-Listening transcription delegates to `../ListenKit/cli/generate-markdown.sh`. You can override the sibling path with:
+## 📂 仓库结构
 
-```bash
-export LISTENKIT_ROOT=/path/to/ListenKit
-```
+- `codex-skills/`：维持系统运转的各类 Agent 本地技能声明（`SKILL.md`）和底层自动化执行脚本。
+- `tools/`：面向 Vault（知识库）特定逻辑的辅助测试工具与词典离线缓存配置。
+- `docs/`：深入的产品级和系统架构设计文档。
 
-This repository does not vendor `yt-dlp`, `ffmpeg`, Apple Speech helper code, or faster-whisper helpers.
+---
 
-## Privacy And Copyright
+## ⚠️ 隐私、版权与使用声明
 
-Do not commit private daily notes, course materials, audio files, commercial textbook transcripts, local Obsidian workspace state, or temporary transcription artifacts.
+本仓库**仅开源系统的自动化框架、理念设计和执行脚本**，绝不包含个人金库内的实际笔记。在使用本系统构建你自己的学习库时，请务必遵守以下原则：
+
+- **请勿提交** 任何属于你个人的 Obsidian 私人日记或打卡记录。
+- **请勿提交** 任何受版权保护的商业教材音频、视频及配套的转写原始文件。
+- **请勿提交** `.obsidian/` 本地工作区配置文件或工具生成的临时音频切片文件。
+
+通用音频导入与外部语音识别，请配合部署本系统的前置依赖项目：[ListenKit](https://github.com/feiyanqiqiao/ListenKit)。

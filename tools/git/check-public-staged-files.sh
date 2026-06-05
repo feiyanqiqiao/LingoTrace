@@ -48,7 +48,7 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-allowed_re='^(\.github/workflows/[^/]+\.ya?ml|\.gitignore|AGENTS\.md|README\.md|LICENSE|codex-skills/|tools/README\.md|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/)'
+allowed_re='^(\.github/workflows/[^/]+\.ya?ml|\.gitignore|AGENTS\.md|README\.md|LICENSE|docs/|codex-skills/|tools/README\.md|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/)'
 private_path_re='(^|/)(\.obsidian|tmp|学习系统|筆記|笔记)(/|$)'
 private_ext_re='\.(mp3|m4a|wav|flac|mp4|mov|webm|pdf|jpg|jpeg|png|heic)$'
 generated_re='(^|/)__pycache__(/|$)|\.pyc$|\.pyo$'
