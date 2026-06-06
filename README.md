@@ -1,89 +1,60 @@
-# JapanLearning
+# LingoTrace
 
-JapanLearning 是一个基于 Obsidian 的外语学习系统框架。当前仓库发布的是作者日语学习 vault 中可复用的自动化工具、Codex skills 和公开说明，不是完整私人 vault 备份。
+LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自动化的**外语学习工作流引擎（当前深度适配日语）**。
 
-项目的开箱主线是日语学习；英语和其他外语可以复用这套方法，但需要改造模板、skill 说明、词典 / 发音资源和例句规则。
+它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**
 
-## 适合谁
+本仓库开源了维持这套闭环系统运行的自动化脚本与 AI Agent（基于大模型驱动的）核心技能配置。
 
-- 已经使用或愿意使用 Obsidian 管理学习资料。
-- 愿意让 Codex 或类似 AI agent 协助整理词汇、语法、听力笔记和复习材料。
-- 想把“原始材料 -> 学习笔记 -> 复习卡 -> 定期复习”做成可维护流程。
-- 能接受少量命令行操作，用于转写、校验和安全提交检查。
+---
 
-如果你只想要一套静态日语笔记，本仓库不是最合适的选择。它更像一个可改造的学习系统骨架。
+## 🚀 核心工作流与模块
 
-## 仓库包含什么
+本项目包含五个高度内聚的 Agent Skills（详见 `codex-skills/` 目录），覆盖了外语学习“输入 -> 内化 -> 复习 -> 输出”的全生命周期：
 
-- `codex-skills/`：维护学习系统的本地 Codex skills。
-- `tools/`：适合公开复用的自动化工具和测试。
-- `系统配置/`：路径角色、卡片模板和复习流程说明。
-- `学习系统/总训练.base`：Obsidian Bases 主训练面板 scaffold。
-- `README.md` 与 `docs/USER_GUIDE.md`：公开使用说明。
-- `AGENTS.md`：给 AI agent 的项目规则。
+1. **听力脚本生成器 (`jp-listening-script-generator`)**：处理特定听力材料，生成带有重音标注的全文脚本，或基于切片生成逐句影子跟读（Shadowing）学习包，并强制提炼“常用句”。
+2. **来源笔记生成器 (`jp-source-note-generator`)**：处理广泛的音视频输入（YouTube、播客等），通过大模型自由萃取语法、词汇、表达，并确保完整的出处追溯（Provenance）。
+3. **复习材料维护器 (`jp-review-material-maintainer`)**：独创的双层词汇架构（Focus 焦点复习区 / Base 基础长时图谱），严格防重防漏地自动化维护用户的词汇、语法和错题关联网络。
+4. **生存口语卡生成器 (`jp-survival-speaking-card-generator`)**：将被动输入的“常用句”升维成基于特定真实生活场景（Scene）的口语输出卡片，并绑定发音切片。
+5. **次日复习更新引擎 (`jp-next-day-review-updater`)**：Obsidian 本地内建的间隔重复系统（SRS），负责时间衰减推算与卡片状态流转，处理词汇在 180 天后的“下沉归档”。
 
-## 仓库不包含什么
+---
 
-- 私人日记、课堂笔记和复习记录。
-- Obsidian 本地工作区状态，例如 `.obsidian/`。
-- 教材音频、视频、PDF、截图或完整转写稿。
-- 临时转写产物、缓存和本地媒体文件。
-- 通用 ASR / 音频导入实现。
+## 📚 深度阅读与白皮书文档
 
-通用音视频导入和转写由 sibling 项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责。本仓库只保留外语学习系统和 Obsidian note 生成逻辑。
+为了更好地了解本系统的产品哲学、架构约束与适用人群，请参阅 `docs/` 目录下的详细分析报告：
 
-## 快速开始
+- 📖 **[功能模块与用户旅程审计报告](docs/lingotrace_audit_report.md)**：将外语学习的实际痛点场景映射到 LingoTrace 系统工作流中的全周期拆解。
+- 🏗️ **[产品需求与架构白皮书](docs/lingotrace_product_document.md)**：包含详细的业务流转逻辑、双层词库架构分析和元数据（Frontmatter）字典级约束。
+- 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
+- 🔮 **[多语种与多 Agent 终端演进方案](docs/lingotrace_multilingual_multiagent_design.md)**：探讨项目后续如何解耦和演进，以平滑适配法语、英语等不同语种，并无缝接入如 Antigravity、Claude Code、Trae SOLO 等通用 Agent 产品。
 
-1. 下载或 clone 本仓库。
-2. 用 Obsidian 打开一个你自己的学习 vault。
-3. 参考 `系统配置/` 和 `学习系统/总训练.base` 建立自己的学习结构。
-4. 参考 `codex-skills/` 安装或改造需要的 Codex skills。
-5. 如需听力转写，把 `ListenKit` 放在本仓库旁边，或设置 `LISTENKIT_ROOT`。
-6. 阅读完整指南：[docs/USER_GUIDE.md](docs/USER_GUIDE.md)。
+---
 
-听力转写默认查找 sibling 路径：
+## 🤝 参与贡献与开源许可
 
-```bash
-../ListenKit/cli/generate-markdown.sh
-```
+本项目采用 **AGPL v3** 协议开源，鼓励极客自由分发、学习与修改。为了防范未经授权的直接商业化套壳行为，并保障早期参与者的权益，我们制定了严格的开源商业化规则：
 
-如果你的 ListenKit 在其他位置：
+- **贡献指南与条款**：参与项目前请务必仔细参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- **CLA (贡献者许可协议)**：向本项目提交有效代码（Merge PR）即代表您不可撤销地授权核心维护团队在未来的任意场景（含闭源商业化变现产品）中免费使用。
+- **名誉回馈机制**：我们为社区贡献者建立了三级回馈门槛。针对提供有效代码合并的核心贡献者，除了在商业版的“致谢墙”专属展示外，未来还将获赠商业化客户端的终身免费授权（VIP）。
 
-```bash
-export LISTENKIT_ROOT=/path/to/ListenKit
-```
+---
 
-## 常见学习流程
+## 📂 仓库结构
 
-- 词汇 / 语法 / 发音 / 错题卡：使用 `jp-review-material-maintainer`。
-- 固定听力笔记：使用 `jp-listening-script-generator`。
-- 视频、音频或脚本生成灵活学习笔记：使用 `jp-source-note-generator`。
-- 生活口语句库：使用 `jp-survival-speaking-card-generator`。
-- 每日复习 rollover：使用 `jp-next-day-review-updater`。
+- `codex-skills/`：维持系统运转的各类 Agent 本地技能声明（`SKILL.md`）和底层自动化执行脚本。
+- `tools/`：面向 Vault（知识库）特定逻辑的辅助测试工具与词典离线缓存配置。
+- `docs/`：深入的产品级和系统架构设计文档。
 
-这些 skill 当前以日语学习为主。如果你要学习英语或其他外语，建议先复用工作流思想，再按目标语言重写模板和 skill 规则。
+---
 
-## 工具说明
+## ⚠️ 隐私、版权与使用声明
 
-公开工具入口见 [tools/README.md](tools/README.md)。其中包括：
+本仓库**仅开源系统的自动化框架、理念设计和执行脚本**，绝不包含个人金库内的实际笔记。在使用本系统构建你自己的学习库时，请务必遵守以下原则：
 
-- 听力笔记生成工具。
-- 离线日语词典检查和安装工具。
-- vault 结构验证和迁移工具。
-- 公开提交 allowlist 检查工具。
+- **请勿提交** 任何属于你个人的 Obsidian 私人日记或打卡记录。
+- **请勿提交** 任何受版权保护的商业教材音频、视频及配套的转写原始文件。
+- **请勿提交** `.obsidian/` 本地工作区配置文件或工具生成的临时音频切片文件。
 
-## 隐私与版权
-
-不要把以下内容提交到公开仓库：
-
-- 私人学习笔记、日记、课堂记录。
-- 教材音频、视频、PDF、截图。
-- 商业教材完整转写稿。
-- Obsidian 本地工作区状态。
-- 临时转写产物、缓存和媒体文件。
-
-提交公开变更前，请运行：
-
-```bash
-bash tools/git/check-public-staged-files.sh
-```
+通用音频导入与外部语音识别，请配合部署本系统的前置依赖项目：[ListenKit](https://github.com/feiyanqiqiao/ListenKit)。

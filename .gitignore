@@ -5,6 +5,8 @@
 !.gitignore
 !AGENTS.md
 !README.md
+!CHANGELOG.md
+!CONTRIBUTING.md
 !LICENSE
 !SECURITY.md
 
@@ -22,6 +24,10 @@
 # Public vault scaffolding.
 !系统配置/
 !系统配置/**
+
+# Public docs.
+!docs/
+!docs/**
 
 # Public Codex skills.
 !codex-skills/
