@@ -62,6 +62,8 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertIn('Library/Caches/LingoTrace/venvs/cpython-314', init_script)
         self.assertNotIn('ln -s', init_script)
         self.assertIn('${LISTENKIT_ROOT}/cli/check-runtime.sh', check_script)
+        self.assertIn('Library/Caches/ListenKit/venvs/cpython-314/bin/python', check_script)
+        self.assertNotIn('${LISTENKIT_ROOT}/.venv/bin/python', check_script)
         self.assertIn('ffmpeg', check_script)
         self.assertIn('ffprobe', check_script)
 

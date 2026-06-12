@@ -52,7 +52,7 @@ jp-listening-script-generator
 - 通用轉寫能力：`../ListenKit/cli/generate-markdown.sh`
 - 通用時間範圍切片能力：`../ListenKit/cli/export-audio-slices.py`
 - 離線詞典套件：由 `setup_offline_dictionary.py` 安裝及檢查於 LingoTrace 自己的本機 Cache runtime。
-- Python runtime：正常執行固定使用 `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python`，避免從 iCloud 路徑載入原生擴展時卡住或讓 symlink 被改名。Homebrew `/opt/homebrew/bin/python3.14` 只負責初始化。ListenKit 使用獨立的 `ListenKit/.venv`，兩者不得跨環境 import 套件。
+- Python runtime：LingoTrace 固定使用 `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python`，ListenKit 固定使用 `~/Library/Caches/ListenKit/venvs/cpython-314/bin/python`。兩套環境都放在本機 Cache，避免從 iCloud 路徑載入原生擴展時卡住或讓 symlink 被改名；Homebrew `/opt/homebrew/bin/python3.14` 只負責初始化，兩者不得跨環境 import 套件。
 
 #### 精聽學習語塊
 

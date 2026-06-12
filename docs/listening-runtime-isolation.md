@@ -7,7 +7,7 @@ LingoTrace and ListenKit use separate Python 3.14 virtual environments. Homebrew
 | Project | Runtime | Direct dependencies | Responsibility |
 | --- | --- | --- | --- |
 | LingoTrace | `~/Library/Caches/LingoTrace/venvs/cpython-314` | `fugashi==1.5.2`, `unidic-lite==1.0.8` | Note rendering, tokenization, accent candidates |
-| ListenKit | `ListenKit/.venv` | `faster-whisper==1.2.1` | Audio transcription and timestamped transcript artifacts |
+| ListenKit | `~/Library/Caches/ListenKit/venvs/cpython-314` | `faster-whisper==1.2.1` | Audio transcription and timestamped transcript artifacts |
 
 The environments must not import each other's packages. LingoTrace must not import `faster_whisper`; ListenKit must not import `fugashi`.
 
@@ -34,6 +34,8 @@ cli/init-faster-whisper.sh
 ```
 
 The LingoTrace wrapper always uses `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python`. The repository is stored under iCloud, where loading the `fugashi` native extension directly was observed to hang for more than 100 seconds. A project-root symlink was also renamed to `.venv 2` by iCloud, so the runtime has no entry inside the Vault. The same extension loaded from the local Cache path in about 0.4 seconds. `LINGOTRACE_LISTENING_PYTHON` is the preferred intentional override; `JP_LISTENING_PYTHON` remains a compatibility override. A missing or unhealthy runtime stops before transcription and prints the initialization command.
+
+ListenKit follows the same storage rule for its larger native ASR stack. Its runtime lives at `~/Library/Caches/ListenKit/venvs/cpython-314`; neither project keeps a virtual environment or runtime symlink inside iCloud. The projects remain independent and communicate only through ListenKit CLI and artifact contracts.
 
 The external dictionary-data cache contains only static cross-version data such as `~/Library/Caches/jp-listening-dicts/accent_map.json`. Python packages belong in the dedicated LingoTrace runtime, not under the dictionary-data cache.
 
@@ -68,3 +70,9 @@ On June 12, 2026:
 - LingoTrace's local Cache runtime loaded the pinned dictionary packages and returned the required sample accents.
 - ListenKit transcribed `Unit3/attach/23.mp3` to schema v1 with 28 non-empty, fully timestamped segments.
 - LingoTrace completed an intensive dry-run for `Unit3/attach/23.mp3`, generated 19 learning blocks, and produced non-empty local accent candidates without modifying the material directory.
+
+On June 13, 2026:
+
+- ListenKit moved its Python 3.14 runtime out of iCloud to `~/Library/Caches/ListenKit/venvs/cpython-314` in PR #4.
+- The new runtime passed the bounded import check and remained isolated from LingoTrace's `fugashi` dependency.
+- `Unit3/attach/23.mp3` again produced schema v1 with 28 non-empty, fully timestamped segments.

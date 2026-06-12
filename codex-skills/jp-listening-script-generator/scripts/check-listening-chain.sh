@@ -21,7 +21,7 @@ fi
 
 LINGOTRACE_PYTHON="${LINGOTRACE_LISTENING_PYTHON:-${HOME}/Library/Caches/LingoTrace/venvs/cpython-314/bin/python}"
 LISTENKIT_ROOT="${LISTENKIT_ROOT:-${ROOT:h}/ListenKit}"
-LISTENKIT_PYTHON="${LISTENKIT_PYTHON:-${FASTER_WHISPER_PYTHON:-${LISTENKIT_ROOT}/.venv/bin/python}}"
+LISTENKIT_PYTHON="${LISTENKIT_PYTHON:-${FASTER_WHISPER_PYTHON:-${HOME}/Library/Caches/ListenKit/venvs/cpython-314/bin/python}}"
 
 for tool in ffmpeg ffprobe; do
   if ! command -v "${tool}" >/dev/null 2>&1; then

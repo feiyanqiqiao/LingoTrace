@@ -93,15 +93,15 @@ zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.
 zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh "学习系统/听力/自学素材/attach/dialogue.mp3" --listening-mode intensive --slice-profile dialogue --dry-run
 ```
 
-Set `FASTER_WHISPER_PYTHON=/path/to/python` only when intentionally overriding ListenKit's repo-local environment.
+Set `FASTER_WHISPER_PYTHON=/path/to/python` only when intentionally overriding ListenKit's dedicated environment.
 
 For faster-whisper on Apple Silicon, use Homebrew Python 3.14. Initialize ListenKit with `LISTENKIT_FASTER_WHISPER_BOOTSTRAP_PYTHON=/opt/homebrew/bin/python3.14`; faster-whisper import checks have a 60-second limit and fail clearly instead of waiting indefinitely.
 
-LingoTrace uses `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python` directly. Native extensions and runtime symlinks must not live inside the iCloud-backed Vault. ListenKit uses `../ListenKit/.venv/bin/python`. Homebrew Python 3.14 is only the bootstrap for creating those environments. Set `LINGOTRACE_LISTENING_PYTHON=/path/to/python` only for an intentional LingoTrace override. `JP_LISTENING_PYTHON` remains a legacy compatibility override.
+LingoTrace uses `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python` directly. ListenKit independently uses `~/Library/Caches/ListenKit/venvs/cpython-314/bin/python`. Native extensions and runtime symlinks must not live inside the iCloud-backed Vault. Homebrew Python 3.14 is only the bootstrap for creating those environments. Set `LINGOTRACE_LISTENING_PYTHON=/path/to/python` only for an intentional LingoTrace override. `JP_LISTENING_PYTHON` remains a legacy compatibility override.
 
 The current local test setup uses:
 
-- Python: `../ListenKit/.venv/bin/python` built from `/opt/homebrew/bin/python3.14`
+- Python: `~/Library/Caches/ListenKit/venvs/cpython-314/bin/python` built from `/opt/homebrew/bin/python3.14`
 - model: `small`
 - device: `cpu`
 - compute type: `int8`
@@ -174,7 +174,7 @@ The explicit Apple Speech route may launch a macOS permission flow through Liste
 
 That combination avoids the usual retry pattern of “sandbox run fails first, then ask for approval”.
 
-The default/faster-whisper route is a normal ListenKit CLI subprocess. It does not launch a GUI permission flow. Initialize `../ListenKit/.venv` separately before use; transcription may download a missing model through faster-whisper/Hugging Face caches, but it must not install Python packages.
+The default/faster-whisper route is a normal ListenKit CLI subprocess. It does not launch a GUI permission flow. Initialize ListenKit's local Cache runtime separately before use; transcription may download a missing model through faster-whisper/Hugging Face caches, but it must not install Python packages.
 
 ## Output Contract
 
