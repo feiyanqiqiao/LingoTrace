@@ -1,5 +1,8 @@
 # LingoTrace 升级方案设计白皮书：多语种与多 Agent 终端演进
 
+> [!warning] 历史研究文档
+> 本文保留早期问题分析和多 Agent 终端讨论，不再作为多语言架构的决策来源。已确认的产品边界、兼容原则和阶段路线以 [LingoTrace 多语言架构总体规划方案](lingotrace_multilingual_architecture_plan.md) 为准。特别是本文提出的废弃 `reading`、`accent_display`、`kanji_diff` 等建议，已被渐进兼容和语言包扩展字段方案取代。
+
 当前的 LingoTrace 是一套高度自动化的日语学习与记忆管理工作流系统。如果要在未来将其升级为支持**多语种（如英语、法语、西班牙语）**，以及平滑适配如 **Antigravity、Claude Code、Trae SOLO** 等不同的 Agent 终端产品，我们需要在尊重现有架构的基础上，评估潜在的挑战与合理的演进路径。
 
 以下是详细的挑战分析与重构方案设计。
