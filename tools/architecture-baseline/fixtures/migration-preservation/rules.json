@@ -1,0 +1,26 @@
+{
+  "preserve_data": [
+    "synthetic-study/focus-vocab/合成語.md"
+  ],
+  "recreate_from_pack": [
+    "synthetic-config/paths.json",
+    "synthetic-study/total-training.base"
+  ],
+  "remove_after_cutover": [
+    "codex-skills/jp-review-material-maintainer/SKILL.md"
+  ],
+  "transforms": [
+    {
+      "source": "synthetic-notes/old-path.md",
+      "target": "synthetic-notes/new-path.md",
+      "reason": "approved_path_collision",
+      "approved": true
+    }
+  ],
+  "expected_failures": {
+    "synthetic-notes/unmapped-difference.md": "unmapped_difference",
+    "synthetic-study/listening/missing-attachment.md": "missing_attachment",
+    "synthetic-study/focus-vocab/duplicate-target.md": "duplicate_target",
+    "synthetic-study/speaking-cards/manual-conflict.md": "manual_content_conflict"
+  }
+}

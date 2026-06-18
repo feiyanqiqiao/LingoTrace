@@ -1,0 +1,63 @@
+name: Japanese Baseline
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  TZ: UTC
+
+jobs:
+  japanese-baseline:
+    name: Japanese behavior baseline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Check public file allowlist
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${BASE_SHA}...${HEAD_SHA}"
+          elif [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            RANGE="${AFTER}^...${AFTER}"
+          else
+            RANGE="${BEFORE}...${AFTER}"
+          fi
+
+          bash tools/git/check-public-staged-files.sh --range "$RANGE"
+
+      - name: Run listening baseline tests
+        run: python -m unittest discover -s tools/listening-transcribe-official/tests -p 'test_*.py'
+
+      - name: Run review rollover baseline tests
+        run: python -m unittest discover -s codex-skills/jp-next-day-review-updater/tests -p 'test_*.py'
+
+      - name: Run vault structure baseline tests
+        run: python -m unittest discover -s tools/vault-structure/tests -p 'test_*.py'
+
+      - name: Run architecture baseline tests
+        run: python -m unittest discover -s tools/architecture-baseline/tests -p 'test_*.py'

@@ -1,0 +1,17 @@
+{
+  "audio": "audio/synthetic-listening.source.txt",
+  "slices": [
+    {
+      "id": "S01",
+      "start": 0.0,
+      "end": 1.5,
+      "file": "slices/S01.slice.txt"
+    },
+    {
+      "id": "S02",
+      "start": 1.6,
+      "end": 3.0,
+      "file": "slices/S02.slice.txt"
+    }
+  ]
+}
