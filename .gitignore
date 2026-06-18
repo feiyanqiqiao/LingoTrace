@@ -38,6 +38,8 @@
 !tools/README.md
 !tools/listening-transcribe-official/
 !tools/listening-transcribe-official/**
+!tools/architecture-baseline/
+!tools/architecture-baseline/**
 !tools/vault-structure/
 !tools/vault-structure/**
 !tools/git/

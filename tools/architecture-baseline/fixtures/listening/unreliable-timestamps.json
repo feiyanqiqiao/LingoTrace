@@ -1,0 +1,6 @@
+{
+  "behavior_id": "JP-LISTEN-004",
+  "completion_status": "blocked",
+  "required_resolution": "reviewed_slice_manifest",
+  "reason": "Synthetic transcript contains overlapping or missing timestamps."
+}

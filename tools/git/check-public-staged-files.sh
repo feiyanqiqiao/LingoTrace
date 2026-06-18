@@ -48,7 +48,7 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-allowed_re='^(\.github/dependabot\.yml|\.github/workflows/[^/]+\.ya?ml|\.gitignore|AGENTS\.md|README\.md|CHANGELOG\.md|CONTRIBUTING\.md|LICENSE|SECURITY\.md|docs/|系统配置/|学习系统/总训练\.base|codex-skills/|tools/README\.md|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/)'
+allowed_re='^(\.github/dependabot\.yml|\.github/workflows/[^/]+\.ya?ml|\.gitignore|AGENTS\.md|README\.md|CHANGELOG\.md|CONTRIBUTING\.md|LICENSE|SECURITY\.md|docs/|系统配置/|学习系统/总训练\.base|codex-skills/|tools/README\.md|tools/architecture-baseline/|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/)'
 public_scaffold_re='^(系统配置/|学习系统/总训练\.base$)'
 private_path_re='(^|/)(\.obsidian|tmp|学习系统|筆記|笔记)(/|$)'
 private_ext_re='\.(mp3|m4a|wav|flac|mp4|mov|webm|pdf|jpg|jpeg|png|heic)$'

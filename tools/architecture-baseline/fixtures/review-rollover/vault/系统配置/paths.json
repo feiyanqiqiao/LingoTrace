@@ -1,0 +1,7 @@
+{
+  "managed_review_roots": [
+    "synthetic-study/focus-vocab"
+  ],
+  "base_vocab_root": "synthetic-study/base-vocab",
+  "daily_notes_root": "synthetic-notes"
+}

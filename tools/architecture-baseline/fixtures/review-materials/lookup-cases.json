@@ -1,0 +1,21 @@
+{
+  "search_order": ["focus", "base"],
+  "cases": {
+    "new_vocab": {
+      "action": "create_focus_card"
+    },
+    "base_match": {
+      "action": "restore_focus_card"
+    },
+    "mastered_reappears": {
+      "action": "reactivate_focus_card",
+      "new_review_stage": "day0"
+    },
+    "grammar_input": {
+      "target_root": "grammar"
+    },
+    "error_input": {
+      "target_root": "error"
+    }
+  }
+}
