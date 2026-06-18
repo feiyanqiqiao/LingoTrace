@@ -517,6 +517,7 @@ When a focus review card finishes `day180` and is ready to sink:
 1. create or update the base note under `<base_vocab_root>`
 2. copy over `headword`, `reading`, `meaning_zh`, `source_notes`, `first_seen`, `last_seen`, and `seen_count`
    - also copy `accent_display`, including a blank placeholder when the accent is unknown
+   - preserve and merge `kanji_diff` and `kanji_diff_pairs`; keep the `jp/kanji_diff` tag when the merged value is true
 3. set the base note to `status: promoted`
 4. include tag `jp/promoted`
 5. switch the focus card to `status: mastered`
