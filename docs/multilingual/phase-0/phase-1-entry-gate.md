@@ -10,6 +10,8 @@ Phase 1 starts only when Phase 0 evidence and contracts are merged and reviewed.
 - [ ] The `Japanese Baseline` workflow passes on `main`.
 - [ ] Referenced public paths in Phase 0 documents exist.
 - [ ] No Phase 0 document contradicts the current five `SKILL.md` workflow descriptions.
+- [ ] The conformance checklist can be converted into Phase 1 tests without adding new product decisions.
+- [ ] The migration contract and old-framework exit checklist are confirmed by maintainers before runtime work begins.
 
 ## Required Decisions
 
@@ -23,6 +25,7 @@ Phase 1 starts only when Phase 0 evidence and contracts are merged and reviewed.
 
 - no English functionality
 - no real migration
+- no daily-use cutover
 - no old Vault deletion
 - no new runtime fallback to Japanese behavior
 - no broad field rename of Japanese learning data

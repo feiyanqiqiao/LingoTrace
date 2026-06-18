@@ -90,6 +90,13 @@ def list_after(raw_yaml: str, key: str) -> set[str]:
     return values
 
 
+def section_between(raw_yaml: str, start_key: str, end_key: str) -> str:
+    match = re.search(rf"(?ms)^{start_key}:\n(.*?)^{end_key}:", raw_yaml)
+    if not match:
+        raise AssertionError(f"missing yaml section between {start_key} and {end_key}")
+    return match.group(1)
+
+
 class ContractExampleTests(unittest.TestCase):
     def test_phase0_contract_documents_exist_and_define_fixed_public_contracts(self) -> None:
         docs = {
@@ -115,6 +122,8 @@ class ContractExampleTests(unittest.TestCase):
             self.assertIn(field, architecture)
         self.assertIn("Do not infer target_language from path, tag, folder, or content", architecture)
         self.assertIn("Preserve unknown frontmatter fields and body content", architecture)
+        self.assertIn("External tool failure is a stop condition", architecture)
+        self.assertIn("Implementation Gap Register", architecture)
 
     def test_examples_exist_use_yaml_and_do_not_embed_private_paths(self) -> None:
         examples = [
@@ -150,16 +159,20 @@ class ContractExampleTests(unittest.TestCase):
             "compatible_core",
             "compatible_vault_schema",
             "capabilities",
+            "external_tools",
             "language_fields",
             "item_types",
             "tag_namespace",
             "default_path_roles",
         }
         self.assertTrue(required.issubset(top_level_keys(raw)))
-        self.assertEqual(CAPABILITIES, set(re.findall(r"\bid:\s+([a-z_]+)", raw)))
-        maturity_values = set(re.findall(r"\bmaturity:\s+([a-z_]+)", raw))
+        capabilities_raw = section_between(raw, "capabilities", "external_tools")
+        self.assertEqual(CAPABILITIES, set(re.findall(r"\bid:\s+([a-z_]+)", capabilities_raw)))
+        maturity_values = set(re.findall(r"\bmaturity:\s+([a-z_]+)", capabilities_raw))
         self.assertTrue(maturity_values)
         self.assertTrue(maturity_values.issubset(MATURITY_VALUES))
+        self.assertIn("minimum_required", raw)
+        self.assertIn("failure_policy: stop_before_write", raw)
 
     def test_review_card_shell_example_separates_core_fields_from_japanese_extensions(self) -> None:
         raw = yaml_fence(read_required(EXAMPLES_ROOT / "review-card-shell.example.md"))
@@ -185,6 +198,10 @@ class ContractExampleTests(unittest.TestCase):
             "do not copy old framework wholesale",
             "dry-run",
             "repeatable",
+            "source_manifest",
+            "target_manifest",
+            "content_hash",
+            "excluded_with_user_approval",
         ):
             self.assertIn(token, contract)
 
@@ -199,6 +216,15 @@ class ContractExampleTests(unittest.TestCase):
             "verification_report",
         ):
             self.assertIn(f"{key}:", manifest)
+        for token in (
+            "manifest_version:",
+            "source_manifest:",
+            "target_manifest:",
+            "content_hash:",
+            "excluded_with_user_approval:",
+            "approved_by:",
+        ):
+            self.assertIn(token, manifest)
 
     def test_phase1_entry_gate_blocks_runtime_work_until_phase0_is_complete(self) -> None:
         gate = read_required(PHASE0_ROOT / "phase-1-entry-gate.md")
@@ -214,6 +240,10 @@ class ContractExampleTests(unittest.TestCase):
             "Japanese language pack",
             "new Vault initialization",
             "temporary migration",
+            "conformance checklist can be converted into Phase 1 tests",
+            "migration contract and old-framework exit checklist are confirmed",
+            "no daily-use cutover",
+            "no old Vault deletion",
         ):
             self.assertIn(token, gate)
 

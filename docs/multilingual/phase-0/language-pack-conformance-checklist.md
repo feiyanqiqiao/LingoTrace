@@ -18,6 +18,8 @@ This checklist defines what a language pack must prove before Phase 1 treats it 
 - [ ] Declares each capability as `experimental`, `stable`, or `deprecated`.
 - [ ] Declares dependencies between capabilities when one workflow hands off to another.
 - [ ] Declares read paths and write paths for each capability.
+- [ ] Declares external tool requirements, minimum required interfaces, and failure policy for media, ASR, slicing, dictionary, or pronunciation dependencies.
+- [ ] Stops before write when a required external tool, dependency, version, or locale check fails.
 - [ ] Declares unsupported capabilities explicitly instead of falling back to Japanese logic.
 
 ## Pack-Owned Surface
@@ -26,8 +28,9 @@ This checklist defines what a language pack must prove before Phase 1 treats it 
 - [ ] Lists Skill or workflow entry points owned by the pack.
 - [ ] Lists validators owned by the pack.
 - [ ] Lists dictionaries, pronunciation resources, and other language resources.
-- [ ] Lists default path roles and separates them from explicit Vault path configuration.
+- [ ] Lists default path roles and allows explicit Vault path configuration to override those defaults.
 - [ ] Lists language-specific fields, item types, tag namespace, and display rules.
+- [ ] Declares initialization artifacts and limits them to capabilities actually declared by the pack.
 
 ## Core Boundary
 
@@ -36,6 +39,7 @@ This checklist defines what a language pack must prove before Phase 1 treats it 
 - [ ] Preserves unknown frontmatter fields and Markdown body content.
 - [ ] Treats missing version, missing capability, or missing language pack as a stop condition.
 - [ ] Does not import private learning data into the public repository.
+- [ ] Does not persist undeclared cross-Vault path, cache, deduplication, or review state.
 
 ## Japanese Pack Phase 1 Minimum
 

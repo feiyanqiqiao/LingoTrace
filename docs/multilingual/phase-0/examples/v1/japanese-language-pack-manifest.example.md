@@ -30,7 +30,13 @@ capabilities:
     depends_on:
       - review_materials
 external_tools:
-  media_adapter: ListenKit
+  - id: external_media_adapter
+    tool: ListenKit
+    minimum_required:
+      transcript_markdown: true
+      structured_transcript: true
+      deterministic_slice_export: true
+    failure_policy: stop_before_write
 templates:
   - listening_note
   - source_note

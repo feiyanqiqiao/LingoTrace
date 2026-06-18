@@ -74,7 +74,7 @@ A language pack manifest must declare:
 - transcription locale when media workflows need it: `transcription_locale`
 - compatible version ranges: `compatible_core`, `compatible_vault_schema`
 - implemented capabilities, dependencies, maturity, and read/write scope
-- external tools and adapter boundaries, such as ASR or deterministic audio slicing
+- external tools, minimum required interfaces, failure policy, and adapter boundaries, such as ASR or deterministic audio slicing
 - templates, Skills, validators, resources, and default views owned by the pack
 - language-specific fields, item types, tag namespace, and default path roles
 
@@ -108,9 +108,10 @@ Path ownership order:
 
 1. explicit Vault path configuration
 2. selected language-pack defaults
-3. core fallback only for non-language infrastructure that is declared by the core
 
-Prose examples, historical folders, tags, or note content are not path authority.
+This fixed order applies to Vault learning paths and generated Vault assets. Core-internal cache or temporary paths are not learning paths and must be declared separately if Phase 1 introduces them.
+
+Prose examples, historical folders, tags, or note content are not path authority. Old Vault historical paths may only appear through a migration manifest or a read-only source inventory.
 
 Write-capable workflows must follow this sequence:
 
@@ -122,6 +123,22 @@ Write-capable workflows must follow this sequence:
 6. report changed files and skipped files
 
 Unsupported capability, unknown schema version, missing language pack, or ambiguous target language must fail explicitly. It must not fall back to Japanese behavior.
+
+External tool failure is a stop condition before write when the selected capability depends on that tool. A failed ASR adapter, missing slice exporter, missing dictionary, unsupported locale, or failed dependency check must not produce a partial note, partial SRS update, or guessed language-pack result.
+
+## Implementation Gap Register
+
+The following target-architecture abilities are intentionally not implemented by Phase 0:
+
+| Gap | Earliest owner |
+|---|---|
+| Vault context file format and loader | Phase 1 core design |
+| language-pack manifest loader and validator | Phase 1 core design |
+| Japanese language-pack packaging and new entry points | Phase 1 Japanese language pack |
+| new Japanese Vault initialization | Phase 1 new Vault initialization |
+| source-to-target migration tooling and reports | Phase 1 temporary migration module |
+| real private data migration, daily-use cutover, and old Vault read-only observation | Phase 2 |
+| English language pack and English learning workflows | after core/Japanese boundary acceptance |
 
 ## Demand Ownership Decision Table
 

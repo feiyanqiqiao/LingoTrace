@@ -12,10 +12,13 @@ The migration manifest must include:
 
 - `source_vault`
 - `target_vault`
+- `source_manifest`
+- `target_manifest`
 - `preserve_data`
 - `recreate_from_pack`
 - `transform_with_map`
 - `remove_after_cutover`
+- `excluded_with_user_approval`
 - `conflicts`
 - `verification_report`
 
@@ -33,7 +36,7 @@ Preserve by default:
 - manually curated examples, explanations, accent confirmations, sentence selections, and reflections
 - Japanese fields and `jp` tag namespace that are owned by the Japanese language pack
 
-Byte preservation is preferred when the target relative path is valid. Field-aware comparison is required when the migration tool must inspect frontmatter.
+Byte preservation is preferred when the target relative path is valid. Field-aware comparison is required when the migration tool must inspect frontmatter. Every preserved file or asset must have a `content_hash` comparison strategy or a documented field-aware comparison strategy in the source and target manifests.
 
 ## Recreate From Pack
 
@@ -78,6 +81,20 @@ Conflict categories include:
 - non-repeatable transform result
 
 Each conflict must appear in `conflicts` and in the final `verification_report`.
+
+## Manifest And Verification Structure
+
+The `source_manifest` records the frozen source inventory generated during the Phase 2 write freeze. The `target_manifest` records the target inventory after migration or recreation. Both manifests must use repository-relative or Vault-relative paths, never personal absolute paths.
+
+Each manifest entry records:
+
+- relative path or generated asset ID
+- classification: preserved, recreated from pack, transformed with map, removed after cutover, or excluded with user approval
+- comparison strategy, such as `content_hash`, `frontmatter_and_body`, `links_and_hashes`, or `field_aware`
+- source hash and target hash when bytes should match
+- exclusion reason and approver when the entry is excluded with user approval
+
+The `verification_report` summarizes counts, failed comparisons, unresolved conflicts, excluded entries, and the exact acceptance result. A report with unresolved conflicts, unclassified entries, or missing user approvals blocks cutover.
 
 ## Final Source Manifest
 

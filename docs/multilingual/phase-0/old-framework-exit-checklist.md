@@ -14,6 +14,7 @@ This checklist records exit obligations. It does not authorize deletion by itsel
 - [ ] Old Vault-coupled listening renderer location is replaced by core or Japanese-pack ownership.
 - [ ] Old in-place Vault structure migration scripts are no longer needed for target Vault creation.
 - [ ] Temporary migration adapters are deleted or marked outside runtime after acceptance.
+- [ ] Daily learning entry points, scheduled jobs, and external-tool wrappers point to the new Vault and new framework.
 - [ ] Public docs no longer instruct users to invoke removed entry points.
 
 ## Data Safety Before Exit
