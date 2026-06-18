@@ -42,7 +42,9 @@ templates:
   - source_note
   - vocab_card
   - grammar_card
+  - pronunciation_card
   - error_card
+  - daily_study_checklist
   - survival_speaking_card
 skills:
   - listening_notes

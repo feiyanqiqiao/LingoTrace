@@ -30,12 +30,14 @@ This checklist records exit obligations. It does not authorize deletion by itsel
 
 After target acceptance, the old Vault enters read-only observation. During this period:
 
-- no new learning data is written to the old Vault
-- the target Vault handles daily learning
-- any missing asset discovered in the old Vault is copied through a recorded migration fix, not by reviving the old framework
+- [ ] The old Vault is placed in read-only observation.
+- [ ] No new learning data is written to the old Vault.
+- [ ] The target Vault handles daily learning.
+- [ ] Any missing asset discovered in the old Vault is copied through a recorded migration fix, not by reviving the old framework.
 
 ## Final Removal
 
-Final removal requires explicit user confirmation after read-only observation. Without confirmation, the old Vault remains archived and untouched.
+- [ ] Final removal has explicit user confirmation after read-only observation.
+- [ ] Without confirmation, the old Vault remains archived and untouched.
 
 The public repository may still keep historical evidence documents and tests. It must not keep operational instructions that require the old framework after cutover.

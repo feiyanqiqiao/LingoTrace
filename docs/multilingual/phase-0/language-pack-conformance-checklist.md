@@ -46,6 +46,7 @@ This checklist defines what a language pack must prove before Phase 1 treats it 
 - [ ] Registers Japanese fields such as `reading`, `accent_display`, `meaning_zh`, `kanji_diff`, and `kanji_diff_pairs`.
 - [ ] Registers Japanese item types and `jp` tag namespace that remain valid in migrated data.
 - [ ] Preserves current five Japanese workflows as migration obligations unless a Phase 1 decision explicitly supersedes a behavior.
+- [ ] Covers vocabulary, grammar, pronunciation, error-card, and daily study checklist ownership under `review_materials`.
 - [ ] Keeps ListenKit or other media tooling at an external adapter boundary.
 - [ ] Keeps old `jp-*` entries only as migration evidence or temporary source readers until cutover.
 

@@ -48,6 +48,8 @@ PRIVATE_PATH_MARKERS = {
     "/" + "Users" + "/",
     "Mobile" + " Documents",
     "iCloud" + "~md~obsidian",
+    "zhang" + "qiao",
+    "山" + "桥",
 }
 
 UNRESOLVED_MARKER_PATTERN = r"\b(" + "|".join(("TB" + "D", "TO" + "DO")) + r")\b"
@@ -97,6 +99,10 @@ def section_between(raw_yaml: str, start_key: str, end_key: str) -> str:
     return match.group(1)
 
 
+def checked_lines(text: str) -> list[str]:
+    return [line for line in text.splitlines() if line.startswith("- [ ]")]
+
+
 class ContractExampleTests(unittest.TestCase):
     def test_phase0_contract_documents_exist_and_define_fixed_public_contracts(self) -> None:
         docs = {
@@ -124,6 +130,8 @@ class ContractExampleTests(unittest.TestCase):
         self.assertIn("Preserve unknown frontmatter fields and body content", architecture)
         self.assertIn("External tool failure is a stop condition", architecture)
         self.assertIn("Implementation Gap Register", architecture)
+        self.assertIn("Contract Ownership Matrix", architecture)
+        self.assertIn("daily study checklist", architecture)
 
     def test_examples_exist_use_yaml_and_do_not_embed_private_paths(self) -> None:
         examples = [
@@ -173,6 +181,8 @@ class ContractExampleTests(unittest.TestCase):
         self.assertTrue(maturity_values.issubset(MATURITY_VALUES))
         self.assertIn("minimum_required", raw)
         self.assertIn("failure_policy: stop_before_write", raw)
+        self.assertIn("pronunciation_card", raw)
+        self.assertIn("daily_study_checklist", raw)
 
     def test_review_card_shell_example_separates_core_fields_from_japanese_extensions(self) -> None:
         raw = yaml_fence(read_required(EXAMPLES_ROOT / "review-card-shell.example.md"))
@@ -223,8 +233,24 @@ class ContractExampleTests(unittest.TestCase):
             "content_hash:",
             "excluded_with_user_approval:",
             "approved_by:",
+            "before:",
+            "after:",
+            "preview_result:",
+            "acceptance_result:",
+            "conflict_status:",
+            "failed_comparison_count:",
+            "unclassified_entry_count:",
+            "missing_user_approval_count:",
         ):
             self.assertIn(token, manifest)
+
+    def test_old_framework_exit_checklist_has_verifiable_exit_gates(self) -> None:
+        exit_checklist = read_required(PHASE0_ROOT / "old-framework-exit-checklist.md")
+        lines = checked_lines(exit_checklist)
+
+        self.assertTrue(any("read-only observation" in line for line in lines))
+        self.assertTrue(any("explicit user confirmation" in line for line in lines))
+        self.assertTrue(any("old Vault remains archived" in line for line in lines))
 
     def test_phase1_entry_gate_blocks_runtime_work_until_phase0_is_complete(self) -> None:
         gate = read_required(PHASE0_ROOT / "phase-1-entry-gate.md")
@@ -244,6 +270,9 @@ class ContractExampleTests(unittest.TestCase):
             "migration contract and old-framework exit checklist are confirmed",
             "no daily-use cutover",
             "no old Vault deletion",
+            "no ownership conflicts",
+            "migration asset classification has no unresolved items",
+            "project maintainers and Zheng Jie",
         ):
             self.assertIn(token, gate)
 

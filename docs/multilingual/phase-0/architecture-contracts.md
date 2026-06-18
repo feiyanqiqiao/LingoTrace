@@ -49,7 +49,7 @@ The first contract set uses these fixed capability IDs:
 |---|---|---|
 | `listening_notes` | fixed listening-practice notes, extensive/intensive modes, provenance, and real slice references | `jp-listening-script-generator` |
 | `source_notes` | flexible source notes with mandatory provenance and transcript appendix when available | `jp-source-note-generator` |
-| `review_materials` | vocabulary, grammar, pronunciation, and error review material maintenance | `jp-review-material-maintainer` |
+| `review_materials` | vocabulary, grammar, pronunciation, error review material, and daily study checklist maintenance | `jp-review-material-maintainer` |
 | `speaking_cards` | short daily-life speaking cards and conservative promotion rules | `jp-survival-speaking-card-generator` |
 | `review_rollover` | deterministic end-of-day SRS rollover and focus-to-base sink behavior | `jp-next-day-review-updater` |
 
@@ -101,6 +101,22 @@ The shared core owns only cross-language lifecycle fields. The first fixed core 
 Japanese fields such as `reading`, `accent_display`, `meaning_zh`, `kanji_diff`, and `kanji_diff_pairs` remain Japanese language-pack fields. They must not be mechanically renamed to generic fields during migration.
 
 Preserve unknown frontmatter fields and body content. Core readers and writers must keep language extensions they do not understand, unless a validator returns an explicit blocking error before any write.
+
+## Contract Ownership Matrix
+
+| Contract surface | Owner |
+|---|---|
+| Vault context fields and version negotiation | core |
+| capability IDs and maturity values | core contract |
+| SRS lifecycle fields in the core review-card shell | core |
+| Japanese templates, fields, item types, tag namespace, dictionaries, pronunciation, and accent behavior | Japanese language pack |
+| Japanese review-material templates, including vocabulary, grammar, pronunciation, error, and daily study checklist structures | Japanese language pack |
+| explicit Vault path configuration | private Vault configuration |
+| language-pack default path roles | selected language pack |
+| media import, ASR, transcript generation, and deterministic slicing | external adapter boundary |
+| migration source inventory, target inventory, transform records, conflicts, and verification reports | temporary migration module |
+| old `jp-*` entry points and Vault-embedded public-repository topology | old-framework exit work |
+| private notes, cards, media, transcripts, review history, and personal reflections | private Vault data |
 
 ## Path And Write Contract
 

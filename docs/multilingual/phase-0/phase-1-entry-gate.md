@@ -12,6 +12,9 @@ Phase 1 starts only when Phase 0 evidence and contracts are merged and reviewed.
 - [ ] No Phase 0 document contradicts the current five `SKILL.md` workflow descriptions.
 - [ ] The conformance checklist can be converted into Phase 1 tests without adding new product decisions.
 - [ ] The migration contract and old-framework exit checklist are confirmed by maintainers before runtime work begins.
+- [ ] The five capabilities, core fields, language fields, path rules, and external adapter boundaries have no ownership conflicts.
+- [ ] The migration asset classification has no unresolved items in the Phase 0 public inventory.
+- [ ] The project maintainers and Zheng Jie approve the Phase 1 entry gate before implementation starts.
 
 ## Required Decisions
 

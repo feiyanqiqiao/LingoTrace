@@ -42,8 +42,13 @@ transform_with_map:
   - source: OldConfig/custom-view.base
     target: Config/views/custom-view.base
     reason: reviewed_target_config_location
+    before: OldConfig/custom-view.base
+    after: Config/views/custom-view.base
     dry_run: pass
+    preview_result: no_link_or_hash_change
+    conflict_status: resolved
     accepted_by_user: true
+    acceptance_result: accepted
 remove_after_cutover:
   - embedded_public_repo
   - old_jp_entrypoints
@@ -62,5 +67,9 @@ verification_report:
   transformed_count: 1
   removed_count: 3
   excluded_with_user_approval_count: 1
+  failed_comparison_count: 0
+  unclassified_entry_count: 0
+  missing_user_approval_count: 0
   unresolved_conflicts: 1
+  acceptance_result: blocked_until_conflict_resolution
 ```
