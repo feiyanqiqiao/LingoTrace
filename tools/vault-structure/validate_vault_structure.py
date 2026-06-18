@@ -13,16 +13,23 @@ WIKILINK = re.compile(r"!?\[\[([^\]]+)\]\]")
 TEMPLATE_MARKERS = ("YYYY", "<", ">")
 
 
+def is_icloud_dataless_placeholder(stat_result: object) -> bool:
+    return getattr(stat_result, "st_size", 0) > 0 and getattr(stat_result, "st_blocks", 1) == 0
+
+
+def stat_note_file(path: Path) -> object:
+    try:
+        return path.stat()
+    except OSError as exc:
+        raise OSError(f"unable to stat note file: {path}") from exc
+
+
 def note_files(root: Path) -> list[Path]:
     result: list[Path] = []
     for base in (root / "学习系统", root / "系统配置", root / "笔记"):
         if base.exists():
             for path in base.rglob("*.md"):
-                try:
-                    st = path.stat()
-                    if st.st_size > 0 and getattr(st, "st_blocks", 1) == 0:
-                        continue
-                except OSError:
+                if is_icloud_dataless_placeholder(stat_note_file(path)):
                     continue
                 result.append(path)
     return sorted(result)

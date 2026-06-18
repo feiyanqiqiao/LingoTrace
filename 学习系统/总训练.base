@@ -104,8 +104,6 @@ views:
       - seen_count
       - attempt_count
     sort:
-      - property: formula.track_label
-        direction: ASC
       - property: first_seen
         direction: DESC
       - property: formula.priority_rank

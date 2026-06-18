@@ -376,19 +376,25 @@ def extract_label(text: str, path: Path) -> str:
     return path.stem
 
 
+def is_icloud_dataless_placeholder(stat_result: object) -> bool:
+    return getattr(stat_result, "st_size", 0) > 0 and getattr(stat_result, "st_blocks", 1) == 0
+
+
+def stat_review_item(path: Path) -> object:
+    try:
+        return path.stat()
+    except OSError as exc:
+        raise ReviewUpdateError(f"{path}: unable to stat review item") from exc
+
+
 def load_items(paths_config: PathsConfig) -> list[ItemState]:
     items: list[ItemState] = []
     for root_path in paths_config.managed_review_roots:
         if not root_path.exists():
             raise ReviewUpdateError(f"Managed root is missing: {root_path}")
         for path in sorted(root_path.rglob("*.md")):
-            # Skip iCloud dataless placeholder files to avoid blocking on download
-            try:
-                st = path.stat()
-                if st.st_size > 0 and getattr(st, "st_blocks", 1) == 0:
-                    print(f"Skipping iCloud placeholder file: {path}")
-                    continue
-            except OSError:
+            if is_icloud_dataless_placeholder(stat_review_item(path)):
+                print(f"Skipping iCloud placeholder file: {path}")
                 continue
             text = path.read_text()
             if not text.startswith("---\n"):

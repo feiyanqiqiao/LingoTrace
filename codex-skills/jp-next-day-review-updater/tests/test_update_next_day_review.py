@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "update_next_day_review.py"
@@ -23,6 +24,86 @@ class UpdateNextDayReviewTests(unittest.TestCase):
 
     def focus_vocab_path(self, vault_root: Path, name: str) -> Path:
         return vault_root / "focus-vocab" / name
+
+    def write_active_card(self, path: Path, headword: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "\n".join(
+                [
+                    "---",
+                    "track: class_review",
+                    "item_type: vocab",
+                    "status: active",
+                    "priority: normal",
+                    "done_today: true",
+                    f"headword: {headword}",
+                    "reading: よみ",
+                    "meaning_zh: 意思",
+                    "source_notes: []",
+                    "first_seen: 2026-06-18",
+                    "last_seen: 2026-06-18",
+                    "seen_count: 1",
+                    "error_count: 0",
+                    "review_stage: day0",
+                    "next_review: 2026-06-18",
+                    'last_reviewed: ""',
+                    "---",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    def test_load_items_skips_icloud_dataless_placeholder(self) -> None:
+        class FakeStat:
+            st_size = 128
+            st_blocks = 0
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            vault_root = Path(tmp_dir)
+            review_root = vault_root / "review"
+            valid_path = review_root / "valid.md"
+            placeholder_path = review_root / "placeholder.md"
+            self.write_active_card(valid_path, "正常")
+            self.write_active_card(placeholder_path, "未下载")
+            paths_config = MODULE.PathsConfig(
+                managed_review_roots=(review_root,),
+                base_vocab_root=self.base_vocab_root(vault_root),
+                daily_notes_root=vault_root / "notes",
+            )
+            original_stat = Path.stat
+
+            def fake_stat(path: Path, *args: object, **kwargs: object):
+                if path == placeholder_path:
+                    return FakeStat()
+                return original_stat(path, *args, **kwargs)
+
+            with patch.object(Path, "stat", fake_stat):
+                items = MODULE.load_items(paths_config)
+
+        self.assertEqual([item.path for item in items], [valid_path])
+
+    def test_load_items_reports_non_placeholder_stat_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            vault_root = Path(tmp_dir)
+            review_root = vault_root / "review"
+            bad_path = review_root / "bad.md"
+            self.write_active_card(bad_path, "坏文件")
+            paths_config = MODULE.PathsConfig(
+                managed_review_roots=(review_root,),
+                base_vocab_root=self.base_vocab_root(vault_root),
+                daily_notes_root=vault_root / "notes",
+            )
+            original_stat = Path.stat
+
+            def fake_stat(path: Path, *args: object, **kwargs: object):
+                if path == bad_path:
+                    raise OSError("permission denied")
+                return original_stat(path, *args, **kwargs)
+
+            with patch.object(Path, "stat", fake_stat):
+                with self.assertRaisesRegex(MODULE.ReviewUpdateError, "unable to stat review item"):
+                    MODULE.load_items(paths_config)
 
     def test_base_note_path_uses_focus_card_stem_not_raw_headword(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
