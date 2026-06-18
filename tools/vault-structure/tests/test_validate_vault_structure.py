@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "validate_vault_structure.py"
@@ -15,6 +16,47 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ValidateVaultStructureTests(unittest.TestCase):
+    def test_note_files_skips_icloud_dataless_placeholder(self) -> None:
+        class FakeStat:
+            st_size = 128
+            st_blocks = 0
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            valid = root / "学习系统/词库/有效.md"
+            placeholder = root / "学习系统/词库/未下载.md"
+            valid.parent.mkdir(parents=True)
+            valid.write_text("# 有效\n", encoding="utf-8")
+            placeholder.write_text("# 未下载\n", encoding="utf-8")
+            original_stat = Path.stat
+
+            def fake_stat(path: Path, *args: object, **kwargs: object):
+                if path == placeholder:
+                    return FakeStat()
+                return original_stat(path, *args, **kwargs)
+
+            with patch.object(Path, "stat", fake_stat):
+                notes = MODULE.note_files(root)
+
+        self.assertEqual(notes, [valid])
+
+    def test_note_files_reports_non_placeholder_stat_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            bad = root / "学习系统/词库/坏文件.md"
+            bad.parent.mkdir(parents=True)
+            bad.write_text("# 坏文件\n", encoding="utf-8")
+            original_stat = Path.stat
+
+            def fake_stat(path: Path, *args: object, **kwargs: object):
+                if path == bad:
+                    raise OSError("permission denied")
+                return original_stat(path, *args, **kwargs)
+
+            with patch.object(Path, "stat", fake_stat):
+                with self.assertRaisesRegex(OSError, "unable to stat note file"):
+                    MODULE.note_files(root)
+
     def test_relative_audio_embed_resolves_from_note_parent(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

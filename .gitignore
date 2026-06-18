@@ -53,7 +53,9 @@ tmp/
 学习系统/
 笔记/
 
-# Keep the real learning content private, but publish the empty dashboard scaffold.
+# Keep real learning content private.
+# Publish only the reusable 总训练.base dashboard template; incidental local view
+# changes should not be submitted.
 !学习系统/
 !学习系统/总训练.base
 
