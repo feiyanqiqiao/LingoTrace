@@ -43,6 +43,7 @@ Do not treat folder paths in prose as the source of truth. System-managed path r
 - If a merged branch is attached to a temporary worktree, verify that worktree is clean, remove it, and then delete the branch.
 - After cleanup, verify that the local checkout is on `main`, `main` tracks `origin/main`, and no completed topic branches remain locally or remotely.
 - Before committing or merging, review the staged file list and confirm it only contains public allowlisted files. Private notes, Obsidian state, audio, images, PDFs, and temporary transcription artifacts must stay untracked or ignored.
+- `学习系统/总训练.base` is public only as the reusable dashboard template. Commit changes to it only when intentionally changing the shared default Bases view, such as filters, columns, formulas, sort order, or widths. Do not include incidental Obsidian UI or daily-study changes; if it appears in a diff, either justify the template change in the pull request or remove it from scope.
 - Run `bash tools/git/check-public-staged-files.sh` before committing public changes. When GitHub Actions is available for this repository, use the same allowlist check against pull request diffs.
 - Do not bypass failing GitHub checks when they exist unless the failure is understood, documented in the pull request, and unrelated to the proposed change.
 
