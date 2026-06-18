@@ -103,6 +103,16 @@ def checked_lines(text: str) -> list[str]:
     return [line for line in text.splitlines() if line.startswith("- [ ]")]
 
 
+def table_rows(text: str) -> dict[str, list[str]]:
+    rows: dict[str, list[str]] = {}
+    for line in text.splitlines():
+        if not line.startswith("| AC-"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        rows[cells[0]] = cells
+    return rows
+
+
 class ContractExampleTests(unittest.TestCase):
     def test_phase0_contract_documents_exist_and_define_fixed_public_contracts(self) -> None:
         docs = {
@@ -296,11 +306,21 @@ class ContractExampleTests(unittest.TestCase):
             "japanese-migration-contract.md",
             "old-framework-exit-checklist.md",
             "phase-1-entry-gate.md",
+            "japanese-vault-context.example.md",
+            "japanese-language-pack-manifest.example.md",
+            "review-card-shell.example.md",
+            "japanese-migration-manifest.example.md",
             "test_contract_examples.py",
             "External review required",
             "not a Phase 0 completion claim",
         ):
             self.assertIn(token, matrix)
+
+        rows = table_rows(matrix)
+        self.assertEqual({f"AC-{index:02d}" for index in range(1, 11)}, set(rows))
+        for acceptance_id in [f"AC-{index:02d}" for index in range(1, 10)]:
+            self.assertEqual("Covered by PR C", rows[acceptance_id][3])
+        self.assertEqual("External review required", rows["AC-10"][3])
 
 
 if __name__ == "__main__":
