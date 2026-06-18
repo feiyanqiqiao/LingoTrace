@@ -25,12 +25,12 @@ Evidence references use repository-relative public paths and stable section or s
 | `EV-SPEAK-VALIDATOR` | `codex-skills/jp-survival-speaking-card-generator/scripts/validate-survival-speaking-cards.sh` | read-only observable validation boundary |
 | `EV-ROLLOVER-SKILL` | `codex-skills/jp-next-day-review-updater/SKILL.md` | declared end-of-day contract |
 | `EV-ROLLOVER-CODE` | `codex-skills/jp-next-day-review-updater/scripts/update_next_day_review.py` | deterministic SRS and pending-write implementation |
-| `EV-ROLLOVER-TESTS` | `codex-skills/jp-next-day-review-updater/tests/test_update_next_day_review.py` | 6 executable characterization tests |
+| `EV-ROLLOVER-TESTS` | `codex-skills/jp-next-day-review-updater/tests/test_update_next_day_review.py` | 8 executable characterization tests on the updated PR A branch; 6 existed at the initial baseline commit |
 | `EV-PATHS` | `系统配置/paths.json` | current path-role configuration |
 | `EV-REVIEW-FLOW` | `系统配置/复习流程.md` | current human-facing review schedule |
 | `EV-DAILY-TEMPLATE` | `系统配置/模板/每日学习清单模板.md` | checklist structure |
 | `EV-VAULT-CODE` | `tools/vault-structure/validate_vault_structure.py` | current path, link, and layout validation |
-| `EV-VAULT-TESTS` | `tools/vault-structure/tests/` | 16 executable structure and migration tests |
+| `EV-VAULT-TESTS` | `tools/vault-structure/tests/` | 18 executable structure and migration tests on the updated PR A branch; 16 existed at the initial baseline commit |
 
 ## Behavior Mapping
 
@@ -50,6 +50,8 @@ Evidence references use repository-relative public paths and stable section or s
 /usr/bin/python3 -m unittest discover -s tools/vault-structure/tests -p 'test_*.py'
 ```
 
-Result on the baseline commit: 74 listening tests, 6 rollover tests, and 16 Vault-structure tests passed.
+Initial result at the PR A baseline commit: 74 listening tests, 6 rollover tests, and 16 Vault-structure tests passed.
+
+Result after updating PR A onto `main` commit `4cd72448ecdaec3eefb091dd9c7fb52c7f66816a`: 74 listening tests, 8 rollover tests, and 18 Vault-structure tests passed.
 
 PR B must rerun the same suites and the new architecture-baseline suite with Python 3.14 in GitHub Actions. The PR A local result is a starting-point check, not the future required status check.
