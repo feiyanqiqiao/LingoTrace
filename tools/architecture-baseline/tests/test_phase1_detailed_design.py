@@ -356,6 +356,35 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_defines_command_report_envelope(self) -> None:
+        design = read_design()
+
+        for token in (
+            "Command Report Envelope",
+            "--format json",
+            '"command"',
+            '"mode"',
+            '"accepted"',
+            '"exit_code"',
+            '"errors"',
+            '"warnings"',
+            '"read_files"',
+            '"planned_writes"',
+            '"changed_files"',
+            '"skipped_files"',
+            '"blocked_files"',
+            '"artifacts"',
+            "Report paths must be Vault-relative, repository-relative, or synthetic fixture labels.",
+            "Dry-run reports must not list files under `changed_files`.",
+            "Blocking findings must use the explicit capability, adapter, validation, path, or migration error codes defined by this design.",
+            "migration-inventory reports must include `source_manifest`, `target_manifest`, `verification_report`, and `old_framework_exit_ledger` under `artifacts`.",
+            "PR 1 implements the shared report envelope and tests it with synthetic fixtures.",
+            "Command report envelope is deterministic and contains no personal absolute paths.",
+            "DD-13",
+            "Command reports are machine-checkable and safe for public CI logs.",
+        ):
+            self.assertIn(token, design)
+
 
 if __name__ == "__main__":
     unittest.main()

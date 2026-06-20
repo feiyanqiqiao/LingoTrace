@@ -701,6 +701,52 @@ Rules:
 - `migration-inventory --dry-run` reads source and target Vault paths in read-only mode and emits source and target manifest previews without copying files; target is required even in dry-run so comparison reports cannot be inferred from source layout.
 - Commands return non-zero status for missing context, unsupported capability, version mismatch, invalid path role, external adapter preflight failure, or unresolved conflict.
 
+### 4.7.1 Command Report Envelope
+
+Every Phase 1 command must be able to emit a deterministic machine-checkable report with `--format json`. Human-readable output can be added later, but implementation tests and public CI logs use the JSON report envelope.
+
+Minimum report shape:
+
+```json
+{
+  "command": "validate-vault",
+  "mode": "dry-run",
+  "accepted": false,
+  "exit_code": 1,
+  "vault_root": "<synthetic-vault-root>",
+  "target_language": "ja",
+  "language_pack": "lingo-japanese",
+  "capability_id": null,
+  "errors": [
+    {
+      "code": "missing_vault_context",
+      "message": "Vault context is required before write-capable workflows.",
+      "path": ".lingotrace/vault-context.json"
+    }
+  ],
+  "warnings": [],
+  "read_files": [],
+  "planned_writes": [],
+  "changed_files": [],
+  "skipped_files": [],
+  "blocked_files": [],
+  "artifacts": {}
+}
+```
+
+Report rules:
+
+- Report paths must be Vault-relative, repository-relative, or synthetic fixture labels.
+- Reports must not contain personal absolute paths.
+- `accepted` is true only when `exit_code` is zero and no blocking `errors` remain.
+- Dry-run reports must not list files under `changed_files`.
+- `planned_writes` records previewed writes that were not applied.
+- Blocking findings must use the explicit capability, adapter, validation, path, or migration error codes defined by this design.
+- `validate-vault` reports resolved path roles and enabled capability availability under `artifacts`.
+- `validate-pack` reports manifest identity, version compatibility, capability maturity, and pack-owned surface validation under `artifacts`.
+- `init-japanese-vault --dry-run` reports scaffold plan and conflict report under `artifacts`.
+- migration-inventory reports must include `source_manifest`, `target_manifest`, `verification_report`, and `old_framework_exit_ledger` under `artifacts`.
+
 ### 4.8 Legacy Bridge Rule
 
 Core runtime must not import or call old `jp-*` Skills. The Japanese pack may link to those Skills as evidence while Phase 1 is being implemented, and the temporary migration module may read old Skill documents or old Vault structure in read-only mode to build inventory evidence.
@@ -1003,6 +1049,7 @@ Deliverables:
 - `lingotrace/core/review_cards.py`
 - `lingotrace/core/transactions.py`
 - core tests using synthetic fixtures
+- shared command report envelope
 - public allowlist update for the new package and tests
 
 Acceptance:
@@ -1013,6 +1060,7 @@ Acceptance:
 - Path role resolver uses Vault config before pack defaults.
 - Review-card shell preserves unknown language fields.
 - Write transaction guard can run in preview mode and stop before write.
+- PR 1 implements the shared report envelope and tests it with synthetic fixtures.
 
 ### PR 2: Japanese Pack Boundary
 
@@ -1129,6 +1177,7 @@ Phase 1 is complete only when all of the following are true:
 - Capability checks enforce the five fixed Phase 0 capability IDs.
 - Capability registry reports explicit unavailable-capability failure codes.
 - Path resolution follows Vault config before language-pack defaults.
+- Command report envelope is deterministic and contains no personal absolute paths.
 - Review-card shell updates preserve language-owned and unknown fields.
 - Write-capable operations use a preflight and preview path before writing.
 - Japanese pack declares and validates the migrated Japanese fields.
@@ -1171,3 +1220,4 @@ This matrix is a review aid, not a Phase 1 completion claim. It maps the detaile
 | DD-10 | Phase 1 completion criteria do not imply real migration or cutover. | Section 12 requires core, pack, initializer, migration dry-run, exit tracking, green checks, and human acceptance while explicitly stating that Phase 1 completion does not mean real data has moved. | Covered by this design PR |
 | DD-11 | Runtime implementation, real private migration, English functionality, daily-use cutover, old Vault deletion, and old-framework removal are not delivered by this design PR. | The Boundary section in the PR body and sections 1, 6, 7, 10, and 12 keep these items out of design PR scope. | Out of this design PR scope |
 | DD-12 | Maintainers and Zheng Jie accept this detailed design before runtime implementation starts. | Section 10 requires acceptance by project maintainers and Zheng Jie, no unresolved review threads, green public checks, and an up-to-date PR body before runtime implementation PRs can start. | External review required |
+| DD-13 | Command reports are machine-checkable and safe for public CI logs. | Section 4.7.1 defines the `--format json` command report envelope, path-safety rules, dry-run write reporting, and per-command artifacts. | Covered by this design PR |
