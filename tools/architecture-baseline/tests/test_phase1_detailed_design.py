@@ -258,6 +258,32 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_pr_sequence_and_completion_gate_include_latest_surfaces(self) -> None:
+        design = read_design()
+
+        for token in (
+            "PR 2: Japanese Pack Boundary",
+            "workflow entrypoint registry",
+            "display rules",
+            "default views",
+            "unsupported-capability failure records",
+            "PR 4: Temporary Migration Inventory",
+            "migration manifest schema",
+            "source and target manifest generator",
+            "old-framework exit ledger",
+            "unclassified entries block acceptance",
+        ):
+            self.assertIn(token, design)
+
+        for token in (
+            "Phase 1 Completion Gate",
+            "Capability registry reports explicit unavailable-capability failure codes.",
+            "Japanese pack workflow entrypoints, display rules, default views, and initialization artifacts are manifest-declared.",
+            "Migration dry-run emits the manifest schema, comparison report, and old-framework exit ledger on synthetic fixtures.",
+            "Temporary migration readers remain outside runtime and have recorded removal conditions.",
+        ):
+            self.assertIn(token, design)
+
 
 if __name__ == "__main__":
     unittest.main()

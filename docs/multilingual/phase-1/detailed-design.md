@@ -993,7 +993,11 @@ Deliverables:
 - Japanese pack manifest
 - Japanese field declaration file
 - Japanese default path roles
+- Japanese workflow entrypoint registry
 - Japanese validators
+- Japanese display rules
+- Japanese default views
+- unsupported-capability failure records
 - conformance tests derived from `language-pack-conformance-checklist.md`
 
 Acceptance:
@@ -1001,7 +1005,10 @@ Acceptance:
 - Japanese pack declares all five Phase 0 capabilities.
 - Japanese fields remain Japanese pack fields.
 - Japanese validators accept synthetic Phase 0 fixtures.
+- Workflow entrypoints are called only through the core write guard.
+- Display rules and default views are manifest-declared and generated from the pack.
 - Unsupported capability and external adapter failures stop before write.
+- Unsupported, experimental, and deprecated capability failure codes are explicit and stop before write.
 
 ### PR 3: New Japanese Vault Initialization
 
@@ -1028,15 +1035,22 @@ Owner: temporary migration
 Deliverables:
 
 - read-only source inventory scanner
+- migration manifest schema
+- source and target manifest generator
+- old-framework exit ledger
 - classification output
 - synthetic comparison report
 - conflict and user-approval records
 
 Acceptance:
 
+- Manifest includes `source_vault`, `target_vault`, `source_manifest`, `target_manifest`, and `verification_report`.
+- Comparison strategies include `content_hash`, `frontmatter_and_body`, `links_and_hashes`, and `field_aware`.
 - Synthetic preserve-data entries keep relative paths, content hashes, frontmatter, and references.
 - System assets are classified as `recreate-from-pack` or `remove-after-cutover`.
 - Transform entries require an explicit mapping.
+- Old-framework exit ledger records temporary-migration and remove-after-cutover candidates.
+- PR 4 acceptance states that unclassified entries block acceptance.
 - Conflicts block acceptance.
 
 ### PR 5: Contributor Documentation
@@ -1083,12 +1097,16 @@ Phase 1 is complete only when all of the following are true:
 - Core can load and validate explicit Vault context.
 - Core can load and validate the Japanese pack manifest.
 - Capability checks enforce the five fixed Phase 0 capability IDs.
+- Capability registry reports explicit unavailable-capability failure codes.
 - Path resolution follows Vault config before language-pack defaults.
 - Review-card shell updates preserve language-owned and unknown fields.
 - Write-capable operations use a preflight and preview path before writing.
 - Japanese pack declares and validates the migrated Japanese fields.
+- Japanese pack workflow entrypoints, display rules, default views, and initialization artifacts are manifest-declared.
 - New Japanese Vault initialization works on synthetic targets and reports conflicts.
 - Migration inventory dry-run works on synthetic source and target fixtures.
+- Migration dry-run emits the manifest schema, comparison report, and old-framework exit ledger on synthetic fixtures.
+- Temporary migration readers remain outside runtime and have recorded removal conditions.
 - Old framework exit items remain tracked for Phase 2.
 - Main branch checks are green.
 - Maintainers and Zheng Jie accept that Phase 2 can start migration execution planning.
