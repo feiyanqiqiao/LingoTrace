@@ -972,6 +972,24 @@ Tasks that touch more than one owner must be split into dependency-ordered PRs. 
 
 Phase 1 implementation should be split into small PRs after this detailed design is accepted.
 
+### Before Runtime Implementation Gate
+
+Runtime implementation PRs cannot start until this detailed design PR is accepted by the project maintainers and Zheng Jie. The accepted design must have no unresolved review threads, green public checks, and an up-to-date PR body that records the validation evidence.
+
+The runtime-start gate does not approve English functionality, real private migration, daily-use cutover, old Vault deletion, or old-framework removal. It only allows the Phase 1 implementation PRs below to begin.
+
+### Dependency-Gated PR Sequence
+
+| Implementation PR | Dependency | Dependency evidence |
+|---|---|---|
+| PR 1: Core Contract Skeleton | PR 1 has no runtime-code prerequisite beyond this gate. | Accepted detailed design, green public checks, and public allowlist scope. |
+| PR 2: Japanese Pack Boundary | PR 2 depends on PR 1. | Core manifest loader, capability registry, path resolver, and write guard are available to test pack declarations. |
+| PR 3: New Japanese Vault Initialization | PR 3 depends on PR 1 and PR 2. | Initializer can read the core context contract and generate only Japanese-pack-declared scaffold assets. |
+| PR 4: Temporary Migration Inventory | PR 4 depends on PR 1 and PR 3. | Migration dry-run can bind explicit source and target Vault roots and compare against a synthetic initialized target. |
+| PR 5: Contributor Documentation | PR 5 depends on accepted PR 1 through PR 4 evidence. | Contributor docs can point to real Phase 1 entry points and validation commands. |
+
+Any dependency exception must be documented in the PR body with the reason, affected owner, and review checkpoint. Even with an exception, no PR may combine core runtime, Japanese pack boundary, new Vault initialization, temporary migration, and contributor documentation as one implementation change.
+
 ### PR 1: Core Contract Skeleton
 
 Owner: core

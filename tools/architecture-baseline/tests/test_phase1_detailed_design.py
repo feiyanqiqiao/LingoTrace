@@ -307,6 +307,25 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_defines_runtime_start_gate_and_pr_dependencies(self) -> None:
+        design = read_design()
+
+        for token in (
+            "Before Runtime Implementation Gate",
+            "Runtime implementation PRs cannot start until this detailed design PR is accepted",
+            "project maintainers and Zheng Jie",
+            "no unresolved review threads",
+            "Dependency-Gated PR Sequence",
+            "PR 1 has no runtime-code prerequisite beyond this gate",
+            "PR 2 depends on PR 1",
+            "PR 3 depends on PR 1 and PR 2",
+            "PR 4 depends on PR 1 and PR 3",
+            "PR 5 depends on accepted PR 1 through PR 4 evidence",
+            "Any dependency exception must be documented in the PR body",
+            "no PR may combine core runtime, Japanese pack boundary, new Vault initialization, temporary migration, and contributor documentation as one implementation change",
+        ):
+            self.assertIn(token, design)
+
 
 if __name__ == "__main__":
     unittest.main()
