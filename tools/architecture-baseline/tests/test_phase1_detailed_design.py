@@ -160,15 +160,36 @@ class Phase1DetailedDesignTests(unittest.TestCase):
             '"read_path_roles"',
             '"write_path_roles"',
             '"templates"',
+            '"workflow_entrypoints"',
             '"validators"',
             '"resources"',
+            '"display_rules"',
+            '"default_views"',
             '"initialization_artifacts"',
             '"capability_id": "review_materials"',
             '"capability_id": "review_rollover"',
             '"artifact_class": "recreate-from-pack"',
             "Pack-Owned Surface Registry",
             "Every capability must declare both `read_path_roles` and `write_path_roles`",
-            "Pack-owned templates, validators, resources, and initialization artifacts",
+            "Pack-owned templates, workflow entrypoints, validators, resources, display rules, default views, and initialization artifacts",
+            "old `jp-*` Skills are evidence only and are not pack workflow entrypoints",
+        ):
+            self.assertIn(token, design)
+
+    def test_phase1_design_declares_unsupported_capability_failure_contract(self) -> None:
+        design = read_design()
+
+        for token in (
+            '"unsupported_capabilities": []',
+            "Unsupported Capability Declaration",
+            "A reviewed capability ID absent from `capabilities` must appear in `unsupported_capabilities`",
+            '"failure_policy": "stop_before_write"',
+            '"fallback": "none"',
+            "unsupported_capability",
+            "not_enabled_in_vault",
+            "experimental_not_enabled",
+            "deprecated_write_blocked",
+            "must not fall back to Japanese behavior",
         ):
             self.assertIn(token, design)
 

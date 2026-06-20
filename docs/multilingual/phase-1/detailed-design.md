@@ -81,7 +81,10 @@ lingotrace/
       manifest.json
       fields.json
       paths.json
+      workflows.py
       validators.py
+      templates/
+      views/
   init/
     japanese_vault.py
   migration/
@@ -323,6 +326,7 @@ Japanese pack manifest file path:
       "manual_review_cases": []
     }
   ],
+  "unsupported_capabilities": [],
   "external_tools": [
     {
       "id": "listenkit_markdown",
@@ -382,6 +386,38 @@ Japanese pack manifest file path:
       "artifact_class": "recreate-from-pack"
     }
   ],
+  "workflow_entrypoints": [
+    {
+      "id": "listening_notes_workflow",
+      "capability_id": "listening_notes",
+      "entrypoint": "lingotrace.packs.japanese.workflows:listening_notes",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "source_notes_workflow",
+      "capability_id": "source_notes",
+      "entrypoint": "lingotrace.packs.japanese.workflows:source_notes",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_materials_workflow",
+      "capability_id": "review_materials",
+      "entrypoint": "lingotrace.packs.japanese.workflows:review_materials",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "speaking_cards_workflow",
+      "capability_id": "speaking_cards",
+      "entrypoint": "lingotrace.packs.japanese.workflows:speaking_cards",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_rollover_workflow",
+      "capability_id": "review_rollover",
+      "entrypoint": "lingotrace.packs.japanese.workflows:review_rollover",
+      "call_policy": "through_core_write_guard"
+    }
+  ],
   "validators": [
     {
       "id": "review_materials_validator",
@@ -406,6 +442,28 @@ Japanese pack manifest file path:
       "capability_id": "listening_notes",
       "resource_type": "pronunciation",
       "failure_policy": "preserve_unknown_without_confirmation"
+    }
+  ],
+  "display_rules": [
+    {
+      "id": "accent_display_rule",
+      "field": "accent_display",
+      "owner": "Japanese language pack",
+      "rule": "display pitch-accent hints without confirming generated candidates"
+    },
+    {
+      "id": "meaning_language_rule",
+      "field": "meaning_zh",
+      "owner": "Japanese language pack",
+      "rule": "Chinese explanation field remains separate from target-language content"
+    }
+  ],
+  "default_views": [
+    {
+      "id": "total_training_dashboard",
+      "capability_id": "review_rollover",
+      "path": "lingotrace/packs/japanese/views/total-training.base",
+      "artifact_class": "recreate-from-pack"
     }
   ],
   "initialization_artifacts": [
@@ -447,6 +505,32 @@ Rules:
 
 If any evidence field is missing, ambiguous, or contradicted by the Phase 0 baseline, the capability must stay `experimental` and unavailable by default in new Vault context. Experimental capabilities may be present in the manifest for design visibility, but the write transaction guard treats them as disabled unless a later reviewed PR changes the maturity and updates the conformance tests.
 
+### 4.1.4 Unsupported Capability Declaration
+
+The manifest must distinguish "not supported by this pack" from "forgotten by the manifest". The Japanese pack supports all five Phase 0 capability IDs in Phase 1, so its manifest sets `"unsupported_capabilities": []`.
+
+A reviewed capability ID absent from `capabilities` must appear in `unsupported_capabilities` with this shape:
+
+```json
+{
+  "id": "listening_notes",
+  "failure_reason": "this language pack has no accepted media workflow yet",
+  "failure_policy": "stop_before_write",
+  "fallback": "none"
+}
+```
+
+Failure codes exposed by the capability registry:
+
+| Case | Registry code | Write behavior |
+|---|---|---|
+| Capability appears in `unsupported_capabilities` | `unsupported_capability` | stop before write |
+| Capability is supported by the pack but absent from Vault `enabled_capabilities` | `not_enabled_in_vault` | stop before write |
+| Capability is `experimental` and the Vault did not explicitly opt into experimental reads | `experimental_not_enabled` | stop before write |
+| Capability is `deprecated` and the operation wants to write | `deprecated_write_blocked` | stop before write |
+
+Every unsupported, unavailable, experimental, or deprecated case must report one of these explicit codes and must not fall back to Japanese behavior.
+
 ### 4.2 Language Pack Manifest Loader
 
 The Language pack manifest loader reads a selected first-party pack manifest from the public project. Phase 1 should use:
@@ -464,14 +548,18 @@ Required manifest surfaces:
 - `compatible_core`
 - `compatible_vault_schema`
 - `capabilities`
+- `unsupported_capabilities`
 - `external_tools`
 - `language_fields`
 - `item_types`
 - `tag_namespace`
 - `default_path_roles`
 - `templates`
+- `workflow_entrypoints`
 - `validators`
 - `resources`
+- `display_rules`
+- `default_views`
 - `initialization_artifacts`
 
 Rules:
@@ -671,9 +759,9 @@ Validators must be deterministic and testable with synthetic public fixtures.
 
 ### 5.4 Pack-Owned Surface Registry
 
-The Japanese pack manifest is also the registry for pack-owned templates, validators, resources, and initialization artifacts. Core code reads these records as declared surfaces; it must not discover templates, validators, dictionaries, or scaffold files by scanning arbitrary folders.
+The Japanese pack manifest is also the registry for pack-owned templates, workflow entrypoints, validators, resources, display rules, default views, and initialization artifacts. Core code reads these records as declared surfaces; it must not discover templates, workflow functions, validators, dictionaries, views, or scaffold files by scanning arbitrary folders.
 
-Pack-owned templates, validators, resources, and initialization artifacts must record:
+Pack-owned templates, workflow entrypoints, validators, resources, display rules, default views, and initialization artifacts must record:
 
 - a stable `id`
 - the owning `capability_id`
@@ -685,8 +773,10 @@ Rules:
 
 - Every capability must declare both `read_path_roles` and `write_path_roles`.
 - A capability can read or write only roles listed in its own manifest record.
+- Workflow entrypoints are new Japanese-pack entrypoints called only through the core write guard; old `jp-*` Skills are evidence only and are not pack workflow entrypoints.
 - A template or initialization artifact with `artifact_class: recreate-from-pack` is public system material, not migrated private learning data.
 - Validators are loaded from declared entry points only.
+- Default views are generated pack artifacts; they are not evidence that private Obsidian view state should be migrated.
 - Resources such as dictionaries and pronunciation data must keep their own failure policy and must not silently write unconfirmed generated values into learning cards.
 
 ## 6. New Japanese Vault Initialization
