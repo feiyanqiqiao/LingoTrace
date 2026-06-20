@@ -114,6 +114,45 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_defines_japanese_path_roles_and_stable_evidence_gate(self) -> None:
+        design = read_design()
+
+        for token in (
+            "Minimum Japanese path role set for Phase 1",
+            "Target new-Vault default",
+            "These defaults describe the target new Japanese Vault",
+            '"role": "focus_vocab_root"',
+            '"role": "base_vocab_root"',
+            '"role": "grammar_root"',
+            '"role": "error_root"',
+            '"role": "speaking_card_root"',
+            '"role": "speaking_guide_root"',
+            '"role": "listening_root"',
+            '"role": "pronunciation_accent_root"',
+            '"role": "pronunciation_phoneme_root"',
+            '"role": "source_notes_root"',
+            '"role": "daily_notes_root"',
+            '"grammar_root": "review/grammar"',
+            '"error_root": "review/errors"',
+            '"pronunciation_accent_root": "review/pronunciation/accent"',
+            '"pronunciation_phoneme_root": "review/pronunciation/phoneme"',
+            '"source_notes_root": "sources"',
+            '"daily_notes_root": "daily"',
+        ):
+            self.assertIn(token, design)
+
+        for token in (
+            "Stable Capability Evidence Gate",
+            '"behavior_evidence"',
+            '"conformance_tests"',
+            '"manual_review_cases"',
+            "JP-REVIEW-001",
+            "JP-ROLLOVER-001",
+            "Experimental By Default Rule",
+            "no capability can be marked `stable`",
+        ):
+            self.assertIn(token, design)
+
     def test_phase1_design_defines_public_allowlist_and_legacy_bridge_rules(self) -> None:
         design = read_design()
 

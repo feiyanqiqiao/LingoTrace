@@ -194,13 +194,48 @@ Vault path configuration file path:
       "source": "vault_config"
     },
     {
-      "role": "speaking_cards_root",
+      "role": "grammar_root",
+      "relative_path": "review/grammar",
+      "source": "vault_config"
+    },
+    {
+      "role": "error_root",
+      "relative_path": "review/errors",
+      "source": "vault_config"
+    },
+    {
+      "role": "speaking_card_root",
       "relative_path": "speaking/cards",
+      "source": "vault_config"
+    },
+    {
+      "role": "speaking_guide_root",
+      "relative_path": "speaking/guides",
       "source": "vault_config"
     },
     {
       "role": "listening_root",
       "relative_path": "listening",
+      "source": "vault_config"
+    },
+    {
+      "role": "pronunciation_accent_root",
+      "relative_path": "review/pronunciation/accent",
+      "source": "vault_config"
+    },
+    {
+      "role": "pronunciation_phoneme_root",
+      "relative_path": "review/pronunciation/phoneme",
+      "source": "vault_config"
+    },
+    {
+      "role": "source_notes_root",
+      "relative_path": "sources",
+      "source": "vault_config"
+    },
+    {
+      "role": "daily_notes_root",
+      "relative_path": "daily",
       "source": "vault_config"
     }
   ]
@@ -236,31 +271,46 @@ Japanese pack manifest file path:
       "id": "listening_notes",
       "maturity": "stable",
       "depends_on": [],
-      "external_tools": ["listenkit_markdown", "listenkit_slice_export"]
+      "external_tools": ["listenkit_markdown", "listenkit_slice_export"],
+      "behavior_evidence": ["JP-LISTEN-001", "JP-LISTEN-002", "JP-LISTEN-003", "JP-LISTEN-004", "JP-LISTEN-005", "JP-LISTEN-007"],
+      "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
+      "manual_review_cases": []
     },
     {
       "id": "source_notes",
       "maturity": "stable",
       "depends_on": [],
-      "external_tools": ["listenkit_markdown"]
+      "external_tools": ["listenkit_markdown"],
+      "behavior_evidence": ["JP-SOURCE-001", "JP-SOURCE-003", "JP-SOURCE-004", "JP-SOURCE-005", "JP-SOURCE-006"],
+      "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
+      "manual_review_cases": ["source-note direction selection remains a human or reviewer-accepted semantic judgment"]
     },
     {
       "id": "review_materials",
       "maturity": "stable",
       "depends_on": [],
-      "external_tools": ["japanese_dictionary"]
+      "external_tools": ["japanese_dictionary"],
+      "behavior_evidence": ["JP-REVIEW-001", "JP-REVIEW-005", "JP-REVIEW-006", "JP-REVIEW-009"],
+      "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
+      "manual_review_cases": ["semantic routing for grammar, error, accent, and phoneme cards"]
     },
     {
       "id": "speaking_cards",
       "maturity": "stable",
       "depends_on": ["review_materials"],
-      "external_tools": []
+      "external_tools": [],
+      "behavior_evidence": ["JP-SPEAK-001", "JP-SPEAK-002", "JP-SPEAK-003", "JP-SPEAK-004", "JP-SPEAK-005"],
+      "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
+      "manual_review_cases": ["naturalness and immediate-usefulness acceptance"]
     },
     {
       "id": "review_rollover",
       "maturity": "stable",
       "depends_on": [],
-      "external_tools": []
+      "external_tools": [],
+      "behavior_evidence": ["JP-ROLLOVER-001", "JP-ROLLOVER-002", "JP-ROLLOVER-003", "JP-ROLLOVER-004", "JP-ROLLOVER-005", "JP-ROLLOVER-006"],
+      "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
+      "manual_review_cases": []
     }
   ],
   "external_tools": [
@@ -292,13 +342,40 @@ Japanese pack manifest file path:
   "default_path_roles": {
     "focus_vocab_root": "review/focus/vocab",
     "base_vocab_root": "review/base/vocab",
-    "speaking_cards_root": "speaking/cards",
-    "listening_root": "listening"
+    "grammar_root": "review/grammar",
+    "error_root": "review/errors",
+    "speaking_card_root": "speaking/cards",
+    "speaking_guide_root": "speaking/guides",
+    "listening_root": "listening",
+    "pronunciation_accent_root": "review/pronunciation/accent",
+    "pronunciation_phoneme_root": "review/pronunciation/phoneme",
+    "source_notes_root": "sources",
+    "daily_notes_root": "daily"
   }
 }
 ```
 
 The first implementation PR may adjust values only when it records the reason and updates the corresponding conformance tests. It must not remove a Phase 0 capability from the Japanese pack without a reviewed replacement decision.
+
+### 4.1.2 Stable Capability Evidence Gate
+
+The Japanese pack can mark a capability as `stable` only when the manifest record carries enough reviewable evidence to connect the Phase 0 baseline with Phase 1 tests. The fields are:
+
+- `behavior_evidence`: Phase 0 behavior IDs or an explicit Phase 1 replacement decision.
+- `conformance_tests`: executable public tests that assert the runtime contract or synthetic fixture behavior.
+- `manual_review_cases`: accepted reviewer checks for semantic quality that cannot be fully proven by deterministic tests.
+
+Rules:
+
+- no capability can be marked `stable` without at least one `behavior_evidence` entry.
+- A stable capability must have either executable `conformance_tests` or an accepted `manual_review_cases` entry.
+- Evidence must name concrete Phase 0 IDs such as `JP-REVIEW-001` and `JP-ROLLOVER-001`, not a broad workflow title.
+- Missing external adapter preflight, unresolved ownership conflicts, or incomplete path-role coverage prevents stable maturity.
+- A behavior marked `candidate` in Phase 0 can support a stable capability only when Phase 1 records the accepted manual review case or replacement decision that upgrades it.
+
+### 4.1.3 Experimental By Default Rule
+
+If any evidence field is missing, ambiguous, or contradicted by the Phase 0 baseline, the capability must stay `experimental` and unavailable by default in new Vault context. Experimental capabilities may be present in the manifest for design visibility, but the write transaction guard treats them as disabled unless a later reviewed PR changes the maturity and updates the conformance tests.
 
 ### 4.2 Language Pack Manifest Loader
 
@@ -364,6 +441,24 @@ Phase 1 should use:
 ```text
 .lingotrace/paths.json
 ```
+
+Minimum Japanese path role set for Phase 1:
+
+| Role | Target new-Vault default | Phase 0 source behavior |
+|---|---|---|
+| `focus_vocab_root` | `review/focus/vocab` | Focus-first vocabulary review |
+| `base_vocab_root` | `review/base/vocab` | Long-term vocabulary sink |
+| `grammar_root` | `review/grammar` | Grammar card routing |
+| `error_root` | `review/errors` | Error card routing |
+| `speaking_card_root` | `speaking/cards` | Survival speaking review cards |
+| `speaking_guide_root` | `speaking/guides` | Long speaking scene guides kept out of review |
+| `listening_root` | `listening` | Fixed listening notes and slice artifacts |
+| `pronunciation_accent_root` | `review/pronunciation/accent` | Accent contrast cards |
+| `pronunciation_phoneme_root` | `review/pronunciation/phoneme` | Phoneme contrast cards |
+| `source_notes_root` | `sources` | Flexible source notes and provenance |
+| `daily_notes_root` | `daily` | Daily checklist writeback |
+
+These defaults describe the target new Japanese Vault. They do not force the current old Vault to move files in Phase 1. Real private data paths are preserved by Phase 2 migration manifests unless a reviewed transform mapping is accepted.
 
 Resolver rules:
 
