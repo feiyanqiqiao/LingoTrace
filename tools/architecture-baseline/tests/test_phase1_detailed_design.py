@@ -284,6 +284,29 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_keeps_migration_cli_matrix_and_adapter_codes_contractual(self) -> None:
+        design = read_design()
+
+        for token in (
+            "migration-inventory --source <source-vault> --target <target-vault> --dry-run",
+            "target is required even in dry-run",
+            "source and target Vault paths in read-only mode",
+            "migration manifest, source/target manifest generator, old-framework exit ledger",
+        ):
+            self.assertIn(token, design)
+
+        for token in (
+            "Japanese pack manifest, field ownership, workflow entrypoints, validators, resources, display rules, default views, default path roles",
+            "External Adapter Preflight Codes",
+            "external_tool_unavailable",
+            "external_tool_version_mismatch",
+            "external_locale_unavailable",
+            "external_side_effect_blocked",
+            "external_adapter_failed",
+            "must not be converted into an unsupported capability code",
+        ):
+            self.assertIn(token, design)
+
 
 if __name__ == "__main__":
     unittest.main()

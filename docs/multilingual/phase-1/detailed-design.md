@@ -689,7 +689,7 @@ Phase 1 should expose one standard-library CLI wrapper around the runtime packag
 python -m lingotrace.cli.lingotrace validate-vault --vault <vault-root>
 python -m lingotrace.cli.lingotrace validate-pack --pack lingo-japanese
 python -m lingotrace.cli.lingotrace init-japanese-vault --target <target-vault> --dry-run
-python -m lingotrace.cli.lingotrace migration-inventory --source <source-vault> --dry-run
+python -m lingotrace.cli.lingotrace migration-inventory --source <source-vault> --target <target-vault> --dry-run
 ```
 
 Rules:
@@ -698,7 +698,7 @@ Rules:
 - `validate-vault` reads `.lingotrace/vault-context.json` and `.lingotrace/paths.json`.
 - `validate-pack` reads `lingotrace/packs/japanese/manifest.json`.
 - `init-japanese-vault --dry-run` reports the scaffold write plan and conflicts without creating files.
-- `migration-inventory --dry-run` reads the source Vault in read-only mode and emits an inventory report without copying files.
+- `migration-inventory --dry-run` reads source and target Vault paths in read-only mode and emits source and target manifest previews without copying files; target is required even in dry-run so comparison reports cannot be inferred from source layout.
 - Commands return non-zero status for missing context, unsupported capability, version mismatch, invalid path role, external adapter preflight failure, or unresolved conflict.
 
 ### 4.8 Legacy Bridge Rule
@@ -943,15 +943,27 @@ External adapter boundary responsibilities:
 
 Core does not perform ASR itself. Language packs can declare adapter requirements, and the write guard enforces them before write.
 
+### 8.1 External Adapter Preflight Codes
+
+Adapter readiness is separate from capability support. External adapter failures must not be converted into an unsupported capability code, because that would hide whether the pack lacks a workflow or a required tool is unavailable.
+
+| Case | Adapter code | Write behavior |
+|---|---|---|
+| Required tool or command is missing | `external_tool_unavailable` | stop before write |
+| Required tool exists but cannot satisfy the declared minimum interface | `external_tool_version_mismatch` | stop before write |
+| Required transcription, dictionary, or pronunciation locale is unavailable | `external_locale_unavailable` | stop before write |
+| Preflight would install, upgrade, mutate cache, or otherwise have a side effect | `external_side_effect_blocked` | stop before write |
+| Adapter command fails, times out, or returns an invalid readiness report | `external_adapter_failed` | stop before write |
+
 ## 9. Workstream Ownership Matrix
 
 | Workstream | Owner | Phase 1 deliverable | Must not include |
 |---|---|---|---|
 | Core runtime skeleton | core | context loader, manifest loader, Capability registry, Path role resolver, Review-card shell service, Write transaction guard | Japanese text rules or English fields |
-| Japanese pack boundary | Japanese language pack | Japanese pack manifest, Japanese field ownership, deterministic validators, default path roles | broad field rename or old runtime mode |
+| Japanese pack boundary | Japanese language pack | Japanese pack manifest, field ownership, workflow entrypoints, validators, resources, display rules, default views, default path roles | broad field rename or old runtime mode |
 | New Japanese Vault scaffold | new Vault initialization | initializer dry-run, scaffold write plan, synthetic initialization tests | private data copy or daily-use cutover |
-| Migration dry-run inventory | temporary migration | read-only inventory, synthetic comparison report, classification rules | real private data migration |
-| External adapter checks | external adapter boundary | preflight contract for ASR, dictionary, and slice export dependencies | ASR implementation inside core |
+| Migration dry-run inventory | temporary migration | read-only inventory, migration manifest, source/target manifest generator, old-framework exit ledger, synthetic comparison report, classification rules | real private data migration |
+| External adapter checks | external adapter boundary | preflight contract and failure codes for ASR, dictionary, and slice export dependencies | ASR implementation inside core |
 | Contributor-facing docs | public documentation | Phase 1 contributor guide and PR decomposition | instructions to run old framework as the target |
 
 Tasks that touch more than one owner must be split into dependency-ordered PRs. A single PR must not simultaneously change core runtime, Japanese pack validators, migration tooling, and user-facing docs unless it is a documentation-only review of the already accepted design.
