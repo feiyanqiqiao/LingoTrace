@@ -313,8 +313,8 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         for token in (
             "Before Runtime Implementation Gate",
             "Runtime implementation PRs cannot start until this detailed design PR is accepted",
-            "project maintainers and Zheng Jie",
-            "no unresolved review threads",
+            "project owner",
+            "cross-review by additional project members is not a Phase 1 gate",
             "Dependency-Gated PR Sequence",
             "PR 1 has no runtime-code prerequisite beyond this gate",
             "PR 2 depends on PR 1",
@@ -333,7 +333,7 @@ class Phase1DetailedDesignTests(unittest.TestCase):
             "Phase 1 Design Review Acceptance Matrix",
             "This matrix is a review aid, not a Phase 1 completion claim.",
             "Covered by this design PR",
-            "External review required",
+            "Owner acceptance required",
             "Out of this design PR scope",
             "DD-01",
             "DD-02",
@@ -352,7 +352,7 @@ class Phase1DetailedDesignTests(unittest.TestCase):
             "The Japanese pack boundary is implementable without preserving the old framework as runtime.",
             "Temporary migration design preserves private data by default without approving real migration.",
             "Old-framework exit obligations remain visible before Phase 2.",
-            "Maintainers and Zheng Jie accept this detailed design before runtime implementation starts.",
+            "The project owner accepts this detailed design before runtime implementation starts.",
         ):
             self.assertIn(token, design)
 

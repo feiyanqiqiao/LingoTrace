@@ -1020,7 +1020,7 @@ Phase 1 implementation should be split into small PRs after this detailed design
 
 ### Before Runtime Implementation Gate
 
-Runtime implementation PRs cannot start until this detailed design PR is accepted by the project maintainers and Zheng Jie. The accepted design must have no unresolved review threads, green public checks, and an up-to-date PR body that records the validation evidence.
+Runtime implementation PRs cannot start until this detailed design PR is accepted by the project owner. The accepted design must have green public checks and an up-to-date PR body that records the validation evidence. If review threads exist, they must be resolved before merge, but cross-review by additional project members is not a Phase 1 gate.
 
 The runtime-start gate does not approve English functionality, real private migration, daily-use cutover, old Vault deletion, or old-framework removal. It only allows the Phase 1 implementation PRs below to begin.
 
@@ -1188,7 +1188,7 @@ Phase 1 is complete only when all of the following are true:
 - Temporary migration readers remain outside runtime and have recorded removal conditions.
 - Old framework exit items remain tracked for Phase 2.
 - Main branch checks are green.
-- Maintainers and Zheng Jie accept that Phase 2 can start migration execution planning.
+- The project owner accepts that Phase 2 can start migration execution planning.
 
 Phase 1 completion does not mean real data has moved. It means the new framework skeleton is ready for Phase 2 migration execution planning.
 
@@ -1201,7 +1201,7 @@ This matrix is a review aid, not a Phase 1 completion claim. It maps the detaile
 | Status | Meaning |
 |---|---|
 | Covered by this design PR | The design PR contains the requested design, boundary, gate, or test evidence. |
-| External review required | Project maintainers and Zheng Jie must explicitly accept the decision before the next stage starts. |
+| Owner acceptance required | The project owner must explicitly accept the decision before the next stage starts; separate project-member cross-review is not required. |
 | Out of this design PR scope | The item belongs to a later implementation, migration, cutover, or old-framework removal PR. |
 
 ### Matrix
@@ -1219,5 +1219,5 @@ This matrix is a review aid, not a Phase 1 completion claim. It maps the detaile
 | DD-09 | Validation strategy keeps Japanese behavior baseline and new framework tests separate. | Section 11 requires existing Japanese behavior baseline checks plus new framework tests on synthetic public data, with the new runtime test tree added only after runtime tests exist. | Covered by this design PR |
 | DD-10 | Phase 1 completion criteria do not imply real migration or cutover. | Section 12 requires core, pack, initializer, migration dry-run, exit tracking, green checks, and human acceptance while explicitly stating that Phase 1 completion does not mean real data has moved. | Covered by this design PR |
 | DD-11 | Runtime implementation, real private migration, English functionality, daily-use cutover, old Vault deletion, and old-framework removal are not delivered by this design PR. | The Boundary section in the PR body and sections 1, 6, 7, 10, and 12 keep these items out of design PR scope. | Out of this design PR scope |
-| DD-12 | Maintainers and Zheng Jie accept this detailed design before runtime implementation starts. | Section 10 requires acceptance by project maintainers and Zheng Jie, no unresolved review threads, green public checks, and an up-to-date PR body before runtime implementation PRs can start. | External review required |
+| DD-12 | The project owner accepts this detailed design before runtime implementation starts. | Section 10 requires project-owner acceptance, green public checks, and an up-to-date PR body before runtime implementation PRs can start. Existing review threads, if any, must be resolved before merge, but separate project-member cross-review is not a Phase 1 gate. | Owner acceptance required |
 | DD-13 | Command reports are machine-checkable and safe for public CI logs. | Section 4.7.1 defines the `--format json` command report envelope, path-safety rules, dry-run write reporting, and per-command artifacts. | Covered by this design PR |
