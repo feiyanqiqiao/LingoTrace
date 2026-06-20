@@ -326,6 +326,36 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_has_review_acceptance_matrix(self) -> None:
+        design = read_design()
+
+        for token in (
+            "Phase 1 Design Review Acceptance Matrix",
+            "This matrix is a review aid, not a Phase 1 completion claim.",
+            "Covered by this design PR",
+            "External review required",
+            "Out of this design PR scope",
+            "DD-01",
+            "DD-02",
+            "DD-03",
+            "DD-04",
+            "DD-05",
+            "DD-06",
+            "DD-07",
+            "DD-08",
+            "DD-09",
+            "DD-10",
+            "DD-11",
+            "DD-12",
+            "Runtime boundaries and blocked work are explicit.",
+            "Runtime configuration schemas and command surfaces are concrete enough for PR 1 implementation.",
+            "The Japanese pack boundary is implementable without preserving the old framework as runtime.",
+            "Temporary migration design preserves private data by default without approving real migration.",
+            "Old-framework exit obligations remain visible before Phase 2.",
+            "Maintainers and Zheng Jie accept this detailed design before runtime implementation starts.",
+        ):
+            self.assertIn(token, design)
+
 
 if __name__ == "__main__":
     unittest.main()

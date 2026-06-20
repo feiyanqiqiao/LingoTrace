@@ -1142,3 +1142,32 @@ Phase 1 is complete only when all of the following are true:
 - Maintainers and Zheng Jie accept that Phase 2 can start migration execution planning.
 
 Phase 1 completion does not mean real data has moved. It means the new framework skeleton is ready for Phase 2 migration execution planning.
+
+## 13. Phase 1 Design Review Acceptance Matrix
+
+This matrix is a review aid, not a Phase 1 completion claim. It maps the detailed-design review criteria to concrete evidence in this PR so reviewers can decide whether runtime implementation may begin.
+
+### Status Vocabulary
+
+| Status | Meaning |
+|---|---|
+| Covered by this design PR | The design PR contains the requested design, boundary, gate, or test evidence. |
+| External review required | Project maintainers and Zheng Jie must explicitly accept the decision before the next stage starts. |
+| Out of this design PR scope | The item belongs to a later implementation, migration, cutover, or old-framework removal PR. |
+
+### Matrix
+
+| ID | Design review criterion | Evidence | Status |
+|---|---|---|---|
+| DD-01 | Runtime boundaries and blocked work are explicit. | Sections 1 and 2 separate core, Japanese pack, Vault configuration, and private data; they also block English functionality, real private migration, daily-use cutover, old Vault deletion, runtime Japanese fallback, broad field rename, and long-term old-framework compatibility. | Covered by this design PR |
+| DD-02 | Runtime configuration schemas and command surfaces are concrete enough for PR 1 implementation. | Section 4 defines `.lingotrace/vault-context.json`, `.lingotrace/paths.json`, `lingotrace/packs/japanese/manifest.json`, and the `validate-vault`, `validate-pack`, `init-japanese-vault`, and `migration-inventory` command surfaces. | Covered by this design PR |
+| DD-03 | Capability maturity, unavailable-capability behavior, and adapter failures have explicit stop-before-write rules. | Sections 4.1.2, 4.1.3, 4.1.4, and 8.1 define stable evidence, experimental-default behavior, unavailable-capability codes, and external adapter preflight codes. | Covered by this design PR |
+| DD-04 | The Japanese pack boundary is implementable without preserving the old framework as runtime. | Sections 5 and 10 define Japanese-owned fields, validators, pack-owned surfaces, workflow entrypoints, and PR 2 acceptance while keeping old `jp-*` entries as evidence only. | Covered by this design PR |
+| DD-05 | Target new Japanese Vault initialization is separated from data migration. | Sections 6 and 10 define initializer dry-run behavior, scaffold conflict reporting, generated context binding, and PR 3 dependency on PR 1 and PR 2. | Covered by this design PR |
+| DD-06 | Temporary migration design preserves private data by default without approving real migration. | Section 7 defines preserve/recreate/transform/remove classifications, explicit source and target manifests, comparison strategies, conflict handling, and the statement that Phase 1 does not copy real private learning data. | Covered by this design PR |
+| DD-07 | Old-framework exit obligations remain visible before Phase 2. | Section 7.4 defines the old-framework exit ledger, temporary-migration and remove-after-cutover handling, read-only observation rules, and Phase 2 cutover blockers. | Covered by this design PR |
+| DD-08 | Workstream ownership and implementation dependencies prevent broad mixed-scope PRs. | Sections 9 and 10 define the ownership matrix, the Before Runtime Implementation Gate, the Dependency-Gated PR Sequence, and the dependency-exception rule. | Covered by this design PR |
+| DD-09 | Validation strategy keeps Japanese behavior baseline and new framework tests separate. | Section 11 requires existing Japanese behavior baseline checks plus new framework tests on synthetic public data, with the new runtime test tree added only after runtime tests exist. | Covered by this design PR |
+| DD-10 | Phase 1 completion criteria do not imply real migration or cutover. | Section 12 requires core, pack, initializer, migration dry-run, exit tracking, green checks, and human acceptance while explicitly stating that Phase 1 completion does not mean real data has moved. | Covered by this design PR |
+| DD-11 | Runtime implementation, real private migration, English functionality, daily-use cutover, old Vault deletion, and old-framework removal are not delivered by this design PR. | The Boundary section in the PR body and sections 1, 6, 7, 10, and 12 keep these items out of design PR scope. | Out of this design PR scope |
+| DD-12 | Maintainers and Zheng Jie accept this detailed design before runtime implementation starts. | Section 10 requires acceptance by project maintainers and Zheng Jie, no unresolved review threads, green public checks, and an up-to-date PR body before runtime implementation PRs can start. | External review required |
