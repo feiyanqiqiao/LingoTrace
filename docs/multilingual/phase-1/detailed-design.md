@@ -100,6 +100,23 @@ tests/
 
 Existing Phase 0 tests under `tools/architecture-baseline/` remain contract and characterization tests. New runtime tests should live under `tests/lingotrace/` once the package exists. Phase 1 must not import `tools/architecture-baseline/tests/helpers.py` into production code because those helpers are only an independent acceptance oracle.
 
+## 3.1 Public Allowlist And CI Changes
+
+The first implementation PR that creates runtime files must update the public file allowlist narrowly:
+
+- allow `lingotrace/` for public runtime source
+- allow `tests/lingotrace/` for public runtime tests
+- keep `tools/architecture-baseline/` as the contract and characterization test area
+- keep `.lingotrace/` private to target Vaults; it must not be added to the public allowlist
+
+The same PR must update CI only after tests exist for the new runtime tree. The new CI step should run:
+
+```bash
+python -m unittest discover -s tests/lingotrace -p 'test_*.py'
+```
+
+CI must continue running the existing `Japanese Baseline` and `Public File Allowlist` gates. A runtime PR cannot bypass those gates by limiting workflow paths.
+
 ## 4. Core Interfaces
 
 ### 4.1 Vault Context Loader
@@ -126,6 +143,162 @@ Rules:
 - `target_language` is never inferred from folder, tag, card content, or old Japanese path names.
 - The loader returns a typed context object and a list of validation findings.
 - Validation findings are deterministic strings suitable for CLI output and tests.
+
+### 4.1.1 Runtime Config Schemas
+
+Phase 1 fixes the first runtime configuration shape as JSON so loaders can be implemented with the Python standard library.
+
+Vault context file path:
+
+```json
+{
+  "path": ".lingotrace/vault-context.json",
+  "vault_schema_version": 1,
+  "target_language": "ja",
+  "explanation_language": "zh",
+  "language_pack": "lingo-japanese",
+  "language_pack_version": "0.1.0",
+  "enabled_capabilities": [
+    "listening_notes",
+    "source_notes",
+    "review_materials",
+    "speaking_cards",
+    "review_rollover"
+  ]
+}
+```
+
+Field rules:
+
+- `vault_schema_version` is an integer. Phase 1 accepts only `1`.
+- `target_language` is a lowercase BCP-47 primary language subtag. Phase 1 accepts `ja` for the Japanese pack.
+- `explanation_language` is a lowercase BCP-47 primary language subtag. Phase 1 accepts `zh`.
+- `language_pack` must match exactly one first-party pack ID.
+- `language_pack_version` is an exact version pin, not a range.
+- `enabled_capabilities` is a list of unique fixed capability IDs.
+
+Vault path configuration file path:
+
+```json
+{
+  "path": ".lingotrace/paths.json",
+  "path_roles": [
+    {
+      "role": "focus_vocab_root",
+      "relative_path": "review/focus/vocab",
+      "source": "vault_config"
+    },
+    {
+      "role": "base_vocab_root",
+      "relative_path": "review/base/vocab",
+      "source": "vault_config"
+    },
+    {
+      "role": "speaking_cards_root",
+      "relative_path": "speaking/cards",
+      "source": "vault_config"
+    },
+    {
+      "role": "listening_root",
+      "relative_path": "listening",
+      "source": "vault_config"
+    }
+  ]
+}
+```
+
+Path rules:
+
+- `role` must match a role declared by the selected language pack.
+- `relative_path` must be Vault-relative and must not contain `..`.
+- `source` is `vault_config` for explicit Vault overrides and `language_pack_default` for resolved defaults.
+- A resolver report must show which roles came from Vault config and which came from pack defaults.
+
+Japanese pack manifest file path:
+
+```json
+{
+  "path": "lingotrace/packs/japanese/manifest.json",
+  "language_pack_id": "lingo-japanese",
+  "language_pack_version": "0.1.0",
+  "target_language": "ja",
+  "transcription_locale": "ja-JP",
+  "compatible_core": {
+    "minimum": "0.1.0",
+    "maximum_exclusive": "0.2.0"
+  },
+  "compatible_vault_schema": {
+    "minimum": 1,
+    "maximum": 1
+  },
+  "capabilities": [
+    {
+      "id": "listening_notes",
+      "maturity": "stable",
+      "depends_on": [],
+      "external_tools": ["listenkit_markdown", "listenkit_slice_export"]
+    },
+    {
+      "id": "source_notes",
+      "maturity": "stable",
+      "depends_on": [],
+      "external_tools": ["listenkit_markdown"]
+    },
+    {
+      "id": "review_materials",
+      "maturity": "stable",
+      "depends_on": [],
+      "external_tools": ["japanese_dictionary"]
+    },
+    {
+      "id": "speaking_cards",
+      "maturity": "stable",
+      "depends_on": ["review_materials"],
+      "external_tools": []
+    },
+    {
+      "id": "review_rollover",
+      "maturity": "stable",
+      "depends_on": [],
+      "external_tools": []
+    }
+  ],
+  "external_tools": [
+    {
+      "id": "listenkit_markdown",
+      "minimum_required": "generate-markdown command is available",
+      "failure_policy": "stop_before_write"
+    },
+    {
+      "id": "listenkit_slice_export",
+      "minimum_required": "deterministic slice export command is available",
+      "failure_policy": "stop_before_write"
+    },
+    {
+      "id": "japanese_dictionary",
+      "minimum_required": "offline dictionary lookup is available",
+      "failure_policy": "stop_before_write"
+    }
+  ],
+  "language_fields": [
+    {"name": "reading", "owner": "Japanese language pack"},
+    {"name": "accent_display", "owner": "Japanese language pack"},
+    {"name": "meaning_zh", "owner": "Japanese language pack"},
+    {"name": "kanji_diff", "owner": "Japanese language pack"},
+    {"name": "kanji_diff_pairs", "owner": "Japanese language pack"}
+  ],
+  "item_types": ["vocab", "grammar", "pronunciation", "error", "speaking_card"],
+  "tag_namespace": "jp",
+  "default_path_roles": {
+    "focus_vocab_root": "review/focus/vocab",
+    "base_vocab_root": "review/base/vocab",
+    "speaking_cards_root": "speaking/cards",
+    "listening_root": "listening"
+  }
+}
+```
+
+The first implementation PR may adjust values only when it records the reason and updates the corresponding conformance tests. It must not remove a Phase 0 capability from the Japanese pack without a reviewed replacement decision.
 
 ### 4.2 Language Pack Manifest Loader
 
@@ -250,6 +423,37 @@ Failure rules:
 - Validation failure stops before write.
 - Partial SRS advancement is not allowed.
 
+### 4.7 Command Surface
+
+Phase 1 should expose one standard-library CLI wrapper around the runtime package. The initial command surface is:
+
+```bash
+python -m lingotrace.cli.lingotrace validate-vault --vault <vault-root>
+python -m lingotrace.cli.lingotrace validate-pack --pack lingo-japanese
+python -m lingotrace.cli.lingotrace init-japanese-vault --target <target-vault> --dry-run
+python -m lingotrace.cli.lingotrace migration-inventory --source <source-vault> --dry-run
+```
+
+Rules:
+
+- Every command defaults to read-only or dry-run behavior until an implementation PR explicitly adds a write flag and tests it.
+- `validate-vault` reads `.lingotrace/vault-context.json` and `.lingotrace/paths.json`.
+- `validate-pack` reads `lingotrace/packs/japanese/manifest.json`.
+- `init-japanese-vault --dry-run` reports the scaffold write plan and conflicts without creating files.
+- `migration-inventory --dry-run` reads the source Vault in read-only mode and emits an inventory report without copying files.
+- Commands return non-zero status for missing context, unsupported capability, version mismatch, invalid path role, external adapter preflight failure, or unresolved conflict.
+
+### 4.8 Legacy Bridge Rule
+
+Core runtime must not import or call old `jp-*` Skills. The Japanese pack may link to those Skills as evidence while Phase 1 is being implemented, and the temporary migration module may read old Skill documents or old Vault structure in read-only mode to build inventory evidence.
+
+This rule keeps old entries out of the target runtime:
+
+- old `jp-*` Skills are not core APIs
+- old Vault-embedded repository layout is not a target deployment model
+- old path guessing is not a runtime fallback
+- temporary source readers must be removable before Phase 2 cutover acceptance
+
 ## 5. Japanese Language Pack Boundary
 
 The first language pack is Japanese because it migrates the current verified workflow. It must be implemented as a pack boundary, not as a direct rename of old code.
@@ -362,6 +566,7 @@ External adapter boundary responsibilities:
 - report required command availability
 - report required locale availability
 - report whether deterministic slicing is available
+- report that the preflight has no package installation or upgrade side effect
 - stop before write when a required adapter check fails
 
 Core does not perform ASR itself. Language packs can declare adapter requirements, and the write guard enforces them before write.

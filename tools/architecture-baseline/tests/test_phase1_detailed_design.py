@@ -70,6 +70,7 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         design = read_design()
 
         for token in (
+            "Runtime Config Schemas",
             "Vault context loader",
             "Language pack manifest loader",
             "Capability registry",
@@ -80,6 +81,53 @@ class Phase1DetailedDesignTests(unittest.TestCase):
             "Japanese pack manifest",
             "initializer dry-run",
             "migration inventory dry-run",
+        ):
+            self.assertIn(token, design)
+
+    def test_phase1_design_defines_config_schema_and_command_surface(self) -> None:
+        design = read_design()
+
+        for token in (
+            '".lingotrace/vault-context.json"',
+            '"vault_schema_version": 1',
+            '"target_language": "ja"',
+            '"explanation_language": "zh"',
+            '"language_pack": "lingo-japanese"',
+            '"enabled_capabilities"',
+            '".lingotrace/paths.json"',
+            '"path_roles"',
+            '"role": "focus_vocab_root"',
+            '"relative_path": "review/focus/vocab"',
+            '"source": "vault_config"',
+            '"lingotrace/packs/japanese/manifest.json"',
+            '"language_pack_id": "lingo-japanese"',
+            '"compatible_core"',
+            '"compatible_vault_schema"',
+            '"id": "review_materials"',
+            '"minimum_required"',
+            '"failure_policy": "stop_before_write"',
+            '"name": "reading"',
+            "Command Surface",
+            "validate-vault",
+            "init-japanese-vault --dry-run",
+            "migration-inventory --dry-run",
+        ):
+            self.assertIn(token, design)
+
+    def test_phase1_design_defines_public_allowlist_and_legacy_bridge_rules(self) -> None:
+        design = read_design()
+
+        for token in (
+            "Public Allowlist And CI Changes",
+            "lingotrace/",
+            "tests/lingotrace/",
+            "tools/architecture-baseline/",
+            ".lingotrace/",
+            "must not be added to the public allowlist",
+            "python -m unittest discover -s tests/lingotrace -p 'test_*.py'",
+            "Legacy Bridge Rule",
+            "Core runtime must not import or call old `jp-*` Skills",
+            "no package installation or upgrade side effect",
         ):
             self.assertIn(token, design)
 
