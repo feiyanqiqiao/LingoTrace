@@ -153,6 +153,25 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_declares_capability_paths_and_pack_owned_surfaces(self) -> None:
+        design = read_design()
+
+        for token in (
+            '"read_path_roles"',
+            '"write_path_roles"',
+            '"templates"',
+            '"validators"',
+            '"resources"',
+            '"initialization_artifacts"',
+            '"capability_id": "review_materials"',
+            '"capability_id": "review_rollover"',
+            '"artifact_class": "recreate-from-pack"',
+            "Pack-Owned Surface Registry",
+            "Every capability must declare both `read_path_roles` and `write_path_roles`",
+            "Pack-owned templates, validators, resources, and initialization artifacts",
+        ):
+            self.assertIn(token, design)
+
     def test_phase1_design_defines_public_allowlist_and_legacy_bridge_rules(self) -> None:
         design = read_design()
 

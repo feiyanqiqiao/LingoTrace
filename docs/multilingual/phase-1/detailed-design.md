@@ -271,6 +271,8 @@ Japanese pack manifest file path:
       "id": "listening_notes",
       "maturity": "stable",
       "depends_on": [],
+      "read_path_roles": ["listening_root"],
+      "write_path_roles": ["listening_root"],
       "external_tools": ["listenkit_markdown", "listenkit_slice_export"],
       "behavior_evidence": ["JP-LISTEN-001", "JP-LISTEN-002", "JP-LISTEN-003", "JP-LISTEN-004", "JP-LISTEN-005", "JP-LISTEN-007"],
       "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
@@ -280,6 +282,8 @@ Japanese pack manifest file path:
       "id": "source_notes",
       "maturity": "stable",
       "depends_on": [],
+      "read_path_roles": ["source_notes_root", "listening_root"],
+      "write_path_roles": ["source_notes_root"],
       "external_tools": ["listenkit_markdown"],
       "behavior_evidence": ["JP-SOURCE-001", "JP-SOURCE-003", "JP-SOURCE-004", "JP-SOURCE-005", "JP-SOURCE-006"],
       "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
@@ -289,6 +293,8 @@ Japanese pack manifest file path:
       "id": "review_materials",
       "maturity": "stable",
       "depends_on": [],
+      "read_path_roles": ["focus_vocab_root", "base_vocab_root", "grammar_root", "error_root", "pronunciation_accent_root", "pronunciation_phoneme_root", "source_notes_root", "daily_notes_root"],
+      "write_path_roles": ["focus_vocab_root", "base_vocab_root", "grammar_root", "error_root", "pronunciation_accent_root", "pronunciation_phoneme_root", "daily_notes_root"],
       "external_tools": ["japanese_dictionary"],
       "behavior_evidence": ["JP-REVIEW-001", "JP-REVIEW-005", "JP-REVIEW-006", "JP-REVIEW-009"],
       "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
@@ -298,6 +304,8 @@ Japanese pack manifest file path:
       "id": "speaking_cards",
       "maturity": "stable",
       "depends_on": ["review_materials"],
+      "read_path_roles": ["speaking_card_root", "speaking_guide_root", "listening_root", "source_notes_root"],
+      "write_path_roles": ["speaking_card_root"],
       "external_tools": [],
       "behavior_evidence": ["JP-SPEAK-001", "JP-SPEAK-002", "JP-SPEAK-003", "JP-SPEAK-004", "JP-SPEAK-005"],
       "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
@@ -307,6 +315,8 @@ Japanese pack manifest file path:
       "id": "review_rollover",
       "maturity": "stable",
       "depends_on": [],
+      "read_path_roles": ["focus_vocab_root", "base_vocab_root", "grammar_root", "error_root", "speaking_card_root", "listening_root", "pronunciation_accent_root", "pronunciation_phoneme_root", "daily_notes_root"],
+      "write_path_roles": ["focus_vocab_root", "base_vocab_root", "grammar_root", "error_root", "speaking_card_root", "listening_root", "pronunciation_accent_root", "pronunciation_phoneme_root", "daily_notes_root"],
       "external_tools": [],
       "behavior_evidence": ["JP-ROLLOVER-001", "JP-ROLLOVER-002", "JP-ROLLOVER-003", "JP-ROLLOVER-004", "JP-ROLLOVER-005", "JP-ROLLOVER-006"],
       "conformance_tests": ["tools/architecture-baseline/tests/test_phase1_detailed_design.py"],
@@ -351,7 +361,67 @@ Japanese pack manifest file path:
     "pronunciation_phoneme_root": "review/pronunciation/phoneme",
     "source_notes_root": "sources",
     "daily_notes_root": "daily"
-  }
+  },
+  "templates": [
+    {
+      "id": "focus_vocab_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/japanese/templates/focus-vocab-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "speaking_card",
+      "capability_id": "speaking_cards",
+      "path": "lingotrace/packs/japanese/templates/speaking-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "daily_checklist",
+      "capability_id": "review_rollover",
+      "path": "lingotrace/packs/japanese/templates/daily-checklist.md",
+      "artifact_class": "recreate-from-pack"
+    }
+  ],
+  "validators": [
+    {
+      "id": "review_materials_validator",
+      "capability_id": "review_materials",
+      "entrypoint": "lingotrace.packs.japanese.validators:validate_review_materials"
+    },
+    {
+      "id": "review_rollover_validator",
+      "capability_id": "review_rollover",
+      "entrypoint": "lingotrace.packs.japanese.validators:validate_review_rollover"
+    }
+  ],
+  "resources": [
+    {
+      "id": "japanese_dictionary",
+      "capability_id": "review_materials",
+      "resource_type": "dictionary",
+      "failure_policy": "stop_before_write"
+    },
+    {
+      "id": "pitch_accent_data",
+      "capability_id": "listening_notes",
+      "resource_type": "pronunciation",
+      "failure_policy": "preserve_unknown_without_confirmation"
+    }
+  ],
+  "initialization_artifacts": [
+    {
+      "id": "default_vault_context",
+      "capability_id": "review_rollover",
+      "path": ".lingotrace/vault-context.json",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "default_path_config",
+      "capability_id": "review_rollover",
+      "path": ".lingotrace/paths.json",
+      "artifact_class": "recreate-from-pack"
+    }
+  ]
 }
 ```
 
@@ -399,12 +469,17 @@ Required manifest surfaces:
 - `item_types`
 - `tag_namespace`
 - `default_path_roles`
+- `templates`
+- `validators`
+- `resources`
+- `initialization_artifacts`
 
 Rules:
 
 - A Vault can bind only one language pack.
 - Only `experimental`, `stable`, and `deprecated` maturity values are accepted.
 - Unsupported capabilities stop before write.
+- Every capability must declare both `read_path_roles` and `write_path_roles` so path access can be validated before write.
 - A pack cannot claim core fields as language fields.
 - External pack installation is outside Phase 1.
 
@@ -593,6 +668,26 @@ The Japanese pack owns validators for:
 - current workflow-specific constraints that Phase 0 marked as `migration-required`
 
 Validators must be deterministic and testable with synthetic public fixtures.
+
+### 5.4 Pack-Owned Surface Registry
+
+The Japanese pack manifest is also the registry for pack-owned templates, validators, resources, and initialization artifacts. Core code reads these records as declared surfaces; it must not discover templates, validators, dictionaries, or scaffold files by scanning arbitrary folders.
+
+Pack-owned templates, validators, resources, and initialization artifacts must record:
+
+- a stable `id`
+- the owning `capability_id`
+- the public path or Python entry point
+- whether the artifact is generated from the pack or preserved from private data
+- the failure policy when the artifact or resource is unavailable
+
+Rules:
+
+- Every capability must declare both `read_path_roles` and `write_path_roles`.
+- A capability can read or write only roles listed in its own manifest record.
+- A template or initialization artifact with `artifact_class: recreate-from-pack` is public system material, not migrated private learning data.
+- Validators are loaded from declared entry points only.
+- Resources such as dictionaries and pronunciation data must keep their own failure policy and must not silently write unconfirmed generated values into learning cards.
 
 ## 6. New Japanese Vault Initialization
 
