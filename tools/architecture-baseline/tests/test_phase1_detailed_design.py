@@ -227,6 +227,37 @@ class Phase1DetailedDesignTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
+    def test_phase1_design_defines_migration_manifest_and_exit_ledger(self) -> None:
+        design = read_design()
+
+        for token in (
+            "Migration Manifest Schema",
+            '"source_vault"',
+            '"target_vault"',
+            '"source_manifest"',
+            '"target_manifest"',
+            '"excluded_with_user_approval"',
+            '"verification_report"',
+            '"comparison_strategy"',
+            '"content_hash"',
+            '"frontmatter_and_body"',
+            '"links_and_hashes"',
+            '"field_aware"',
+            "unclassified entries block cutover",
+        ):
+            self.assertIn(token, design)
+
+        for token in (
+            "Old-Framework Exit Ledger",
+            '"exit_candidate_id"',
+            '"exit_status"',
+            '"remove-after-cutover"',
+            "read-only observation",
+            "not copied into the target Vault",
+            "must be resolved before Phase 2 cutover acceptance",
+        ):
+            self.assertIn(token, design)
+
 
 if __name__ == "__main__":
     unittest.main()

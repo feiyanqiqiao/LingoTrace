@@ -824,7 +824,68 @@ The scanner output must include:
 - required user approval when applicable
 - content hash when a file is eligible for preservation comparison
 
-### 7.2 Comparison Report
+### 7.2 Migration Manifest Schema
+
+The temporary migration module must produce a manifest-shaped report even in Phase 1 dry-run mode. Phase 1 uses synthetic source and target fixtures; Phase 2 reuses the same shape for real private migration after a short write freeze.
+
+Minimum manifest shape:
+
+```json
+{
+  "source_vault": "<explicit-source-vault>",
+  "target_vault": "<explicit-target-vault>",
+  "source_manifest": [
+    {
+      "relative_path": "review/focus/vocab/example.md",
+      "classification": "preserve-data",
+      "comparison_strategy": "frontmatter_and_body",
+      "content_hash": "sha256:<source-hash-or-empty-for-synthetic>",
+      "detected_references": ["[[sources/example]]"],
+      "conflict_status": "clear"
+    }
+  ],
+  "target_manifest": [
+    {
+      "relative_path": "review/focus/vocab/example.md",
+      "classification": "preserve-data",
+      "comparison_strategy": "frontmatter_and_body",
+      "content_hash": "sha256:<target-hash-or-empty-for-synthetic>",
+      "comparison_result": "matches"
+    }
+  ],
+  "preserve_data": [],
+  "recreate_from_pack": [],
+  "transform_with_map": [],
+  "remove_after_cutover": [],
+  "excluded_with_user_approval": [],
+  "conflicts": [],
+  "comparison_strategies": [
+    "content_hash",
+    "frontmatter_and_body",
+    "links_and_hashes",
+    "field_aware"
+  ],
+  "verification_report": {
+    "unclassified_count": 0,
+    "unresolved_conflict_count": 0,
+    "missing_user_approval_count": 0,
+    "accepted": false
+  }
+}
+```
+
+Manifest rules:
+
+- `source_vault` and `target_vault` are explicit inputs and must not be inferred from folder names, tags, content, or historical layout.
+- Manifest paths are Vault-relative or generated asset IDs; personal absolute paths are invalid.
+- Valid `comparison_strategy` values are `content_hash`, `frontmatter_and_body`, `links_and_hashes`, and `field_aware`.
+- `preserve-data` entries need a content hash, field-aware comparison, link-resolution report, or a recorded reason why the synthetic fixture cannot carry real bytes.
+- `transform-with-map` records source path, target path, reason, before value, after value, preview result, conflict status, and acceptance result.
+- `excluded_with_user_approval` records approver and reason; missing approval blocks acceptance.
+- `conflicts` and `verification_report` must include unresolved links, missing attachments, missing transcript artifacts, ambiguous field ownership, and non-repeatable transform results.
+- unclassified entries block cutover.
+
+### 7.3 Comparison Report
 
 The comparison report validates a synthetic source and synthetic target first. It checks:
 
@@ -835,6 +896,37 @@ The comparison report validates a synthetic source and synthetic target first. I
 - conflict records block acceptance
 
 Phase 2 owns real private data migration, final source manifest generation, daily-use cutover, old Vault read-only observation, and old Vault deletion.
+
+### 7.4 Old-Framework Exit Ledger
+
+Phase 1 migration tooling must also produce an old-framework exit ledger. This ledger is not permission to delete anything. It is a review artifact showing which old framework assets are still evidence, which are temporary migration readers, and which must disappear from target daily operation.
+
+Minimum ledger entry shape:
+
+```json
+{
+  "exit_candidate_id": "old-jp-skills",
+  "source_pattern": "codex-skills/jp-*",
+  "classification": "remove-after-cutover",
+  "target_handling": "not copied into the target Vault",
+  "replacement_owner": "Japanese language pack",
+  "exit_status": "tracked",
+  "required_evidence": [
+    "new workflow entrypoint exists",
+    "baseline or replacement check passes",
+    "public docs no longer instruct this entrypoint"
+  ]
+}
+```
+
+Ledger rules:
+
+- Exit candidates include old `jp-*` entry paths, installed-copy sync scripts, old Vault-coupled listening renderer paths, in-place layout migration scripts, implicit path fallback, old public docs that instruct removed entrypoints, and embedded public-repository topology.
+- `exit_status` values are `tracked`, `blocked`, `ready-for-read-only-observation`, and `accepted-after-user-confirmation`.
+- Entries classified as `temporary-migration` must name the read-only source reader and the condition for removal.
+- Entries classified as `remove-after-cutover` are not copied into the target Vault.
+- Read-only observation starts only after target acceptance; any asset discovered during read-only observation is handled through a recorded migration fix, not by reviving the old framework.
+- Ledger entries with missing replacement evidence, unresolved conflicts, or missing user confirmation must be resolved before Phase 2 cutover acceptance.
 
 ## 8. External Adapter Boundary
 
