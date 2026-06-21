@@ -30,7 +30,7 @@ Do not treat folder paths in prose as the source of truth. Runtime path roles li
 - Keep edits scoped. Do not reorder large sets of notes, bulk-rewrite frontmatter, or normalize unrelated Markdown while working on a narrow task.
 - Preserve manually curated content, especially listening-note sentence selections, review notes, and daily study summaries, unless the user explicitly asks to reset them.
 - Avoid changing generated tools or helper scripts unless the task is specifically about the automation itself.
-- アクセント對比卡 belongs to the pronunciation accent role, not ordinary vocabulary. Do not place it in the normal vocabulary or sentence-practice roles; follow the concrete card rules in `系统配置/模板/录入模板索引.md`.
+- アクセント对比卡 belongs to the pronunciation accent role, not ordinary vocabulary. Do not place it in the normal vocabulary or sentence-practice roles; follow the concrete card rules in `系统配置/模板/录入模板索引.md`.
 - Phoneme contrast cards such as 清音/浊音, 送气, and 声带振动 belong in the pronunciation phoneme role, not in the sentence-practice role.
 
 ## Git Workflow
