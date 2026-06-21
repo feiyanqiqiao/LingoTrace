@@ -1,0 +1,324 @@
+{
+  "language_pack_id": "lingo-japanese",
+  "language_pack_version": "0.1.0",
+  "target_language": "ja",
+  "transcription_locale": "ja-JP",
+  "compatible_core": {
+    "minimum": "0.1.0",
+    "maximum_exclusive": "0.2.0"
+  },
+  "compatible_vault_schema": {
+    "minimum": 1,
+    "maximum": 1
+  },
+  "capabilities": [
+    {
+      "id": "listening_notes",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": ["listening_root"],
+      "write_path_roles": ["listening_root"],
+      "external_tools": ["listenkit_markdown", "listenkit_slice_export"],
+      "behavior_evidence": [
+        "JP-LISTEN-001",
+        "JP-LISTEN-002",
+        "JP-LISTEN-003",
+        "JP-LISTEN-004",
+        "JP-LISTEN-005",
+        "JP-LISTEN-007"
+      ],
+      "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
+      "manual_review_cases": []
+    },
+    {
+      "id": "source_notes",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": ["source_notes_root", "listening_root"],
+      "write_path_roles": ["source_notes_root"],
+      "external_tools": ["listenkit_markdown"],
+      "behavior_evidence": [
+        "JP-SOURCE-001",
+        "JP-SOURCE-003",
+        "JP-SOURCE-004",
+        "JP-SOURCE-005",
+        "JP-SOURCE-006"
+      ],
+      "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
+      "manual_review_cases": [
+        "source-note direction selection remains a human or reviewer-accepted semantic judgment"
+      ]
+    },
+    {
+      "id": "review_materials",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
+        "source_notes_root",
+        "daily_notes_root"
+      ],
+      "write_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
+        "daily_notes_root"
+      ],
+      "external_tools": ["japanese_dictionary"],
+      "behavior_evidence": [
+        "JP-REVIEW-001",
+        "JP-REVIEW-005",
+        "JP-REVIEW-006",
+        "JP-REVIEW-009"
+      ],
+      "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
+      "manual_review_cases": [
+        "semantic routing for grammar, error, accent, and phoneme cards"
+      ]
+    },
+    {
+      "id": "speaking_cards",
+      "maturity": "stable",
+      "depends_on": ["review_materials"],
+      "read_path_roles": [
+        "speaking_card_root",
+        "speaking_guide_root",
+        "listening_root",
+        "source_notes_root"
+      ],
+      "write_path_roles": ["speaking_card_root"],
+      "external_tools": [],
+      "behavior_evidence": [
+        "JP-SPEAK-001",
+        "JP-SPEAK-002",
+        "JP-SPEAK-003",
+        "JP-SPEAK-004",
+        "JP-SPEAK-005"
+      ],
+      "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
+      "manual_review_cases": [
+        "naturalness and immediate-usefulness acceptance"
+      ]
+    },
+    {
+      "id": "review_rollover",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "speaking_card_root",
+        "listening_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
+        "daily_notes_root"
+      ],
+      "write_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "speaking_card_root",
+        "listening_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
+        "daily_notes_root"
+      ],
+      "external_tools": [],
+      "behavior_evidence": [
+        "JP-ROLLOVER-001",
+        "JP-ROLLOVER-002",
+        "JP-ROLLOVER-003",
+        "JP-ROLLOVER-004",
+        "JP-ROLLOVER-005",
+        "JP-ROLLOVER-006"
+      ],
+      "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
+      "manual_review_cases": []
+    }
+  ],
+  "unsupported_capabilities": [],
+  "external_tools": [
+    {
+      "id": "listenkit_markdown",
+      "minimum_required": "generate-markdown command is available",
+      "failure_policy": "stop_before_write"
+    },
+    {
+      "id": "listenkit_slice_export",
+      "minimum_required": "deterministic slice export command is available",
+      "failure_policy": "stop_before_write"
+    },
+    {
+      "id": "japanese_dictionary",
+      "minimum_required": "offline dictionary lookup is available",
+      "failure_policy": "stop_before_write"
+    }
+  ],
+  "language_fields": [
+    {
+      "name": "reading",
+      "owner": "Japanese language pack",
+      "purpose": "Kana reading for Japanese review items."
+    },
+    {
+      "name": "accent_display",
+      "owner": "Japanese language pack",
+      "purpose": "Review-facing pitch accent display."
+    },
+    {
+      "name": "meaning_zh",
+      "owner": "Japanese language pack",
+      "purpose": "Chinese explanation field."
+    },
+    {
+      "name": "kanji_diff",
+      "owner": "Japanese language pack",
+      "purpose": "Kanji comparison note."
+    },
+    {
+      "name": "kanji_diff_pairs",
+      "owner": "Japanese language pack",
+      "purpose": "Structured kanji comparison pairs."
+    }
+  ],
+  "item_types": ["vocab", "grammar", "pronunciation", "error", "speaking_card"],
+  "tag_namespace": "jp",
+  "default_path_roles": {
+    "focus_vocab_root": "review/focus/vocab",
+    "base_vocab_root": "review/base/vocab",
+    "grammar_root": "review/grammar",
+    "error_root": "review/errors",
+    "speaking_card_root": "speaking/cards",
+    "speaking_guide_root": "speaking/guides",
+    "listening_root": "listening",
+    "pronunciation_accent_root": "review/pronunciation/accent",
+    "pronunciation_phoneme_root": "review/pronunciation/phoneme",
+    "source_notes_root": "sources",
+    "daily_notes_root": "daily"
+  },
+  "templates": [
+    {
+      "id": "focus_vocab_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/japanese/templates/focus-vocab-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "speaking_card",
+      "capability_id": "speaking_cards",
+      "path": "lingotrace/packs/japanese/templates/speaking-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "daily_checklist",
+      "capability_id": "review_rollover",
+      "path": "lingotrace/packs/japanese/templates/daily-checklist.md",
+      "artifact_class": "recreate-from-pack"
+    }
+  ],
+  "workflow_entrypoints": [
+    {
+      "id": "listening_notes_workflow",
+      "capability_id": "listening_notes",
+      "entrypoint": "lingotrace.packs.japanese.workflows:listening_notes",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "source_notes_workflow",
+      "capability_id": "source_notes",
+      "entrypoint": "lingotrace.packs.japanese.workflows:source_notes",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_materials_workflow",
+      "capability_id": "review_materials",
+      "entrypoint": "lingotrace.packs.japanese.workflows:review_materials",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "speaking_cards_workflow",
+      "capability_id": "speaking_cards",
+      "entrypoint": "lingotrace.packs.japanese.workflows:speaking_cards",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_rollover_workflow",
+      "capability_id": "review_rollover",
+      "entrypoint": "lingotrace.packs.japanese.workflows:review_rollover",
+      "call_policy": "through_core_write_guard"
+    }
+  ],
+  "validators": [
+    {
+      "id": "review_materials_validator",
+      "capability_id": "review_materials",
+      "entrypoint": "lingotrace.packs.japanese.validators:validate_review_materials"
+    },
+    {
+      "id": "review_rollover_validator",
+      "capability_id": "review_rollover",
+      "entrypoint": "lingotrace.packs.japanese.validators:validate_review_rollover"
+    }
+  ],
+  "resources": [
+    {
+      "id": "japanese_dictionary",
+      "capability_id": "review_materials",
+      "resource_type": "dictionary",
+      "failure_policy": "stop_before_write"
+    },
+    {
+      "id": "pitch_accent_data",
+      "capability_id": "listening_notes",
+      "resource_type": "pronunciation",
+      "failure_policy": "preserve_unknown_without_confirmation"
+    }
+  ],
+  "display_rules": [
+    {
+      "id": "accent_display_rule",
+      "field": "accent_display",
+      "owner": "Japanese language pack",
+      "rule": "display pitch-accent hints without confirming generated candidates"
+    },
+    {
+      "id": "meaning_language_rule",
+      "field": "meaning_zh",
+      "owner": "Japanese language pack",
+      "rule": "Chinese explanation field remains separate from target-language content"
+    }
+  ],
+  "default_views": [
+    {
+      "id": "total_training_dashboard",
+      "capability_id": "review_rollover",
+      "path": "lingotrace/packs/japanese/views/total-training.base",
+      "artifact_class": "recreate-from-pack"
+    }
+  ],
+  "initialization_artifacts": [
+    {
+      "id": "default_vault_context",
+      "capability_id": "review_rollover",
+      "path": ".lingotrace/vault-context.json",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "default_path_config",
+      "capability_id": "review_rollover",
+      "path": ".lingotrace/paths.json",
+      "artifact_class": "recreate-from-pack"
+    }
+  ]
+}

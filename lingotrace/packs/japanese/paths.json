@@ -1,0 +1,15 @@
+{
+  "default_path_roles": {
+    "focus_vocab_root": "review/focus/vocab",
+    "base_vocab_root": "review/base/vocab",
+    "grammar_root": "review/grammar",
+    "error_root": "review/errors",
+    "speaking_card_root": "speaking/cards",
+    "speaking_guide_root": "speaking/guides",
+    "listening_root": "listening",
+    "pronunciation_accent_root": "review/pronunciation/accent",
+    "pronunciation_phoneme_root": "review/pronunciation/phoneme",
+    "source_notes_root": "sources",
+    "daily_notes_root": "daily"
+  }
+}

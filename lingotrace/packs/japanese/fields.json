@@ -1,0 +1,29 @@
+{
+  "language_fields": [
+    {
+      "name": "reading",
+      "owner": "Japanese language pack",
+      "purpose": "Kana reading for Japanese review items."
+    },
+    {
+      "name": "accent_display",
+      "owner": "Japanese language pack",
+      "purpose": "Review-facing pitch accent display."
+    },
+    {
+      "name": "meaning_zh",
+      "owner": "Japanese language pack",
+      "purpose": "Chinese explanation field."
+    },
+    {
+      "name": "kanji_diff",
+      "owner": "Japanese language pack",
+      "purpose": "Kanji comparison note."
+    },
+    {
+      "name": "kanji_diff_pairs",
+      "owner": "Japanese language pack",
+      "purpose": "Structured kanji comparison pairs."
+    }
+  ]
+}
