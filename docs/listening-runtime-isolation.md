@@ -27,13 +27,13 @@ Initialize each project explicitly from its own repository. Initialization is ne
 
 ```bash
 # LingoTrace repository
-codex-skills/jp-listening-script-generator/scripts/init-listening-runtime.sh
+~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python tools/listening-transcribe-official/setup_offline_dictionary.py --python ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python --install
 
 # ListenKit repository
 cli/init-faster-whisper.sh
 ```
 
-The LingoTrace wrapper always uses `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python`. The repository is stored under iCloud, where loading the `fugashi` native extension directly was observed to hang for more than 100 seconds. A project-root symlink was also renamed to `.venv 2` by iCloud, so the runtime has no entry inside the Vault. The same extension loaded from the local Cache path in about 0.4 seconds. `LINGOTRACE_LISTENING_PYTHON` is the preferred intentional override; `JP_LISTENING_PYTHON` remains a compatibility override. A missing or unhealthy runtime stops before transcription and prints the initialization command.
+The LingoTrace listening execution layer uses `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python`. The repository is stored under iCloud, where loading the `fugashi` native extension directly was observed to hang for more than 100 seconds. A project-root symlink was also renamed to `.venv 2` by iCloud, so the runtime has no entry inside the Vault. The same extension loaded from the local Cache path in about 0.4 seconds. `LINGOTRACE_LISTENING_PYTHON` is the preferred intentional override; `JP_LISTENING_PYTHON` remains a compatibility override. A missing or unhealthy runtime stops before transcription and prints the initialization command.
 
 ListenKit follows the same storage rule for its larger native ASR stack. Its runtime lives at `~/Library/Caches/ListenKit/venvs/cpython-314`; neither project keeps a virtual environment or runtime symlink inside iCloud. The projects remain independent and communicate only through ListenKit CLI and artifact contracts.
 
@@ -41,19 +41,18 @@ The external dictionary-data cache contains only static cross-version data such 
 
 ## Health Check
 
-Run the read-only chain check from the LingoTrace repository:
+Run the read-only dictionary check from the LingoTrace repository:
 
 ```bash
-codex-skills/jp-listening-script-generator/scripts/check-listening-chain.sh
+~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python tools/listening-transcribe-official/setup_offline_dictionary.py --python ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python --check
 ```
 
 It verifies:
 
-- Both project runtimes use Python 3.14.
+- The LingoTrace runtime uses Python 3.14.
 - LingoTrace loads the pinned dictionary packages and returns `公園⓪`, `散歩⓪`, and `し⓪` for the sample sentence.
-- ListenKit imports `faster-whisper` within its bounded health check.
-- Cross-project Python imports fail as required.
-- ListenKit CLI entry points, JSON schema handling, `ffmpeg`, and `ffprobe` are available.
+
+ListenKit runtime checks remain owned by the ListenKit repository. Listening-note tasks triggered through the Japanese Agent Skill still perform source-audio, transcript, and slice-tool preflight before changing files.
 
 ## Upgrades And Diagnosis
 

@@ -9,6 +9,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 PHASE25_GATE = REPO_ROOT / "docs/multilingual/phase-2/phase-2-5-switch-completion.md"
 README = REPO_ROOT / "README.md"
 AGENTS = REPO_ROOT / "AGENTS.md"
+USER_GUIDE = REPO_ROOT / "docs/USER_GUIDE.md"
+AGENT_SKILL = REPO_ROOT / "lingotrace/packs/japanese/agent_skills/SKILL.md"
 PACK_VIEW = REPO_ROOT / "lingotrace/packs/japanese/views/total-training.base"
 
 
@@ -44,20 +46,61 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
         ):
             self.assertIn(phrase, body)
 
-    def test_public_docs_point_to_new_framework_entrypoints(self) -> None:
-        combined = read_required(README) + "\n" + read_required(AGENTS)
+    def test_japanese_pack_contains_skill_first_agent_entry(self) -> None:
+        skill = read_required(AGENT_SKILL)
 
         for phrase in (
-            "lingotrace.packs.japanese.workflows:listening_notes",
-            "lingotrace.packs.japanese.workflows:source_notes",
-            "lingotrace.packs.japanese.workflows:review_materials",
-            "lingotrace.packs.japanese.workflows:speaking_cards",
-            "lingotrace.packs.japanese.workflows:review_rollover",
+            "请把这段音频做成精听稿",
+            "帮我把这篇材料整理成日语学习笔记",
+            "把这个词加入复习",
+            "这句话很实用，帮我做成口语卡",
+            "今天复习结束了，帮我结算",
+            "listening_notes",
+            "source_notes",
+            "review_materials",
+            "speaking_cards",
+            "review_rollover",
+            "Agent Skill must not write files directly",
+            "core write guard",
+        ):
+            self.assertIn(phrase, skill)
+
+        self.assertNotIn("codex-skills/", skill)
+
+    def test_public_user_docs_are_natural_language_first(self) -> None:
+        combined = read_required(README) + "\n" + read_required(USER_GUIDE)
+
+        for phrase in (
+            "自然语言",
+            "Agent Skill",
+            "请把这段音频做成精听稿",
+            "今天复习结束了，帮我结算",
+            "保存到你的日语学习库",
         ):
             self.assertIn(phrase, combined)
 
-        self.assertNotIn("Use the local skill documents as the source of truth", combined)
-        self.assertNotIn("codex-skills/", combined)
+        for forbidden in (
+            "写入新框架 Vault",
+            "调用 workflow entrypoint",
+            "传入 artifact",
+            "执行 apply mode",
+            "target Vault",
+            "CommandReport",
+            "lingotrace.packs.japanese.workflows:",
+            "codex-skills/",
+        ):
+            self.assertNotIn(forbidden, combined)
+
+    def test_agents_doc_points_to_agent_skill_and_hidden_runtime_contract(self) -> None:
+        agents = read_required(AGENTS)
+
+        self.assertIn("lingotrace/packs/japanese/agent_skills/SKILL.md", agents)
+        self.assertIn("natural-language operating entry", agents)
+        self.assertIn("Do not ask users to mention workflow entrypoints", agents)
+        self.assertIn("LingoTrace core and Japanese pack", agents)
+        self.assertIn("core write guard", agents)
+        self.assertNotIn("Use the local skill documents as the source of truth", agents)
+        self.assertNotIn("codex-skills/", agents)
 
     def test_legacy_roots_are_not_public_tracked_operational_surfaces(self) -> None:
         files = tracked_files()
