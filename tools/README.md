@@ -2,6 +2,12 @@
 
 此目錄只放可重複使用、適合納入版本控制的工具。一次性資料修復腳本、臨時轉寫產物與歷史腳本應放入 `tmp/legacy/`，不要留在 `tools/`。
 
+## Phase 1 Runtime
+
+Phase 1 的公共 runtime 入口位於 `lingotrace/`，測試位於 `tests/lingotrace/`。貢獻者應從 `docs/multilingual/phase-1/contributor-guide.md` 了解可修改範圍、禁止範圍、測試命令與公開提交檢查。
+
+這一階段只建立核心契約、Japanese pack 邊界、新 Japanese Vault dry-run scaffold、migration inventory dry-run 和貢獻者文檔；不代表英語支持、真實私有資料遷移、日常切換或舊框架移除已交付。
+
 ## Listening Transcribe
 
 目錄：`tools/listening-transcribe-official/`
