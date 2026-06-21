@@ -61,3 +61,6 @@ jobs:
 
       - name: Run architecture baseline tests
         run: python -m unittest discover -s tools/architecture-baseline/tests -p 'test_*.py'
+
+      - name: Run runtime contract tests
+        run: python -m unittest discover -s tests/lingotrace -p 'test_*.py'
