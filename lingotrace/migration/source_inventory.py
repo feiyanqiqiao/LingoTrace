@@ -9,6 +9,34 @@ from lingotrace.core.reports import CommandReport, Finding
 from lingotrace.migration.compare import COMPARISON_STRATEGIES
 
 
+REMOVE_AFTER_CUTOVER_PREFIXES = (
+    ".antigravitycli/",
+    ".github/",
+    ".obsidian/",
+    ".worktrees/",
+    "docs/",
+    "lingotrace/",
+    "tests/",
+    "tmp/",
+    "tools/",
+    "系统配置/",
+)
+REMOVE_AFTER_CUTOVER_FILES = {
+    ".DS_Store",
+    ".gitignore",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+}
+PRESERVE_DATA_PREFIXES = (
+    "学习系统/",
+    "笔记/",
+)
+
+
 def plan_final_source_inventory(
     *,
     source_vault: str | Path | None,
@@ -159,12 +187,18 @@ def _classification(
         return "excluded_with_user_approval"
     if relative_path in transform_map:
         return "transform-with-map"
+    if _is_transient_file(relative_path):
+        return "remove-after-cutover"
     if relative_path.startswith("codex-skills/"):
         return "temporary-migration"
     if relative_path.startswith("系统配置/模板/") or relative_path == "学习系统/总训练.base":
         return "recreate-from-pack"
-    if relative_path.startswith("tools/listening-transcribe-official/") or relative_path.startswith(".git/"):
+    if relative_path.startswith(".git/"):
         return "remove-after-cutover"
+    if _has_prefix(relative_path, REMOVE_AFTER_CUTOVER_PREFIXES):
+        return "remove-after-cutover"
+    if _has_prefix(relative_path, PRESERVE_DATA_PREFIXES):
+        return "preserve-data"
     if relative_path.endswith(".md"):
         return "preserve-data"
     return "unclassified"
@@ -186,6 +220,19 @@ def _content_hash(path: Path) -> str:
 
 def _same_root(source_root: Path, target_root: Path) -> bool:
     return source_root.expanduser().resolve() == target_root.expanduser().resolve()
+
+
+def _has_prefix(relative_path: str, prefixes: tuple[str, ...]) -> bool:
+    return any(relative_path.startswith(prefix) for prefix in prefixes)
+
+
+def _is_transient_file(relative_path: str) -> bool:
+    path = Path(relative_path)
+    return (
+        path.name in REMOVE_AFTER_CUTOVER_FILES
+        or path.suffix == ".pyc"
+        or "__pycache__" in path.parts
+    )
 
 
 def _report(errors: list[Finding]) -> CommandReport:
