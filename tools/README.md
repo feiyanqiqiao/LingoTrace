@@ -32,21 +32,15 @@ Phase 1 的公共 runtime 入口位於 `lingotrace/`，測試位於 `tests/lingo
 
 何時不要使用：
 
-- 不要直接把它當作日常入口。請優先透過 Skill wrapper 執行。
+- 不要直接把它當作日常入口。日常學習應優先透過 `lingotrace/packs/japanese/agent_skills/SKILL.md` 描述的自然語言 Agent Skill 觸發。
 - 不要用它生成一般來源筆記、詞彙卡或生活口語卡。
 - 不要讓它自動決選最終常用句。
-
-常用命令：
-
-```bash
-zsh codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh --help
-```
 
 實際調用鏈路：
 
 ```text
-jp-listening-script-generator
-  -> run-listening-transcribe.sh
+Japanese Agent Skill
+  -> LingoTrace listening execution layer
   -> tools/listening-transcribe-official/transcribe_listening.py
   -> ../ListenKit/cli/generate-markdown.sh
   -> ../ListenKit/cli/export-audio-slices.py
@@ -54,7 +48,7 @@ jp-listening-script-generator
 
 依賴：
 
-- Skill wrapper：`codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh`
+- Agent Skill：`lingotrace/packs/japanese/agent_skills/SKILL.md`
 - 通用轉寫能力：`../ListenKit/cli/generate-markdown.sh`
 - 通用時間範圍切片能力：`../ListenKit/cli/export-audio-slices.py`
 - 離線詞典套件：由 `setup_offline_dictionary.py` 安裝及檢查於 LingoTrace 自己的本機 Cache runtime。
@@ -108,9 +102,8 @@ jp-listening-script-generator
 常用命令：
 
 ```bash
-codex-skills/jp-listening-script-generator/scripts/init-listening-runtime.sh
+~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python tools/listening-transcribe-official/setup_offline_dictionary.py --python ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python --install
 ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python tools/listening-transcribe-official/setup_offline_dictionary.py --python ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python --check
-codex-skills/jp-listening-script-generator/scripts/check-listening-chain.sh
 ```
 
 依賴：

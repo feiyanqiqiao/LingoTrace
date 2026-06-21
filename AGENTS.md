@@ -1,19 +1,22 @@
 # AGENTS.md
 
-This repository is the public LingoTrace framework inside an Obsidian-based Japanese learning history. Treat notes, frontmatter, wikilinks, Bases, public templates, and language-pack workflows as part of the user-facing study system.
+This repository is the public LingoTrace framework inside an Obsidian-based Japanese learning history. Treat notes, frontmatter, wikilinks, Bases, public templates, and language-pack agent skills as part of the user-facing study system.
 
 ## Primary Entry Points
 
-Use the LingoTrace Japanese language-pack entrypoints as the operational source of truth for target Vault behavior:
+Use `lingotrace/packs/japanese/agent_skills/SKILL.md` as the natural-language operating entry for Japanese daily learning tasks.
 
-- Listening notes: `lingotrace.packs.japanese.workflows:listening_notes`
-- Source notes: `lingotrace.packs.japanese.workflows:source_notes`
-- Review material maintenance: `lingotrace.packs.japanese.workflows:review_materials`
-- Survival-speaking cards: `lingotrace.packs.japanese.workflows:speaking_cards`
-- YouTube/audio export: use sibling `../ListenKit/cli/import-audio.sh`
-- End-of-day review rollover: `lingotrace.packs.japanese.workflows:review_rollover`
+Users should be able to ask in ordinary study language, such as:
 
-Do not copy full schemas or workflow details into this document. Read the relevant `lingotrace/packs/japanese/` module and public tests before changing the matching subsystem.
+- "请把这段音频做成精听稿。"
+- "帮我把这篇材料整理成日语学习笔记。"
+- "把这个词加入复习。"
+- "这句话很实用，帮我做成口语卡。"
+- "今天复习结束了，帮我结算。"
+
+Do not ask users to mention workflow entrypoints, function names, data envelopes, or write-mode terms. The agent skill maps natural-language requests to the matching Japanese pack capability. Actual file changes must still go through the LingoTrace core and Japanese pack, including context checks, capability checks, path boundaries, and the core write guard.
+
+Do not copy full schemas or workflow details into this document. Read the agent skill, the relevant `lingotrace/packs/japanese/` module, and public tests before changing the matching subsystem.
 
 ## Path Roles
 
@@ -23,7 +26,7 @@ Do not treat folder paths in prose as the source of truth. Runtime path roles li
 
 - Prefer Obsidian-aware and Markdown-aware workflows for note search, note edits, frontmatter, wikilinks, and `.base` files.
 - Search before editing vocabulary. Check the focus review layer before the base lexicon so duplicate cards are not created.
-- For workflows that support it, run preview mode first, inspect the report, then run apply mode only when the result is clear.
+- For user-facing tasks that may update existing study state, describe the planned changes in ordinary language and ask for confirmation before saving them.
 - Keep edits scoped. Do not reorder large sets of notes, bulk-rewrite frontmatter, or normalize unrelated Markdown while working on a narrow task.
 - Preserve manually curated content, especially listening-note sentence selections, review notes, and daily study summaries, unless the user explicitly asks to reset them.
 - Avoid changing generated tools or helper scripts unless the task is specifically about the automation itself.
