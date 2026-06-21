@@ -103,7 +103,8 @@ def _blocking_findings(manifest: dict[str, Any]) -> list[Finding]:
         if classification != "preserve-data":
             continue
 
-        target_entry = target_entries.get(relative_path)
+        target_path = str(source_entry.get("target_path", relative_path))
+        target_entry = target_entries.get(target_path)
         if target_entry is None:
             errors.append(
                 Finding(
