@@ -33,6 +33,13 @@
 !codex-skills/
 !codex-skills/**
 
+# Public runtime source and tests.
+!lingotrace/
+!lingotrace/**
+!tests/
+!tests/lingotrace/
+!tests/lingotrace/**
+
 # Public listening tooling.
 !tools/
 !tools/README.md
