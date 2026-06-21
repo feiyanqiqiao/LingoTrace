@@ -120,7 +120,7 @@ class JapanesePackTests(unittest.TestCase):
             report = getattr(workflows, function_name)()
             self.assertFalse(report.accepted)
             self.assertEqual([], report.to_dict()["changed_files"])
-            self.assertEqual("workflow_not_implemented", report.to_dict()["errors"][0]["code"])
+            self.assertEqual("missing_vault_root", report.to_dict()["errors"][0]["code"])
 
         workflow_source = (PACK_ROOT / "workflows.py").read_text(encoding="utf-8")
         self.assertNotIn("codex-skills", workflow_source)

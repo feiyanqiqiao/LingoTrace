@@ -1,7 +1,0 @@
-interface:
-  display_name: "JP Next-Day Review Updater"
-  short_description: "Close out the day's review workflow by advancing done_today items and updating next review dates."
-  default_prompt: "Use $jp-next-day-review-updater to run the end-of-day rollover for this Japanese learning vault. Prefer running the local wrapper in `--dry-run` mode first, then rerun without `--dry-run` for the actual update. Keep the state transition deterministic: advance only `status: active` items with `done_today: true`, clear `done_today`, update `last_reviewed / review_stage / next_review`, apply the delayed-review rule, and when a focus vocab card finishes `day180`, sink it into the configured base vocabulary root from `系统配置/paths.json`, mark the focus card `status: mastered`, and clear its active scheduling. Rewrite the target note's `## 每日学习清单` section when that note exists. If the note exists but lacks that section, add it with the fixed `今日完成 / 今日卡点 / 简短复盘` structure. If the daily note is missing, still complete the review-state rollover and report that checklist rewriting was skipped."
-
-policy:
-  allow_implicit_invocation: true
