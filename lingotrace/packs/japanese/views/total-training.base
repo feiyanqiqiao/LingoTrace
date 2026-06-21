@@ -1,0 +1,33 @@
+filters:
+  and:
+    - file.ext == "md"
+    - status == "active"
+formulas:
+  core_text: if(jp_text, jp_text, if(headword, headword, file.name))
+  support_text: if(meaning_zh, meaning_zh, "")
+properties:
+  done_today:
+    displayName: Today done
+  track:
+    displayName: Track
+  item_type:
+    displayName: Item type
+  reading:
+    displayName: Reading
+  accent_display:
+    displayName: Accent
+  meaning_zh:
+    displayName: Chinese meaning
+  next_review:
+    displayName: Next review
+views:
+  - type: table
+    name: Total Training
+    order:
+      - file.name
+      - done_today
+      - track
+      - item_type
+      - formula.core_text
+      - formula.support_text
+      - next_review
