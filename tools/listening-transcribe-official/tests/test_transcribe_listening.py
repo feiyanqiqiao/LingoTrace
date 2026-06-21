@@ -27,22 +27,27 @@ WRAPPER_PATH = Path(__file__).resolve().parents[3] / "codex-skills/jp-listening-
 INIT_RUNTIME_PATH = WRAPPER_PATH.with_name("init-listening-runtime.sh")
 CHECK_CHAIN_PATH = WRAPPER_PATH.with_name("check-listening-chain.sh")
 REQUIREMENTS_PATH = Path(__file__).resolve().parents[1] / "requirements-listening.txt"
+JAPANESE_WORKFLOWS_PATH = Path(__file__).resolve().parents[3] / "lingotrace/packs/japanese/workflows.py"
 
 
 class TranscribeListeningTests(unittest.TestCase):
-    def test_wrapper_defaults_to_local_cache_virtualenv(self) -> None:
-        wrapper = WRAPPER_PATH.read_text(encoding="utf-8")
+    def test_old_listening_wrappers_are_retired_from_public_runtime(self) -> None:
+        tracked = subprocess.run(
+            ["git", "ls-files", "codex-skills/jp-listening-script-generator/scripts"],
+            cwd=Path(__file__).resolve().parents[3],
+            check=True,
+            text=True,
+            capture_output=True,
+        ).stdout
 
-        self.assertIn('${HOME}/Library/Caches/LingoTrace/venvs/cpython-314/bin/python', wrapper)
-        self.assertNotIn('${ROOT}/.venv', wrapper)
-        self.assertNotIn('/opt/homebrew/bin/python3.14', wrapper)
+        self.assertEqual("", tracked)
 
-    def test_wrapper_supports_explicit_runtime_override_without_fallback(self) -> None:
-        wrapper = WRAPPER_PATH.read_text(encoding="utf-8")
+    def test_japanese_pack_exposes_listening_workflow_entrypoint(self) -> None:
+        workflow_source = JAPANESE_WORKFLOWS_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("LINGOTRACE_LISTENING_PYTHON", wrapper)
-        self.assertIn("JP_LISTENING_PYTHON", wrapper)
-        self.assertIn("init-listening-runtime.sh", wrapper)
+        self.assertIn("def listening_notes(", workflow_source)
+        self.assertIn("input_artifact", workflow_source)
+        self.assertIn("run_file_mutations", workflow_source)
 
     def test_runtime_requirements_only_pin_direct_dictionary_dependencies(self) -> None:
         requirements = [
@@ -52,20 +57,6 @@ class TranscribeListeningTests(unittest.TestCase):
         ]
 
         self.assertEqual(requirements, ["fugashi==1.5.2", "unidic-lite==1.0.8"])
-
-    def test_runtime_init_and_chain_check_are_explicit(self) -> None:
-        init_script = INIT_RUNTIME_PATH.read_text(encoding="utf-8")
-        check_script = CHECK_CHAIN_PATH.read_text(encoding="utf-8")
-
-        self.assertIn('python3.14', init_script)
-        self.assertIn('requirements-listening.txt', init_script)
-        self.assertIn('Library/Caches/LingoTrace/venvs/cpython-314', init_script)
-        self.assertNotIn('ln -s', init_script)
-        self.assertIn('${LISTENKIT_ROOT}/cli/check-runtime.sh', check_script)
-        self.assertIn('Library/Caches/ListenKit/venvs/cpython-314/bin/python', check_script)
-        self.assertNotIn('${LISTENKIT_ROOT}/.venv/bin/python', check_script)
-        self.assertIn('ffmpeg', check_script)
-        self.assertIn('ffprobe', check_script)
 
     def test_confirmed_accent_index_uses_configured_focus_vocab_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

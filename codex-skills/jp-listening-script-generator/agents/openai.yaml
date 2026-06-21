@@ -1,8 +1,0 @@
-interface:
-  display_name: "JP Listening Script Generator"
-  short_description: "Create fixed 泛听 or 精听 listening-practice notes from one local audio file or media URL."
-  default_prompt: >-
-    Use $jp-listening-script-generator to turn one local listening audio file or media URL into the vault's fixed 泛听 or 精听 note format through ListenKit. Default to extensive unless the user explicitly requests intensive or the existing note is already intensive. Persist raw transcript artifacts, slice manifests, export reports, and review sidecars under `artifacts/`; keep source and slice audio under `attach/`. For intensive work, classify the transcript by content rather than path into `dialogue/numbered`, `dialogue/exchange`, or `sentence/sentence`. A numbered dialogue requires at least two consecutive reliable numbered groups; include each spoken number in its own slice and use `0.0` padding. An unnumbered dialogue uses complete two- or four-turn exchanges; sentence material uses natural sentences. Dialogue exchange and sentence profiles use `0.5` seconds of padding only inside non-overlapping safe blank space. Use `--slice-profile auto|dialogue|sentence` for an explicit override and `--slice-manifest PATH` for reviewed boundaries; precedence is CLI override, reviewed manifest profile metadata, then automatic detection. Never route by `Shadowing` folder names, never pass `--allow-overlap`, and do not apply material-specific word corrections during generic normalization. An intensive note with placeholders, missing embeds, or missing non-empty slice files is incomplete. Preserve existing manual edits and curate 0-5 reusable common sentences in the required structured format after transcript generation.
-
-policy:
-  allow_implicit_invocation: true

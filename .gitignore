@@ -21,17 +21,9 @@
 !docs/
 !docs/*.md
 
-# Public vault scaffolding.
-!系统配置/
-!系统配置/**
-
 # Public docs.
 !docs/
 !docs/**
-
-# Public Codex skills.
-!codex-skills/
-!codex-skills/**
 
 # Public runtime source and tests.
 !lingotrace/
@@ -61,12 +53,6 @@ tools/vault-structure/**/*.pyc
 tmp/
 学习系统/
 笔记/
-
-# Keep real learning content private.
-# Publish only the reusable 总训练.base dashboard template; incidental local view
-# changes should not be submitted.
-!学习系统/
-!学习系统/总训练.base
 
 __pycache__/
 **/__pycache__/

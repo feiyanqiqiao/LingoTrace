@@ -53,9 +53,6 @@ jobs:
       - name: Run listening baseline tests
         run: python -m unittest discover -s tools/listening-transcribe-official/tests -p 'test_*.py'
 
-      - name: Run review rollover baseline tests
-        run: python -m unittest discover -s codex-skills/jp-next-day-review-updater/tests -p 'test_*.py'
-
       - name: Run vault structure baseline tests
         run: python -m unittest discover -s tools/vault-structure/tests -p 'test_*.py'
 
