@@ -82,6 +82,63 @@ class FinalSourceInventoryTests(unittest.TestCase):
         self.assertEqual("frontmatter_and_body", by_path["review/focus/vocab/example.md"]["comparison_strategy"])
         self.assertTrue(by_path["review/focus/vocab/example.md"]["content_hash"].startswith("sha256:"))
 
+    def test_preserves_learning_media_artifacts_and_personal_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            output = root / "private-output"
+            write(source / "学习系统/听力/Shadowing_初中級/Unit1/attach/01.mp3", "audio")
+            write(source / "学习系统/听力/Shadowing_初中級/Unit2/artifacts/20.slices.json", "{}")
+            write(source / "学习系统/发音/素材/audio/pronunciation_video.m4a", "audio")
+            write(source / "学习系统/课堂复习/词汇/無題のファイル.base", "base")
+            write(source / "笔记/課程表.jpg", "image")
+
+            report = plan_final_source_inventory(
+                source_vault=source,
+                target_vault=root / "target",
+                output_dir=output,
+                write_freeze_started_at="2026-06-21T01:00:00Z",
+            )
+
+            self.assertTrue(report.accepted, report.to_dict())
+            manifest = json.loads((output / "source-manifest.json").read_text(encoding="utf-8"))
+            by_path = {entry["relative_path"]: entry for entry in manifest["source_manifest"]}
+
+        for relative_path in by_path:
+            self.assertEqual("preserve-data", by_path[relative_path]["classification"])
+            self.assertEqual("content_hash", by_path[relative_path]["comparison_strategy"])
+
+    def test_exits_public_repo_transient_state_and_old_system_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            output = root / "private-output"
+            write(source / ".DS_Store", "finder")
+            write(source / ".github/workflows/japanese-baseline.yml", "workflow")
+            write(source / ".obsidian/workspace.json", "{}")
+            write(source / ".worktrees/.DS_Store", "finder")
+            write(source / "LICENSE", "license")
+            write(source / "docs/runtime-snapshot-lingotrace-python314.txt", "snapshot")
+            write(source / "lingotrace/core/reports.py", "python")
+            write(source / "tests/lingotrace/migration/test_source_inventory.py", "test")
+            write(source / "tmp/audio/checkout_transcript.m4a", "audio")
+            write(source / "tools/architecture-baseline/fixtures/listening/intensive-manifest.json", "{}")
+            write(source / "系统配置/paths.json", "{}")
+
+            report = plan_final_source_inventory(
+                source_vault=source,
+                target_vault=root / "target",
+                output_dir=output,
+                write_freeze_started_at="2026-06-21T01:00:00Z",
+            )
+
+            self.assertTrue(report.accepted, report.to_dict())
+            manifest = json.loads((output / "source-manifest.json").read_text(encoding="utf-8"))
+            by_path = {entry["relative_path"]: entry for entry in manifest["source_manifest"]}
+
+        for relative_path in by_path:
+            self.assertEqual("remove-after-cutover", by_path[relative_path]["classification"])
+
     def test_unclassified_entries_block_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
