@@ -219,6 +219,41 @@ class MigrationVerificationTests(unittest.TestCase):
         )
         self.assertEqual([], envelope["changed_files"])
 
+    def test_verification_uses_target_path_for_mapped_preserve_data(self) -> None:
+        manifest = {
+            "source_manifest": [
+                {
+                    "relative_path": "学习系统/听力/Unit1/01.mp3",
+                    "target_path": "listening/Unit1/01.mp3",
+                    "classification": "preserve-data",
+                    "comparison_strategy": "content_hash",
+                    "content_hash": "sha256:same",
+                }
+            ],
+            "target_manifest": [
+                {
+                    "relative_path": "listening/Unit1/01.mp3",
+                    "content_hash": "sha256:same",
+                }
+            ],
+            "preserve_data": [
+                {
+                    "relative_path": "学习系统/听力/Unit1/01.mp3",
+                    "target_path": "listening/Unit1/01.mp3",
+                    "classification": "preserve-data",
+                }
+            ],
+            "recreate_from_pack": [],
+            "transform_with_map": [],
+            "remove_after_cutover": [],
+            "excluded_with_user_approval": [],
+            "conflicts": [],
+        }
+
+        report = verify_migration_acceptance(manifest)
+
+        self.assertTrue(report.accepted, report.to_dict())
+
 
 if __name__ == "__main__":
     unittest.main()
