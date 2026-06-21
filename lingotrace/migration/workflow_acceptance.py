@@ -79,18 +79,55 @@ def _is_listening_note(relative_path: str, text: str) -> bool:
 
 
 def _is_source_note(relative_path: str, text: str) -> bool:
-    return relative_path.startswith("sources/") and ("track: source_note" in text or "source_url:" in text)
+    frontmatter = _frontmatter(text)
+    return relative_path.startswith("sources/") and (
+        frontmatter.get("track") == "source_note"
+        or "source_kind" in frontmatter
+        or "source_url" in frontmatter
+    )
 
 
 def _is_review_material(relative_path: str, text: str) -> bool:
-    return relative_path.startswith("review/") and "review_stage:" in text and "next_review:" in text
+    frontmatter = _frontmatter(text)
+    return relative_path.startswith("review/") and _has_fields(frontmatter, ("review_stage", "next_review"))
 
 
 def _is_speaking_card(relative_path: str, text: str) -> bool:
-    return relative_path.startswith("speaking/cards/") and "card_type: speaking" in text and "reviewed: true" in text
+    frontmatter = _frontmatter(text)
+    return (
+        relative_path.startswith("speaking/cards/")
+        and frontmatter.get("track") == "survival_speaking"
+        and _has_fields(frontmatter, ("jp_text", "scene", "review_stage", "next_review"))
+    )
 
 
 def _is_review_rollover(relative_path: str, text: str) -> bool:
-    return relative_path.startswith("daily/") and (
-        "track: daily_review" in text or "review_rollover_checked: true" in text
+    frontmatter = _frontmatter(text)
+    if relative_path.startswith("daily/") and (
+        frontmatter.get("track") == "daily_review" or frontmatter.get("review_rollover_checked") == "true"
+    ):
+        return True
+    return relative_path.startswith(("review/", "speaking/cards/")) and _has_fields(
+        frontmatter,
+        ("review_stage", "next_review", "done_today"),
     )
+
+
+def _frontmatter(text: str) -> dict[str, str]:
+    if not text.startswith("---\n"):
+        return {}
+    parts = text.split("---\n", 2)
+    if len(parts) < 3:
+        return {}
+
+    fields: dict[str, str] = {}
+    for line in parts[1].splitlines():
+        if not line or line.startswith(" ") or line.startswith("- ") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        fields[key.strip()] = value.strip().strip('"')
+    return fields
+
+
+def _has_fields(fields: dict[str, str], required: tuple[str, ...]) -> bool:
+    return all(field in fields for field in required)
