@@ -67,6 +67,24 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
 
         self.assertNotIn("codex-skills/", skill)
 
+    def test_japanese_pack_agent_skill_requires_intent_recognition(self) -> None:
+        skill = read_required(AGENT_SKILL)
+
+        for phrase in (
+            "## Intent Recognition",
+            "infer the user's real learning intent",
+            "Do not match only the example phrases",
+            "Audio or video to listening material",
+            "Source material to study note",
+            "Word, grammar, pronunciation, or error to review",
+            "Useful sentence to active output",
+            "End-of-day review settlement",
+            "Dashboard or view maintenance",
+            "请更新总训练表",
+            "ask one short clarification question",
+        ):
+            self.assertIn(phrase, skill)
+
     def test_public_user_docs_are_natural_language_first(self) -> None:
         combined = read_required(README) + "\n" + read_required(USER_GUIDE)
 
@@ -76,6 +94,8 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
             "请把这段音频做成精听稿",
             "今天复习结束了，帮我结算",
             "保存到你的日语学习库",
+            "真实学习意图",
+            "请更新总训练表",
         ):
             self.assertIn(phrase, combined)
 
