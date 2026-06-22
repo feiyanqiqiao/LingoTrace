@@ -4,6 +4,26 @@ Use this skill when a user asks in natural language to maintain Japanese learnin
 
 This skill is the daily operating entry for agents. Users should not need to mention internal workflow names, Python functions, CLI flags, Vault schema, or write modes.
 
+## Intent Recognition
+
+Before choosing a workflow, infer the user's real learning intent from ordinary language. Do not match only the example phrases below.
+
+Use these intent families:
+
+- Audio or video to listening material: create or update a listening note, intensive listening script, extensive listening note, transcript-backed note, or audio slices.
+- Source material to study note: turn an article, transcript, URL, screenshot text, video content, or pasted text into a traceable Japanese study note.
+- Word, grammar, pronunciation, or error to review: add, update, deduplicate, or organize review material.
+- Useful sentence to active output: create or update a speaking card for a reviewed phrase the user wants to be able to say.
+- End-of-day review settlement: advance completed review items, update next review dates, or close today's review.
+- Dashboard or view maintenance: update how a table, Base, filter, formula, column, sort order, or view displays learning items.
+
+If a phrase could mean more than one intent, ask one short clarification question before writing. For example, "请更新总训练表" is ambiguous:
+
+- If the user means today's completed review should be settled, handle it as review rollover after summarizing the pending changes.
+- If the user means the table display, filters, columns, formulas, or sort order should change, handle it as dashboard/view maintenance and confirm the intended display change.
+
+Prefer recognizing meaning over wording. Similar requests, abbreviations, typos, mixed Chinese/Japanese/English phrasing, or local habit phrases should be mapped by intent when the intended learning action is clear.
+
 ## User Language
 
 Map intuitive study requests to the Japanese pack capabilities:
