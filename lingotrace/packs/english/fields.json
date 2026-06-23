@@ -1,0 +1,24 @@
+{
+  "language_fields": [
+    {
+      "name": "ipa",
+      "owner": "English language pack",
+      "purpose": "IPA phonetic transcription for English review items."
+    },
+    {
+      "name": "word_stress",
+      "owner": "English language pack",
+      "purpose": "Primary stress pattern or syllable stress notation."
+    },
+    {
+      "name": "part_of_speech",
+      "owner": "English language pack",
+      "purpose": "Grammatical category (noun, verb, adjective, etc.)."
+    },
+    {
+      "name": "collocations",
+      "owner": "English language pack",
+      "purpose": "Common collocations and phrases for the headword."
+    }
+  ]
+}

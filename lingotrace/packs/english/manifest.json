@@ -1,0 +1,185 @@
+{
+  "language_pack_id": "lingo-english",
+  "language_pack_version": "0.1.0",
+  "target_language": "en",
+  "transcription_locale": "en-US",
+  "compatible_core": {
+    "minimum": "0.1.0",
+    "maximum_exclusive": "0.2.0"
+  },
+  "compatible_vault_schema": {
+    "minimum": 1,
+    "maximum": 1
+  },
+  "capabilities": [
+    {
+      "id": "source_notes",
+      "maturity": "experimental",
+      "depends_on": [],
+      "read_path_roles": ["source_notes_root"],
+      "write_path_roles": ["source_notes_root"],
+      "external_tools": [],
+      "behavior_evidence": [],
+      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
+      "manual_review_cases": ["English source note creation from reading material"]
+    },
+    {
+      "id": "review_materials",
+      "maturity": "experimental",
+      "depends_on": [],
+      "read_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "source_notes_root"
+      ],
+      "write_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root"
+      ],
+      "external_tools": [],
+      "behavior_evidence": [],
+      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
+      "manual_review_cases": ["English vocabulary card creation with IPA and collocations"]
+    },
+    {
+      "id": "review_rollover",
+      "maturity": "experimental",
+      "depends_on": [],
+      "read_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "daily_notes_root"
+      ],
+      "write_path_roles": [
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "daily_notes_root"
+      ],
+      "external_tools": [],
+      "behavior_evidence": [],
+      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
+      "manual_review_cases": []
+    }
+  ],
+  "unsupported_capabilities": [
+    {
+      "id": "listening_notes",
+      "failure_reason": "English listening transcription tools are not yet available.",
+      "failure_policy": "stop_before_write",
+      "fallback": "none"
+    },
+    {
+      "id": "speaking_cards",
+      "failure_reason": "English speaking card validation is not yet implemented.",
+      "failure_policy": "stop_before_write",
+      "fallback": "none"
+    }
+  ],
+  "external_tools": [],
+  "language_fields": [
+    {
+      "name": "ipa",
+      "owner": "English language pack",
+      "purpose": "IPA phonetic transcription for English review items."
+    },
+    {
+      "name": "word_stress",
+      "owner": "English language pack",
+      "purpose": "Primary stress pattern or syllable stress notation."
+    },
+    {
+      "name": "part_of_speech",
+      "owner": "English language pack",
+      "purpose": "Grammatical category (noun, verb, adjective, etc.)."
+    },
+    {
+      "name": "collocations",
+      "owner": "English language pack",
+      "purpose": "Common collocations and phrases for the headword."
+    }
+  ],
+  "item_types": ["vocab", "grammar", "error", "pronunciation"],
+  "tag_namespace": "en",
+  "default_path_roles": {
+    "focus_vocab_root": "review/focus/vocab",
+    "base_vocab_root": "review/base/vocab",
+    "grammar_root": "review/grammar",
+    "error_root": "review/errors",
+    "speaking_card_root": "speaking/cards",
+    "speaking_guide_root": "speaking/guides",
+    "listening_root": "listening",
+    "pronunciation_accent_root": "review/pronunciation/accent",
+    "pronunciation_phoneme_root": "review/pronunciation/phoneme",
+    "source_notes_root": "sources",
+    "daily_notes_root": "daily"
+  },
+  "templates": [
+    {
+      "id": "focus_vocab_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/english/templates/focus-vocab-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "daily_checklist",
+      "capability_id": "review_rollover",
+      "path": "lingotrace/packs/english/templates/daily-checklist.md",
+      "artifact_class": "recreate-from-pack"
+    }
+  ],
+  "workflow_entrypoints": [
+    {
+      "id": "source_notes_workflow",
+      "capability_id": "source_notes",
+      "entrypoint": "lingotrace.packs.english.workflows:source_notes",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_materials_workflow",
+      "capability_id": "review_materials",
+      "entrypoint": "lingotrace.packs.english.workflows:review_materials",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_rollover_workflow",
+      "capability_id": "review_rollover",
+      "entrypoint": "lingotrace.packs.english.workflows:review_rollover",
+      "call_policy": "through_core_write_guard"
+    }
+  ],
+  "validators": [
+    {
+      "id": "review_materials_validator",
+      "capability_id": "review_materials",
+      "entrypoint": "lingotrace.packs.english.validators:validate_review_materials"
+    },
+    {
+      "id": "review_rollover_validator",
+      "capability_id": "review_rollover",
+      "entrypoint": "lingotrace.packs.english.validators:validate_review_rollover"
+    }
+  ],
+  "display_rules": [],
+  "initialization_artifacts": [
+    {
+      "id": "default_vault_context",
+      "capability_id": "review_rollover",
+      "path": ".lingotrace/vault-context.json",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "default_path_config",
+      "capability_id": "review_rollover",
+      "path": ".lingotrace/paths.json",
+      "artifact_class": "recreate-from-pack"
+    }
+  ]
+}
