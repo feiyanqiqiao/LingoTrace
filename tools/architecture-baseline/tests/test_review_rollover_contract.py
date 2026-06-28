@@ -71,8 +71,9 @@ class ReviewRolloverContractTests(unittest.TestCase):
         self.assertNotIn("active-not-done.md", planned_by_name)
         self.assertEqual("day1", planned_by_name["day0-done.md"]["to_review_stage"])
         self.assertEqual("2026-06-19", planned_by_name["day0-done.md"]["to_next_review"])
-        self.assertEqual("day3", planned_by_name["day1-overdue.md"]["to_review_stage"])
-        self.assertEqual("2026-06-21", planned_by_name["day1-overdue.md"]["to_next_review"])
+        self.assertEqual("day1", planned_by_name["day1-overdue.md"]["to_review_stage"])
+        self.assertEqual("2026-06-19", planned_by_name["day1-overdue.md"]["to_next_review"])
+        self.assertTrue(planned_by_name["day1-overdue.md"]["delay_rescheduled"])
         self.assertEqual("mastered", planned_by_name["day180-done.md"]["to_review_stage"])
         self.assertEqual("", planned_by_name["day180-done.md"]["to_next_review"])
 
