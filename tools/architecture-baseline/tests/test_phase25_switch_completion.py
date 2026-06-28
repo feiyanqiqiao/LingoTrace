@@ -85,6 +85,21 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
         ):
             self.assertIn(phrase, skill)
 
+    def test_clear_review_rollover_requests_do_not_need_second_confirmation(self) -> None:
+        skill = read_required(AGENT_SKILL)
+        guide = read_required(USER_GUIDE)
+
+        for phrase in (
+            "Clear review-settlement requests do not need a second user confirmation",
+            "preview -> apply -> second preview",
+            "If preview reports errors, stop before apply",
+            "Ambiguous requests still require clarification",
+        ):
+            self.assertIn(phrase, skill)
+
+        self.assertIn("明确的复习结算请求不需要二次确认", guide)
+        self.assertNotIn("你确认后才会保存状态变化", guide)
+
     def test_public_user_docs_are_natural_language_first(self) -> None:
         combined = read_required(README) + "\n" + read_required(USER_GUIDE)
 
