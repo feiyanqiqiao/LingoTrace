@@ -10,8 +10,8 @@ formulas:
   track_label: if(track == "class_review", "重点复习", if(track == "survival_speaking", "生活口语", if(track == "listening", "听力", "发音")))
   priority_rank: if(priority == "high", 0, 1)
   due_days: if(next_review, (date(next_review) - today()).days, "")
-  core_text: if(jp_text, jp_text, if(headword, if(accent_display, accent_display, headword), if(pattern, pattern, if(target_text, target_text, file.name))))
-  support_text: if(track == "listening", if(practice_focus, practice_focus, ""), if(meaning_zh, meaning_zh, if(reason, reason, if(reply_hint, reply_hint, ""))))
+  core_text: 'if(item_type == "vocab", if(accent_display, accent_display, if(headword, headword, file.name)), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(track == "survival_speaking", if(jp_text, jp_text, file.name), if(track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name)), if(track == "pronunciation", if(target_text, target_text, file.name), file.name))))))'
+  support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, "")), if(track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, "")), if(track == "pronunciation", if(issue_tags, issue_tags, ""), ""))))))'
   pressure: if(error_count, error_count, 0) + if(seen_count, seen_count, 0) + if(attempt_count, attempt_count, 0)
   due_flag: if(status == "active" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)
   next_day_flag: if(status == "active" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)
@@ -31,12 +31,24 @@ properties:
     displayName: 功能
   headword:
     displayName: 词头
+  reading:
+    displayName: 假名
   accent_display:
     displayName: 重音
+  collocations:
+    displayName: 常见搭配
   pattern:
     displayName: 语法
+  formation:
+    displayName: 接续
   meaning_zh:
     displayName: 中文
+  wrong_form:
+    displayName: 错误表达
+  correct_form:
+    displayName: 正确表达
+  reason:
+    displayName: 错误原因
   jp_text:
     displayName: 日语句子
   reply_hint:
@@ -119,6 +131,7 @@ views:
     columnSize:
       file.name: 260
       done_today: 96
+      formula.core_text: 320
       formula.support_text: 420
   - type: table
     name: 重点复习高风险

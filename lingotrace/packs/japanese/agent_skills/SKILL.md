@@ -48,7 +48,9 @@ Avoid asking users to say implementation phrases such as internal workflow names
 
 ## Operating Rules
 
-Agent Skill must not write files directly. It must route actual changes through the LingoTrace core write guard and the Japanese pack capability that matches the task.
+Agent Skill must not write Vault files directly. Vault file changes must route through the LingoTrace core write guard and the Japanese pack capability that matches the task.
+
+Review rollover is card-frontmatter backed: settlement reads and updates the configured review cards directly. The Obsidian total-training Base reads ordinary card frontmatter. Archived files under `.lingotrace/review-state/` are migration backups only and must not be treated as the active source of truth.
 
 Before a write-capable task, the agent must confirm the learning library context exists and that the matching capability is enabled. If context or capability checks fail, stop before writing and explain the missing setup in user-facing language.
 
@@ -56,8 +58,8 @@ Default behavior is risk-based:
 
 - Listening notes, source notes, and speaking cards usually create new files. When the user clearly asks to create them, the agent may save the result after checking that the destination does not already exist.
 - If a target note already exists, stop and ask before overwriting or merging. Preserve manually curated listening selections, review notes, and daily summaries.
-- Review material maintenance starts with search and duplicate checks. New low-risk cards may be saved; merges, moves, overwrites, or review-state changes need confirmation.
-- Review rollover first summarizes the cards that would change. Only update review state after the user confirms the settlement.
+- Review material maintenance starts with search and duplicate checks. New low-risk cards may be saved; merges, moves, overwrites, or review-card frontmatter changes need confirmation.
+- Review rollover first summarizes the card frontmatter changes that would be saved. Only update cards after the user confirms the settlement.
 
 ## Listening Notes
 
@@ -92,6 +94,6 @@ Do not promote unstable ASR text, raw transcript fragments, or unnatural textboo
 
 ## Review Rollover
 
-For requests such as "今天复习结束了，帮我结算", summarize the pending review-state changes first. Include the count of cards that would advance, cards that would become mastered, and any blocked cards.
+For requests such as "今天复习结束了，帮我结算", summarize the pending card frontmatter changes first. Include the count of cards that would advance, cards that would become mastered, and any blocked cards.
 
-Do not silently batch-update review state. Wait for explicit user confirmation before settlement changes are saved.
+Do not silently batch-update review cards. Wait for explicit user confirmation before settlement changes are saved. Settlement should not rewrite daily notes or base vocabulary Markdown unless the user explicitly asks for a separate content-maintenance task.

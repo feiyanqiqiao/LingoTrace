@@ -40,6 +40,16 @@ STAGE_ADVANCEMENT = {
     "day90": ("day180", 180),
     "day180": ("mastered", 0),
 }
+STAGE_DAYS = {
+    "day0": 0,
+    "day1": 1,
+    "day3": 3,
+    "day7": 7,
+    "day14": 14,
+    "day30": 30,
+    "day90": 90,
+    "day180": 180,
+}
 
 
 def listening_notes(
@@ -206,12 +216,32 @@ def review_rollover(
                 )
             )
             continue
-        next_stage, interval_days = STAGE_ADVANCEMENT[review_stage]
-        next_review = "" if next_stage == "mastered" else (rollover_date + dt.timedelta(days=interval_days)).isoformat()
+        next_review_raw = str(fields.get("next_review", ""))
+        try:
+            original_next_review = dt.date.fromisoformat(next_review_raw)
+        except ValueError:
+            errors.append(
+                Finding(
+                    code="invalid_next_review",
+                    message="Review rollover requires next_review to use YYYY-MM-DD format.",
+                    path=card_path.relative_to(root).as_posix(),
+                )
+            )
+            continue
+        allowed_delay = max(1, STAGE_DAYS[review_stage])
+        overdue_days = (rollover_date - original_next_review).days
+        delay_rescheduled = overdue_days > allowed_delay
+        if delay_rescheduled:
+            next_stage = review_stage
+            next_review = (rollover_date + dt.timedelta(days=allowed_delay)).isoformat()
+        else:
+            next_stage, interval_days = STAGE_ADVANCEMENT[review_stage]
+            next_review = "" if next_stage == "mastered" else (rollover_date + dt.timedelta(days=interval_days)).isoformat()
         updates = {
             "done_today": "false",
             "review_stage": next_stage,
             "next_review": next_review,
+            "last_reviewed": rollover_date.isoformat(),
         }
         if next_stage == "mastered":
             updates["status"] = "mastered"
@@ -222,10 +252,12 @@ def review_rollover(
                 "reason": "done_today active card would advance during target Vault rollover",
                 "from_review_stage": review_stage,
                 "to_review_stage": next_stage,
-                "from_next_review": str(fields.get("next_review", "")),
+                "from_next_review": next_review_raw,
                 "to_next_review": next_review,
+                "last_reviewed": rollover_date.isoformat(),
                 "done_today": False,
             }
+            | ({"delay_rescheduled": True} if delay_rescheduled else {})
         )
         mutations.append(
             FileMutation(

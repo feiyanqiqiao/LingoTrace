@@ -282,6 +282,7 @@ meaning_zh: 合成词
                     "to_review_stage": "day3",
                     "from_next_review": "2026-06-21",
                     "to_next_review": "2026-06-24",
+                    "last_reviewed": "2026-06-21",
                     "done_today": False,
                 }
             ],
@@ -318,6 +319,41 @@ meaning_zh: 合成词
         self.assertIn("done_today: false", body)
         self.assertIn("review_stage: day3", body)
         self.assertIn("next_review: 2026-06-24", body)
+        self.assertIn("last_reviewed: 2026-06-21", body)
+
+    def test_review_rollover_reschedules_overdue_card_without_advancing_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/grammar/〜ものだ.md",
+                """---
+track: class_review
+item_type: grammar
+status: active
+done_today: true
+review_stage: day3
+next_review: 2026-06-01
+last_reviewed: 2026-05-29
+---
+
+# 〜ものだ
+""",
+            )
+
+            preview = workflows.review_rollover(vault_root=root, run_date="2026-06-21")
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            body = (root / "review/grammar/〜ものだ.md").read_text(encoding="utf-8")
+
+        self.assertTrue(preview.accepted, preview.to_dict())
+        planned = preview.to_dict()["planned_writes"][0]
+        self.assertEqual("day3", planned["to_review_stage"])
+        self.assertTrue(planned["delay_rescheduled"])
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("done_today: false", body)
+        self.assertIn("review_stage: day3", body)
+        self.assertIn("next_review: 2026-06-24", body)
+        self.assertIn("last_reviewed: 2026-06-21", body)
 
 
 if __name__ == "__main__":

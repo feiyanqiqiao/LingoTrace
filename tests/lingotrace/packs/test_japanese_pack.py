@@ -109,6 +109,21 @@ class JapanesePackTests(unittest.TestCase):
             self.assertEqual("recreate-from-pack", record["artifact_class"])
             self.assertTrue(record["path"].startswith(".lingotrace/"))
 
+    def test_total_training_dashboard_surfaces_type_specific_review_cues(self) -> None:
+        template = (PACK_ROOT / "views" / "total-training.base").read_text(encoding="utf-8")
+
+        self.assertIn("collocations", template)
+        self.assertIn("formation", template)
+        self.assertIn("correct_form", template)
+        self.assertIn("wrong_form", template)
+        self.assertIn("daily_use_sentences", template)
+        self.assertIn('item_type == "vocab"', template)
+        self.assertIn('item_type == "grammar", if(meaning_zh', template)
+        self.assertIn('item_type == "error", if(correct_form', template)
+        self.assertIn('item_type == "error", if(wrong_form', template)
+        self.assertIn("formula.core_text", template)
+        self.assertIn("formula.support_text", template)
+
     def test_workflows_are_declarative_and_do_not_call_old_jp_skills(self) -> None:
         manifest = read_json(MANIFEST_PATH)
         workflows = importlib.import_module("lingotrace.packs.japanese.workflows")

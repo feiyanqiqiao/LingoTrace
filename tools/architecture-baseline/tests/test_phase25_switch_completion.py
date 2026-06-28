@@ -60,7 +60,7 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
             "review_materials",
             "speaking_cards",
             "review_rollover",
-            "Agent Skill must not write files directly",
+            "Agent Skill must not write Vault files directly",
             "core write guard",
         ):
             self.assertIn(phrase, skill)
