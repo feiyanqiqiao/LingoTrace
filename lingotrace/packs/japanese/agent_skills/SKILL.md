@@ -41,7 +41,7 @@ Prefer user-facing language such as:
 - 保存到你的日语学习库
 - 先让我确认将要新增或修改的内容
 - 不会覆盖你已经手工整理过的笔记
-- 复习结算前会先列出将被更新的卡片
+- 复习结算后会报告更新了哪些卡片
 - 缺少音频、来源或日期时，先向用户确认
 
 Avoid asking users to say implementation phrases such as internal workflow names, data envelopes, or write-mode terms.
@@ -59,7 +59,8 @@ Default behavior is risk-based:
 - Listening notes, source notes, and speaking cards usually create new files. When the user clearly asks to create them, the agent may save the result after checking that the destination does not already exist.
 - If a target note already exists, stop and ask before overwriting or merging. Preserve manually curated listening selections, review notes, and daily summaries.
 - Review material maintenance starts with search and duplicate checks. New low-risk cards may be saved; merges, moves, overwrites, or review-card frontmatter changes need confirmation.
-- Review rollover first summarizes the card frontmatter changes that would be saved. Only update cards after the user confirms the settlement.
+- Clear review-settlement requests do not need a second user confirmation. Run `preview -> apply -> second preview`, then report the saved card frontmatter changes.
+- Ambiguous requests still require clarification. If preview reports errors, stop before apply.
 
 ## Listening Notes
 
@@ -94,6 +95,6 @@ Do not promote unstable ASR text, raw transcript fragments, or unnatural textboo
 
 ## Review Rollover
 
-For requests such as "今天复习结束了，帮我结算", summarize the pending card frontmatter changes first. Include the count of cards that would advance, cards that would become mastered, and any blocked cards.
+For requests such as "今天复习结束了，帮我结算", run an internal preview first. If the preview is accepted and has no errors, apply the rollover immediately and run a second preview to verify no planned review writes remain.
 
-Do not silently batch-update review cards. Wait for explicit user confirmation before settlement changes are saved. Settlement should not rewrite daily notes or base vocabulary Markdown unless the user explicitly asks for a separate content-maintenance task.
+After settlement, report the count of cards advanced, cards that became mastered, delayed reschedules, blocked cards, and the second-preview result. Settlement should not rewrite daily notes or base vocabulary Markdown unless the user explicitly asks for a separate content-maintenance task.

@@ -30,9 +30,9 @@ Language packs own:
 
 ## User Stories
 
-### 1. Preview before settlement
+### 1. Internal preview before settlement
 
-As a learner, I want the agent to show which review cards will change before saving, so I can confirm the settlement safely.
+As a learner, I want clear review-settlement requests to run without a second confirmation, while still using preview internally to prevent unsafe writes.
 
 Acceptance criteria:
 
@@ -40,6 +40,8 @@ Acceptance criteria:
 - Preview returns planned writes for active cards with `done_today: true`.
 - Preview does not modify any file.
 - The planned write includes old/new review stage, old/new `next_review`, `last_reviewed`, and `done_today: false`.
+- For clear settlement requests, an accepted preview with no errors is immediately followed by apply.
+- Ambiguous requests still require clarification before choosing rollover versus dashboard maintenance.
 
 Regression coverage:
 
@@ -200,7 +202,7 @@ Regression coverage:
 
 | Behavior | Japanese regression test | Required for future English pack |
 | --- | --- | --- |
-| Preview before write | `test_review_rollover_previews_due_target_card_without_writes` | Yes |
+| Internal preview before write | `test_review_rollover_previews_due_target_card_without_writes` | Yes |
 | Normal SRS advancement | `test_review_rollover_apply_advances_due_target_card` | Yes |
 | Delayed overdue reschedule | `test_review_rollover_reschedules_overdue_card_without_advancing_stage` | Yes |
 | day180 focus state mastery | `test_review_rollover_sinks_day180_focus_vocab_to_base_vocab` | Yes |

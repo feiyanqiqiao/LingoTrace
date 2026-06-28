@@ -26,7 +26,7 @@ Do not treat folder paths in prose as the source of truth. Runtime path roles li
 
 - Prefer Obsidian-aware and Markdown-aware workflows for note search, note edits, frontmatter, wikilinks, and `.base` files.
 - Search before editing vocabulary. Check the focus review layer before the base lexicon so duplicate cards are not created.
-- For user-facing tasks that may update existing study state, describe the planned changes in ordinary language and ask for confirmation before saving them.
+- For user-facing tasks that may update existing study state, describe the planned changes in ordinary language and ask for confirmation before saving them, except clear end-of-day review settlement requests. Clear review settlement runs an internal preview, applies if accepted, then verifies with a second preview.
 - Keep edits scoped. Do not reorder large sets of notes, bulk-rewrite frontmatter, or normalize unrelated Markdown while working on a narrow task.
 - Preserve manually curated content, especially listening-note sentence selections, review notes, and daily study summaries, unless the user explicitly asks to reset them.
 - Avoid changing generated tools or helper scripts unless the task is specifically about the automation itself.
