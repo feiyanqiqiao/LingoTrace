@@ -53,8 +53,11 @@ Read first:
 
 ```text
 docs/multilingual/language-pack-contributor-guide.md
+docs/multilingual/language-pack-capability-guidance.md
 docs/lingotrace_multilingual_architecture_plan.md
 docs/multilingual/phase-0/language-pack-conformance-checklist.md
+docs/multilingual/review-rollover-user-stories.md
+docs/multilingual/total-training-dashboard-user-stories.md
 lingotrace/packs/japanese/manifest.json
 lingotrace/packs/japanese/agent_skills/SKILL.md
 tests/lingotrace/packs/test_japanese_pack.py
@@ -70,6 +73,9 @@ Implementation rules:
 - Keep user interaction natural-language-first through `agent_skills/SKILL.md`.
 - Route writes through the core write guard when implementing a workflow.
 - Stop before writing if Vault context, capability declaration, path role, or external tooling is missing.
+- Use `docs/multilingual/language-pack-capability-guidance.md` as the capability guidance index.
+- For each implemented capability, state whether the relevant guidance is followed, not applicable, or a language-specific exception.
+- Do not promote language-specific behavior into core unless it meets the guidance index's cross-language promotion rule.
 
 Current infrastructure caveats:
 
@@ -90,6 +96,8 @@ PR acceptance criteria:
 
 - The PR states the target language and explanation language.
 - The PR lists implemented and unsupported capabilities.
+- The PR cites applicable capability guidance documents.
+- The PR lists not-applicable guidance items or language-specific exceptions.
 - The PR includes or updates `manifest.json`, `paths.json`, `fields.json`, and `agent_skills/SKILL.md` for the new pack.
 - Unsupported capabilities include `failure_reason`.
 - The Agent Skill contains natural user examples and does not ask users to say internal workflow names.

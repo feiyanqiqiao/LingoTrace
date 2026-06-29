@@ -17,9 +17,11 @@ Use these intent families:
 - End-of-day review settlement: advance completed review items, update next review dates, or close today's review.
 - Dashboard or view maintenance: update how a table, Base, filter, formula, column, sort order, or view displays learning items.
 
-If a phrase could mean more than one intent, ask one short clarification question before writing. For example, "请更新总训练表" is ambiguous:
+The local phrases "更新总训练表" and "请更新总训练表" are clear end-of-day review settlement requests. Route them to review rollover without asking a second confirmation question.
 
-- If the user means today's completed review should be settled, handle it as review rollover after summarizing the pending changes.
+If another phrase could mean more than one intent, ask one short clarification question before writing:
+
+- If the user means today's completed review should be settled, handle it as review rollover.
 - If the user means the table display, filters, columns, formulas, or sort order should change, handle it as dashboard/view maintenance and confirm the intended display change.
 
 Prefer recognizing meaning over wording. Similar requests, abbreviations, typos, mixed Chinese/Japanese/English phrasing, or local habit phrases should be mapped by intent when the intended learning action is clear.
@@ -34,7 +36,7 @@ Map intuitive study requests to the Japanese pack capabilities:
 | 帮我把这篇材料整理成日语学习笔记 / 生成学习笔记 | Source note task | `source_notes` |
 | 把这个词加入复习 / 建词卡 / 建语法卡 | Review material task | `review_materials` |
 | 这句话很实用，帮我做成口语卡 / 这句以后要会说 | Speaking card task | `speaking_cards` |
-| 今天复习结束了，帮我结算 / 结算复习 | Review rollover task | `review_rollover` |
+| 今天复习结束了，帮我结算 / 结算复习 / 更新总训练表 / 请更新总训练表 | Review rollover task | `review_rollover` |
 
 Prefer user-facing language such as:
 
@@ -50,7 +52,7 @@ Avoid asking users to say implementation phrases such as internal workflow names
 
 Agent Skill must not write Vault files directly. Vault file changes must route through the LingoTrace core write guard and the Japanese pack capability that matches the task.
 
-Review rollover is card-frontmatter backed: settlement reads and updates the configured review cards directly. The Obsidian total-training Base reads ordinary card frontmatter. Archived files under `.lingotrace/review-state/` are migration backups only and must not be treated as the active source of truth.
+Review rollover is card-frontmatter backed: settlement reads and updates the configured review cards directly. The Obsidian total-training Base reads ordinary card frontmatter. Do not create or rely on a parallel review-state JSON store or generated review-state snapshot notes.
 
 Before a write-capable task, the agent must confirm the learning library context exists and that the matching capability is enabled. If context or capability checks fail, stop before writing and explain the missing setup in user-facing language.
 

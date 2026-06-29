@@ -1,10 +1,36 @@
-# Review Rollover User Stories and Acceptance Tests
+# Multilingual Review Rollover User Stories and Acceptance Tests
+
+Status: `Reference Guidance`
+
+Maturity path: `Reference Guidance -> Candidate Contract -> Enforced Contract`
+
+Related guidance index: [Language Pack Capability Guidance](language-pack-capability-guidance.md)
 
 ## Purpose
 
-This document defines the user-facing behavior that must survive review-rollover migration. It is a maintenance contract for language-pack implementations of the shared `review_rollover` capability.
+This document defines the user-facing behavior that must survive review-rollover migration across language packs. It is the shared maintenance contract for implementations of the `review_rollover` capability.
 
 The migration rule is simple: a rollover behavior is not considered migrated until it has a user story, acceptance criteria, and a regression test.
+
+The active review-state source of truth is review-card Markdown frontmatter. Rollover must not introduce a parallel review-state runtime store or snapshot surface.
+
+## Applicability
+
+All language packs that implement `review_rollover` should index, reference, and satisfy this document before the capability is considered complete.
+
+This document is a shared contract for:
+
+- Preview/apply/second-preview settlement flow.
+- Review-card frontmatter as the runtime source of truth.
+- Fixed memory-curve advancement.
+- Delayed-review rescheduling.
+- Invalid-state blocking before writes.
+- Daily-note independence.
+- Capability and write-guard enforcement.
+
+Language packs may define their own path roles, card-type fields, templates, and user-facing wording. If a language pack needs to change a shared rollover rule, the pack must document the exception, add language-specific acceptance criteria, and provide regression coverage before shipping the behavior.
+
+The Japanese pack is the current reference implementation and test source for this contract.
 
 ## Ownership Boundary
 
@@ -15,17 +41,17 @@ Core owns:
 - Capability enablement and stability checks.
 - Vault-relative write guards.
 - `FileMutation` preview/apply execution.
-- Review-state storage primitives and transaction-log primitives.
+- Atomic file-application semantics and blocked-write reporting.
 
 Language packs own:
 
 - Natural-language agent instructions.
 - Path roles used by the pack.
 - Review-card field validation.
-- Language-specific rollover rules.
+- Language-specific memory-curve and delayed-review rules.
 - Review-card frontmatter rollover.
-- Daily-note text.
-- Vocabulary promotion and merge semantics.
+- Vocabulary mastery semantics.
+- Decisions about optional daily-note or content-maintenance behavior.
 - Pack-level regression tests.
 
 ## User Stories
@@ -41,27 +67,35 @@ Acceptance criteria:
 - Preview does not modify any file.
 - The planned write includes old/new review stage, old/new `next_review`, `last_reviewed`, and `done_today: false`.
 - For clear settlement requests, an accepted preview with no errors is immediately followed by apply.
-- Ambiguous requests still require clarification before choosing rollover versus dashboard maintenance.
+- After apply, a fresh preview returns `0` remaining review-card planned writes.
+- "更新总训练表" and "请更新总训练表" are treated as clear settlement requests.
+- Other ambiguous requests still require clarification before choosing rollover versus dashboard maintenance.
 
 Regression coverage:
 
 - `test_review_rollover_previews_due_target_card_without_writes`
+- Required: second-preview verification after apply
 
-### 2. Apply normal SRS advancement
+### 2. Apply fixed memory-curve advancement
 
-As a learner, I want completed review items to advance to the next SRS stage, so tomorrow's review queue reflects today's work.
+As a learner, I want completed review items to advance along a fixed memory curve, so scheduling stays predictable and does not depend on agent judgment.
 
 Acceptance criteria:
 
 - Apply writes ordinary review-card frontmatter through core file mutations.
+- Only cards with `status: active` and `done_today: true` are eligible.
+- The stage chain is fixed: `day0 -> day1 -> day3 -> day7 -> day14 -> day30 -> day90 -> day180 -> mastered`.
 - Apply sets `done_today: false` in card frontmatter.
-- Apply advances `review_stage` by the pack's SRS table in card frontmatter.
-- Apply updates `next_review` from the run date and interval in card frontmatter.
+- Apply advances `review_stage` by the fixed memory curve in card frontmatter.
+- Apply updates `next_review` from the settlement `run_date` and the next-stage interval, not by adding time to the previous `next_review`.
 - Apply writes `last_reviewed` as the run date in card frontmatter.
+- Unknown `review_stage` values block apply before any file is written.
 
 Regression coverage:
 
 - `test_review_rollover_apply_advances_due_target_card`
+- Required: parameterized coverage for every stage transition in the memory curve
+- Required: unknown-stage blocking coverage
 
 ### 3. Reschedule overdue cards without advancing
 
@@ -74,24 +108,29 @@ Acceptance criteria:
 - Clear `done_today`.
 - Write `last_reviewed`.
 - Mark the planned write as delayed reschedule.
+- If `overdue_days == allowed_delay`, the card is still allowed to advance.
 
 Regression coverage:
 
 - `test_review_rollover_reschedules_overdue_card_without_advancing_stage`
+- Required: boundary coverage for `overdue_days == allowed_delay`
 
-### 4. Promote completed day180 focus vocabulary
+### 4. Complete day180 cards as mastered
 
-As a learner, I want a focus vocabulary card that finishes `day180` to leave active review, so active review stays focused and stable knowledge remains searchable.
+As a learner, I want a card that finishes `day180` to leave active review, so the daily queue stays focused on material that still needs scheduled review.
 
 Acceptance criteria:
 
-- A day180 focus vocabulary card becomes `mastered`.
-- The focus Markdown card's review-state frontmatter is updated during settlement.
-- Base-vocabulary content maintenance is a separate content workflow; settlement does not block on base-card Markdown writes.
+- A card that advances from `day180` becomes `review_stage: mastered`.
+- The card's `status` becomes `mastered`.
+- `done_today` is cleared.
+- `last_reviewed` is set to the settlement run date.
+- `next_review` is cleared because mastered cards are no longer scheduled by the normal active-review queue.
+- If a future language pack needs type-specific mastery behavior, it must update this contract and its tests before changing implementation.
 
 Regression coverage:
 
-- `test_review_rollover_sinks_day180_focus_vocab_to_base_vocab`
+- Required: `day180 -> mastered` frontmatter coverage
 
 ### 5. Keep base vocabulary content out of settlement
 
@@ -100,39 +139,39 @@ As a learner, I want settlement to avoid rewriting base vocabulary content, so i
 Acceptance criteria:
 
 - Existing base vocabulary Markdown remains unchanged during review settlement.
-- Focus-card SRS frontmatter still becomes `mastered`.
+- Focus-card or active review-card SRS frontmatter can still become `mastered`.
 - Any base-vocabulary creation or merge must run through a separate explicit content-maintenance workflow.
 
 Regression coverage:
 
-- `test_review_rollover_day180_state_does_not_merge_base_vocab_during_settlement`
+- Required: base vocabulary Markdown untouched during day180 settlement
 
-### 6. Update an existing daily checklist
+### 6. Do not rewrite daily notes during settlement
 
-As a learner, I want the daily note's review summary to reflect the settlement while preserving my manually recorded card points.
+As a learner, I want review settlement to avoid rewriting my daily notes by default, so manual notes and iCloud-delayed daily files cannot block review closeout.
 
 Acceptance criteria:
 
 - Daily note Markdown is not rewritten by default during settlement.
 - Settlement can complete even when the daily note is missing, unavailable, or iCloud-delayed.
-- A second preview after apply returns no remaining review-card planned writes.
+- If a daily-note summary is desired, it must be handled by an explicit content-maintenance workflow rather than normal rollover.
 
 Regression coverage:
 
-- `test_review_rollover_updates_existing_daily_checklist_and_preserves_card_points`
+- Required: existing daily note remains unchanged during settlement
 
-### 7. Append a checklist when the daily note has no anchor
+### 7. Leave daily notes without anchors unchanged
 
 As a learner, I want settlement to avoid editing a daily note without my explicit content-maintenance request.
 
 Acceptance criteria:
 
 - If the daily note exists but lacks the checklist anchor, leave the note unchanged during settlement.
-- Review-state rollover still completes.
+- Review-card rollover still completes.
 
 Regression coverage:
 
-- `test_review_rollover_appends_daily_checklist_when_note_has_no_anchor`
+- Required: daily note without anchor remains unchanged
 
 ### 8. Complete settlement when the daily note is missing
 
@@ -142,7 +181,7 @@ Acceptance criteria:
 
 - Missing daily note does not block review-card rollover.
 - No daily-note write is planned by default.
-- Review-state updates still apply.
+- Review-card frontmatter updates still apply.
 
 Regression coverage:
 
@@ -156,30 +195,14 @@ Acceptance criteria:
 
 - Invalid `next_review` blocks apply.
 - Unknown `review_stage` blocks apply.
-- Missing required promotion fields block day180 focus-vocabulary promotion.
 - Missing or invalid required card frontmatter blocks settlement.
 - No card mutation is applied when blocking errors exist.
 
 Regression coverage:
 
-- `test_review_rollover_blocks_all_writes_when_any_completed_card_has_invalid_next_review`
+- Required: invalid completed card blocks all writes before apply
 
-### 10. Keep archived review-state out of runtime
-
-As a maintainer, I want archived `.lingotrace/review-state/` files to stay out of runtime, so card frontmatter remains the only active source of truth.
-
-Acceptance criteria:
-
-- The total-training Base reads ordinary card frontmatter.
-- Review rollover does not read `.lingotrace/review-state/*.json`.
-- Archived review-state files are backup/reference only.
-- Redundant `views/review-state/*.md` snapshots are not generated.
-
-Regression coverage:
-
-- `test_review_rollover_previews_due_target_card_without_writes`
-
-### 11. Respect capability and write guards
+### 10. Respect capability and write guards
 
 As a maintainer, I want all writes to pass through core manifest and capability guards, so language-pack workflows cannot write outside their declared scope.
 
@@ -187,7 +210,7 @@ Acceptance criteria:
 
 - Content-writing workflows create `FileMutation` objects instead of writing Vault files directly.
 - Review settlement writes only configured review-card frontmatter through `FileMutation`.
-- Archived review-state JSON files are not part of the write path.
+- Parallel review-state JSON files or generated snapshot notes are not part of the write path.
 - `run_file_mutations` checks the selected language-pack manifest.
 - The target vault must enable `review_rollover`.
 - All paths must be vault-relative and inside guarded roots.
@@ -200,20 +223,38 @@ Regression coverage:
 
 ## Migration Test Matrix
 
-| Behavior | Japanese regression test | Required for future English pack |
-| --- | --- | --- |
-| Internal preview before write | `test_review_rollover_previews_due_target_card_without_writes` | Yes |
-| Normal SRS advancement | `test_review_rollover_apply_advances_due_target_card` | Yes |
-| Delayed overdue reschedule | `test_review_rollover_reschedules_overdue_card_without_advancing_stage` | Yes |
-| day180 focus state mastery | `test_review_rollover_sinks_day180_focus_vocab_to_base_vocab` | Yes |
-| Existing base-card untouched | `test_review_rollover_day180_state_does_not_merge_base_vocab_during_settlement` | Yes |
-| Existing daily checklist untouched | `test_review_rollover_updates_existing_daily_checklist_and_preserves_card_points` | Yes |
-| Daily note without anchor untouched | `test_review_rollover_appends_daily_checklist_when_note_has_no_anchor` | Yes |
-| Missing daily note | Card-only apply tests | Yes |
-| Invalid card blocks apply | `test_review_rollover_blocks_all_writes_when_any_completed_card_has_invalid_next_review` | Yes |
-| Archived review-state ignored | Card-frontmatter preview/apply tests | Yes |
-| Capability/write guard | Core mutation and capability tests | Yes |
+| Behavior | Reference Japanese regression coverage | Coverage status | Required for every language pack |
+| --- | --- | --- | --- |
+| Internal preview before write | `test_review_rollover_previews_due_target_card_without_writes` | Covered | Yes |
+| Clear request applies without second confirmation | Agent-skill/docs contract tests | Covered outside workflow unit tests | Yes |
+| Second preview after apply returns zero planned writes | Required workflow/agent regression | Missing | Yes |
+| Fixed memory-curve advancement | `test_review_rollover_apply_advances_due_target_card` | Partially covered | Yes |
+| Every memory-curve transition | Required parameterized workflow regression | Missing | Yes |
+| Delayed overdue reschedule | `test_review_rollover_reschedules_overdue_card_without_advancing_stage` | Covered | Yes |
+| `overdue_days == allowed_delay` advances | Required boundary regression | Missing | Yes |
+| day180 card becomes mastered | Required workflow regression | Missing | Yes |
+| Existing base-card untouched | Required day180/content-boundary regression | Missing | Yes |
+| Existing daily note untouched | Required daily-note regression | Missing | Yes |
+| Daily note without anchor untouched | Required daily-note regression | Missing | Yes |
+| Missing daily note | Card-only apply tests | Covered indirectly | Yes |
+| Invalid card blocks apply | Required invalid-state regression | Missing | Yes |
+| Capability/write guard | Core mutation and capability tests | Covered | Yes |
+
+## Language-Pack Implementation Checklist
+
+Before adding `review_rollover` to a new language pack:
+
+- Declare the capability in the language-pack manifest.
+- Define review-card path roles for that pack.
+- Reuse the shared frontmatter fields: `status`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
+- Implement the fixed memory curve or document an approved exception.
+- Add pack-level tests mapped to every required row in the migration matrix.
+- Ensure the agent skill maps clear settlement requests to `preview -> apply -> second preview`.
+- Include local settlement phrases such as "更新总训练表" and "请更新总训练表" in clear settlement routing.
+- Ensure dashboard/view maintenance requests stay separate from review settlement.
 
 ## Maintenance Rule
 
 When changing `review_rollover`, update this document and add or adjust a regression test in the same change. If a behavior is language-specific, place the test in that language pack's workflow test suite. If a behavior is shared by every language pack, add a core or conformance test.
+
+Do not mark a behavior as fully migrated only because it appears in implementation or agent instructions. It must also have matching acceptance criteria and executable regression coverage.

@@ -4,6 +4,8 @@ This guide is for project members and external agents that build a new LingoTrac
 
 The goal is to make a language pack understandable without reading the full migration history. Do not treat the Japanese pack as a folder to copy. Use it as a reference implementation for shape, tests, and boundaries.
 
+Before designing or reviewing a capability, read [Language Pack Capability Guidance](language-pack-capability-guidance.md). Chinese readers can use [语言包能力指引](language-pack-capability-guidance.zh.md). It is the soft guidance index for capability-level user stories, current reference behavior, planned guidance, and future contract promotion.
+
 ## Runtime Boundary
 
 LingoTrace has four layers:
@@ -56,6 +58,8 @@ The shared capability IDs come from `PHASE0_CAPABILITY_IDS`:
 - `speaking_cards`
 - `review_rollover`
 
+Pack-owned dashboard views, such as a total-training dashboard, are not workflow capability IDs, but they still need capability guidance and pack-level tests when provided.
+
 A new pack does not need to implement all five capabilities in the first PR. The recommended first slice is:
 
 - `source_notes`
@@ -69,6 +73,14 @@ Use maturity deliberately:
 - `stable`: available by default and covered by conformance tests or manual review cases.
 - `experimental`: documented but not available by default.
 - `unsupported`: explicitly unavailable with a user-readable reason.
+
+Capability guidance uses a separate maturity path:
+
+- `Reference Guidance`: recommended behavior that new packs should read and either follow or explain.
+- `Candidate Contract`: behavior that has cross-language evidence and should be treated as a design target.
+- `Enforced Contract`: behavior covered by core or conformance tests.
+
+New language-pack PRs should cite applicable guidance documents and state any not-applicable items or language-specific exceptions.
 
 ## Japanese Reference Boundary
 
@@ -127,6 +139,8 @@ The PR body must state:
 
 - target language and explanation language;
 - implemented capabilities and unsupported capabilities;
+- capability guidance documents followed;
+- not-applicable guidance items or language-specific exceptions;
 - user-facing Agent Skill examples;
 - changed public files;
 - validation commands and results.
