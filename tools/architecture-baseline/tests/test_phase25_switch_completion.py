@@ -107,6 +107,20 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
         self.assertIn("明确的复习结算请求不需要二次确认", guide)
         self.assertNotIn("你确认后才会保存状态变化", guide)
 
+    def test_review_material_agent_skill_requires_confirmation_for_risky_writes(self) -> None:
+        skill = read_required(AGENT_SKILL)
+
+        for phrase in (
+            "structured review item",
+            "deterministic routing",
+            "duplicate handling",
+            "focus/base restoration",
+            "If an image-backed item is not clearly readable",
+            "stop and ask before writing",
+            "Merges, moves, overwrites, and broad rewrites still require user confirmation",
+        ):
+            self.assertIn(phrase, skill)
+
     def test_public_user_docs_are_natural_language_first(self) -> None:
         combined = read_required(README) + "\n" + read_required(USER_GUIDE)
 

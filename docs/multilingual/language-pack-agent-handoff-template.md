@@ -56,6 +56,7 @@ docs/multilingual/language-pack-contributor-guide.md
 docs/multilingual/language-pack-capability-guidance.md
 docs/lingotrace_multilingual_architecture_plan.md
 docs/multilingual/phase-0/language-pack-conformance-checklist.md
+docs/multilingual/review-materials-user-stories.md
 docs/multilingual/review-rollover-user-stories.md
 docs/multilingual/total-training-dashboard-user-stories.md
 lingotrace/packs/japanese/manifest.json

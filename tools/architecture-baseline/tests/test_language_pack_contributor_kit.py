@@ -8,6 +8,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GUIDE = REPO_ROOT / "docs/multilingual/language-pack-contributor-guide.md"
 HANDOFF = REPO_ROOT / "docs/multilingual/language-pack-agent-handoff-template.md"
+CAPABILITY_GUIDANCE = REPO_ROOT / "docs/multilingual/language-pack-capability-guidance.md"
+CAPABILITY_GUIDANCE_ZH = REPO_ROOT / "docs/multilingual/language-pack-capability-guidance.zh.md"
+REVIEW_MATERIALS_GUIDANCE = REPO_ROOT / "docs/multilingual/review-materials-user-stories.md"
 README = REPO_ROOT / "README.md"
 PHASE1_CONTRIBUTOR_GUIDE = REPO_ROOT / "docs/multilingual/phase-1/contributor-guide.md"
 
@@ -119,12 +122,39 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "docs/multilingual/language-pack-contributor-guide.md",
             "docs/lingotrace_multilingual_architecture_plan.md",
             "docs/multilingual/phase-0/language-pack-conformance-checklist.md",
+            "docs/multilingual/review-materials-user-stories.md",
             "lingotrace/packs/japanese/manifest.json",
             "lingotrace/packs/japanese/agent_skills/SKILL.md",
             "tests/lingotrace/packs/test_japanese_pack.py",
         ):
             self.assertIn(relative_path, handoff)
             self.assertTrue((REPO_ROOT / relative_path).exists(), relative_path)
+
+    def test_review_materials_guidance_is_indexed_as_reference_guidance(self) -> None:
+        guide = read_required(CAPABILITY_GUIDANCE)
+        guide_zh = read_required(CAPABILITY_GUIDANCE_ZH)
+        review_materials = read_required(REVIEW_MATERIALS_GUIDANCE)
+
+        self.assertIn(
+            "| `review_materials` | Reference Guidance | `docs/multilingual/review-materials-user-stories.md` |",
+            guide,
+        )
+        self.assertIn(
+            "| `review_materials` | Reference Guidance | `docs/multilingual/review-materials-user-stories.md` |",
+            guide_zh,
+        )
+        self.assertNotIn("`review_materials` | Planned Reference Guidance", guide)
+        self.assertNotIn("`review_materials` | Planned Reference Guidance", guide_zh)
+        for token in (
+            "jp-review-material-maintainer",
+            "focus-first",
+            "base lexicon",
+            "grammar cards",
+            "error cards",
+            "kanji-difference",
+            "daily checklist",
+        ):
+            self.assertIn(token, review_materials)
 
     def test_public_entry_docs_point_to_language_pack_contributor_kit(self) -> None:
         combined = read_required(README) + "\n" + read_required(PHASE1_CONTRIBUTOR_GUIDE)

@@ -270,6 +270,447 @@ meaning_zh: 合成词
             envelope["planned_writes"],
         )
 
+    def test_review_materials_item_creates_initialized_focus_vocab_card(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            preview = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "reading": "ごうせいご",
+                    "meaning_zh": "合成词",
+                    "source_note": "[[source-note]]",
+                },
+                extraction_date="2026-06-22",
+            )
+            apply = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "reading": "ごうせいご",
+                    "meaning_zh": "合成词",
+                    "source_note": "[[source-note]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+
+        preview_envelope = preview.to_dict()
+        apply_envelope = apply.to_dict()
+        self.assertTrue(preview.accepted, preview_envelope)
+        self.assertEqual([], preview_envelope["changed_files"])
+        self.assertEqual("create_focus_card", preview_envelope["planned_writes"][0]["action"])
+        self.assertTrue(apply.accepted, apply_envelope)
+        self.assertEqual(["review/focus/vocab/合成語.md"], apply_envelope["changed_files"])
+        self.assertIn("status: active", body)
+        self.assertIn("done_today: false", body)
+        self.assertIn("review_stage: day0", body)
+        self.assertIn("next_review: 2026-06-22", body)
+        self.assertIn("source_notes: [[source-note]]", body)
+
+    def test_review_materials_item_updates_existing_focus_without_duplicate_or_body_loss(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/合成語.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: false
+review_stage: day3
+next_review: 2026-06-25
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+source_notes: [[old-source]]
+---
+
+## 人工整理
+这里不能丢。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "reading": "ごうせいご",
+                    "meaning_zh": "合成词",
+                    "source_note": "[[new-source]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            files = sorted(path.relative_to(root).as_posix() for path in (root / "review/focus/vocab").glob("*.md"))
+            body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertTrue(report.accepted, envelope)
+        self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
+        self.assertEqual(["review/focus/vocab/合成語.md"], files)
+        self.assertIn("source_notes: [[old-source]], [[new-source]]", body)
+        self.assertIn("review_stage: day3", body)
+        self.assertIn("这里不能丢。", body)
+
+    def test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/base/vocab/合成語.md",
+                """---
+track: class_review
+item_type: vocab
+status: promoted
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+source_notes: [[base-source]]
+---
+
+## 人工整理
+base 内容。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "source_note": "[[new-source]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            focus_body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+            base_body = (root / "review/base/vocab/合成語.md").read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertTrue(report.accepted, envelope)
+        self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
+        self.assertIn("status: active", focus_body)
+        self.assertIn("review_stage: day0", focus_body)
+        self.assertIn("source_notes: [[base-source]], [[new-source]]", focus_body)
+        self.assertIn("status: promoted", base_body)
+        self.assertIn("base 内容。", base_body)
+
+    def test_review_materials_item_reactivates_mastered_focus_card(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/合成語.md",
+                """---
+track: class_review
+item_type: vocab
+status: mastered
+done_today: false
+review_stage: mastered
+next_review:
+last_reviewed: 2026-06-01
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+---
+
+## 人工整理
+再次出错时仍要保留。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "source_note": "[[new-source]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertTrue(report.accepted, envelope)
+        self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
+        self.assertIn("status: active", body)
+        self.assertIn("review_stage: day0", body)
+        self.assertIn("next_review: 2026-06-22", body)
+        self.assertIn("last_reviewed: ", body)
+        self.assertIn("[[new-source]]", body)
+        self.assertIn("再次出错时仍要保留。", body)
+
+    def test_review_materials_item_routes_grammar_error_and_pronunciation_cards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            cases = [
+                (
+                    {
+                        "item_type": "grammar",
+                        "pattern": "ことによって",
+                        "meaning_zh": "通过某种方式",
+                        "formation": "V辞書形 + ことによって",
+                    },
+                    "review/grammar/ことによって.md",
+                    "item_type: grammar",
+                ),
+                (
+                    {
+                        "item_type": "error",
+                        "correct_form": "店として知られている",
+                        "wrong_form": "店に知られている",
+                        "reason": "として marks role or identity.",
+                    },
+                    "review/errors/店として知られている.md",
+                    "item_type: error",
+                ),
+                (
+                    {
+                        "item_type": "pronunciation",
+                        "pronunciation_kind": "accent",
+                        "target_text": "雨 / 飴",
+                        "issue_tags": "accent contrast",
+                    },
+                    "review/pronunciation/accent/雨-飴.md",
+                    "item_type: pronunciation",
+                ),
+            ]
+
+            for item, expected_path, expected_text in cases:
+                report = workflows.review_materials(
+                    vault_root=root,
+                    item=item,
+                    extraction_date="2026-06-22",
+                    mode="apply",
+                )
+                self.assertTrue(report.accepted, report.to_dict())
+                self.assertTrue((root / expected_path).is_file(), expected_path)
+                self.assertIn(expected_text, (root / expected_path).read_text(encoding="utf-8"))
+
+            grammar = (root / "review/grammar/ことによって.md").read_text(encoding="utf-8")
+            error = (root / "review/errors/店として知られている.md").read_text(encoding="utf-8")
+            self.assertIn("status: active", grammar)
+            self.assertIn("done_today: false", grammar)
+            self.assertIn("review_stage: day0", grammar)
+            self.assertIn("next_review: 2026-06-22", grammar)
+            self.assertIn("formation: V辞書形 + ことによって", grammar)
+            self.assertIn("status: active", error)
+            self.assertIn("done_today: false", error)
+            self.assertIn("review_stage: day0", error)
+            self.assertIn("next_review: 2026-06-22", error)
+            self.assertIn("wrong_form: 店に知られている", error)
+
+    def test_review_materials_item_blocks_uncertain_image_backed_extraction(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "不鮮明",
+                    "image_backed": True,
+                    "image_readable": False,
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+
+        envelope = report.to_dict()
+        self.assertFalse(report.accepted)
+        self.assertEqual("uncertain_image_backed_review_material", envelope["errors"][0]["code"])
+
+    def test_review_materials_item_accepts_clearly_readable_image_backed_extraction(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "看板",
+                    "reading": "かんばん",
+                    "meaning_zh": "招牌",
+                    "image_backed": True,
+                    "image_readable": True,
+                    "source_note": "[[image-source]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/看板.md").read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertTrue(report.accepted, envelope)
+        self.assertEqual(["review/focus/vocab/看板.md"], envelope["changed_files"])
+        self.assertIn("source_notes: [[image-source]]", body)
+
+    def test_review_materials_item_preserves_vocab_review_cues(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "紛らわしい",
+                    "reading": "まぎらわしい",
+                    "accent_display": "まぎらわしい⑤",
+                    "meaning_zh": "容易混淆",
+                    "collocations": "紛らわしい表現",
+                    "confusable_with": "[[間違えやすい]]",
+                    "contrast_with": "[[ややこしい]]",
+                    "kanji_diff": True,
+                    "kanji_diff_pairs": "紛らわしい / 間違えやすい",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/紛らわしい.md").read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("accent_display: まぎらわしい⑤", body)
+        self.assertIn("collocations: 紛らわしい表現", body)
+        self.assertIn("confusable_with: [[間違えやすい]]", body)
+        self.assertIn("contrast_with: [[ややこしい]]", body)
+        self.assertIn("kanji_diff: true", body)
+        self.assertIn("kanji_diff_pairs: 紛らわしい / 間違えやすい", body)
+
+    def test_review_materials_item_blocks_missing_core_title(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "grammar",
+                    "meaning_zh": "通过某种方式",
+                    "formation": "V辞書形 + ことによって",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+
+        envelope = report.to_dict()
+        self.assertFalse(report.accepted)
+        self.assertEqual("missing_review_item_title", envelope["errors"][0]["code"])
+
+    def test_review_materials_item_blocks_duplicate_existing_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            for folder in ("a", "b"):
+                write(
+                    root / f"review/focus/vocab/{folder}/合成語.md",
+                    """---
+track: class_review
+item_type: vocab
+status: active
+done_today: false
+review_stage: day1
+next_review: 2026-06-23
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+---
+
+# 合成語
+""",
+                )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "reading": "ごうせいご",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+
+        envelope = report.to_dict()
+        self.assertFalse(report.accepted)
+        self.assertEqual("duplicate_review_material_match", envelope["errors"][0]["code"])
+
+    def test_review_materials_item_blocks_target_path_collision(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/合成語.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: false
+review_stage: day1
+next_review: 2026-06-23
+headword: 別項目
+reading: べつこうもく
+meaning_zh: 其他项目
+---
+
+# 別項目
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "reading": "ごうせいご",
+                    "meaning_zh": "合成词",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertFalse(report.accepted)
+        self.assertEqual("review_material_path_collision", envelope["errors"][0]["code"])
+        self.assertIn("headword: 別項目", body)
+
+    def test_review_materials_item_does_not_touch_daily_checklist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "daily/2026-06-22.md", "## 每日学习清单\n原内容。\n")
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "reading": "ごうせいご",
+                    "meaning_zh": "合成词",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            daily = (root / "daily/2026-06-22.md").read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertTrue(report.accepted, envelope)
+        self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
+        self.assertEqual("## 每日学习清单\n原内容。\n", daily)
+
     def test_review_rollover_previews_due_target_card_without_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

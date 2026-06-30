@@ -93,7 +93,18 @@ The source-note task itself should not create vocabulary, grammar, pronunciation
 
 For requests such as "把这个词加入复习", search before creating. Check the focused review layer before the base lexicon to avoid duplicates.
 
+When the learning point is clear, convert the user request, source note, classroom note, or reviewed pasted material into a structured review item before calling `review_materials`. The workflow owns deterministic routing, initialization, duplicate handling, source-note appending, focus/base restoration, and core write guarding for structured items.
+
+Use the review item route for:
+
+- vocabulary with `headword`, optional `reading`, `accent_display`, `meaning_zh`, and `collocations`;
+- grammar with `pattern`, `meaning_zh`, and `formation`;
+- concrete errors with `correct_form`, `wrong_form`, and `reason`;
+- pronunciation issues with `target_text`, `pronunciation_kind`, and `issue_tags`.
+
 Cards should remain concise enough for review. Long explanations belong in source notes or reference notes, not in the review prompt.
+
+If an image-backed item is not clearly readable, or if the card type, headword, grammar pattern, correct answer, or target root is uncertain, stop and ask before writing. Merges, moves, overwrites, and broad rewrites still require user confirmation.
 
 ## Speaking Cards
 

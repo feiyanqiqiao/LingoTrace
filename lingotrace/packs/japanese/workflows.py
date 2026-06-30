@@ -87,6 +87,8 @@ def review_materials(
     vault_root: str | Path | None = None,
     *,
     card: dict[str, Any] | None = None,
+    item: dict[str, Any] | None = None,
+    extraction_date: str | None = None,
     mode: str = "preview",
 ) -> CommandReport:
     if vault_root is None:
@@ -97,9 +99,23 @@ def review_materials(
         return _workflow_report("review_materials-workflow", mode, errors=errors, read_files=read_files)
 
     if card is not None:
+        if item is not None:
+            return _workflow_error(
+                "review_materials-workflow",
+                mode,
+                "ambiguous_review_material_input",
+                "Provide either card or item, not both.",
+            )
         mutation = _review_card_mutation(card)
         if isinstance(mutation, Finding):
             return _workflow_error("review_materials-workflow", mode, mutation.code, mutation.message, mutation.path)
+        return _run_mutations(root, "review_materials", [mutation], mode)
+    if item is not None:
+        paths = _path_roles(root)
+        read_files.append(".lingotrace/paths.json")
+        mutation = _review_item_mutation(root, paths, item, extraction_date=extraction_date)
+        if isinstance(mutation, Finding):
+            return _workflow_report("review_materials-workflow", mode, errors=[mutation], read_files=read_files)
         return _run_mutations(root, "review_materials", [mutation], mode)
     if mode == "apply":
         return _workflow_error(
@@ -379,6 +395,304 @@ def _review_card_mutation(card: dict[str, Any]) -> FileMutation | Finding:
         return validation.errors[0]
     content = _render_markdown(fields, str(body or ""))
     return FileMutation(path=path, content=content, action="write_review_material", reason="accepted review material card")
+
+
+def _review_item_mutation(
+    root: Path,
+    paths: dict[str, str],
+    item: dict[str, Any],
+    *,
+    extraction_date: str | None,
+) -> FileMutation | Finding:
+    if item.get("image_backed") is True and item.get("image_readable") is not True:
+        return Finding(
+            code="uncertain_image_backed_review_material",
+            message="Image-backed review material must be clearly readable before creating a card.",
+            path=str(item.get("attachment") or "item"),
+        )
+    review_date = extraction_date or dt.date.today().isoformat()
+    try:
+        dt.date.fromisoformat(review_date)
+    except ValueError:
+        return Finding(code="invalid_extraction_date", message="extraction_date must use YYYY-MM-DD format.", path="extraction_date")
+
+    item_type = _infer_review_item_type(item)
+    if item_type not in {"vocab", "grammar", "error", "pronunciation"}:
+        return Finding(code="unsupported_review_item_type", message="Review material item_type is not supported.", path="item_type")
+
+    title = _review_item_title(item_type, item)
+    if isinstance(title, Finding):
+        return title
+    target_role = _review_item_target_role(item_type, item)
+    if isinstance(target_role, Finding):
+        return target_role
+    target_root = paths.get(target_role)
+    if not target_root:
+        return Finding(code="missing_path_role", message=f"Target path role is not configured: {target_role}.", path=target_role)
+
+    if item_type == "vocab":
+        focus_root = paths.get("focus_vocab_root")
+        base_root = paths.get("base_vocab_root")
+        if not focus_root or not base_root:
+            return Finding(code="missing_path_role", message="Vocabulary review requires focus and base path roles.", path="focus_vocab_root")
+        focus_match = _single_review_match(root / focus_root, title)
+        if isinstance(focus_match, Finding):
+            return focus_match
+        if focus_match is not None:
+            return _mutation_for_existing_item(root, focus_match, item, review_date, title, action_role="focus")
+        base_match = _single_review_match(root / base_root, title)
+        if isinstance(base_match, Finding):
+            return base_match
+        if base_match is not None:
+            base_fields = _frontmatter(base_match)
+            fields = _initialized_review_fields(item_type, title, item, review_date)
+            fields.update({key: value for key, value in base_fields.items() if key not in fields and value})
+            fields.update(_item_fields(item_type, item, title))
+            fields["source_notes"] = _merged_source_notes(str(base_fields.get("source_notes", "")), item.get("source_note"))
+            target_path = f"{focus_root}/{_safe_card_filename(title)}.md"
+            collision_error = _path_collision_error(root, target_path, title)
+            if collision_error is not None:
+                return collision_error
+            validation_error = _review_material_validation_error(fields, target_path)
+            if validation_error is not None:
+                return validation_error
+            content = _render_markdown(fields, _generated_review_body(item_type, fields))
+            return FileMutation(
+                path=target_path,
+                content=content,
+                action="restore_focus_card",
+                reason="base lexicon item reappears and returns to active focus review",
+            )
+
+    target_match = _single_review_match(root / target_root, title)
+    if isinstance(target_match, Finding):
+        return target_match
+    if target_match is not None:
+        return _mutation_for_existing_item(root, target_match, item, review_date, title, action_role=target_role)
+
+    fields = _initialized_review_fields(item_type, title, item, review_date)
+    target_path = f"{target_root}/{_safe_card_filename(title)}.md"
+    collision_error = _path_collision_error(root, target_path, title)
+    if collision_error is not None:
+        return collision_error
+    validation_error = _review_material_validation_error(fields, target_path)
+    if validation_error is not None:
+        return validation_error
+    content = _render_markdown(fields, _generated_review_body(item_type, fields))
+    action = "create_focus_card" if item_type == "vocab" else f"create_{item_type}_card"
+    return FileMutation(
+        path=target_path,
+        content=content,
+        action=action,
+        reason="accepted structured review material item",
+    )
+
+
+def _infer_review_item_type(item: dict[str, Any]) -> str:
+    explicit = item.get("item_type")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    if item.get("correct_form") or item.get("wrong_form"):
+        return "error"
+    if item.get("pattern") or item.get("formation"):
+        return "grammar"
+    if item.get("target_text") or item.get("pronunciation_kind"):
+        return "pronunciation"
+    return "vocab"
+
+
+def _review_item_title(item_type: str, item: dict[str, Any]) -> str | Finding:
+    key_by_type = {
+        "vocab": "headword",
+        "grammar": "pattern",
+        "error": "correct_form",
+        "pronunciation": "target_text",
+    }
+    key = key_by_type[item_type]
+    value = item.get(key)
+    if not isinstance(value, str) or not value.strip():
+        return Finding(code="missing_review_item_title", message=f"Review material item requires {key}.", path=key)
+    return value.strip()
+
+
+def _review_item_target_role(item_type: str, item: dict[str, Any]) -> str | Finding:
+    if item_type == "vocab":
+        return "focus_vocab_root"
+    if item_type == "grammar":
+        return "grammar_root"
+    if item_type == "error":
+        return "error_root"
+    pronunciation_kind = item.get("pronunciation_kind")
+    if pronunciation_kind == "accent":
+        return "pronunciation_accent_root"
+    if pronunciation_kind == "phoneme":
+        return "pronunciation_phoneme_root"
+    return Finding(
+        code="missing_pronunciation_kind",
+        message="Pronunciation review material requires pronunciation_kind: accent or phoneme.",
+        path="pronunciation_kind",
+    )
+
+
+def _single_review_match(path_root: Path, title: str) -> Path | Finding | None:
+    if not path_root.exists():
+        return None
+    matches: list[Path] = []
+    for card_path in sorted(path_root.rglob("*.md")):
+        fields = _frontmatter(card_path)
+        if _review_match_key(fields, card_path) == title:
+            matches.append(card_path)
+    if len(matches) > 1:
+        return Finding(
+            code="duplicate_review_material_match",
+            message="Multiple existing review cards match the same learning point.",
+            path=", ".join(path.relative_to(path_root).as_posix() for path in matches),
+        )
+    return matches[0] if matches else None
+
+
+def _review_match_key(fields: dict[str, str], card_path: Path) -> str:
+    for key in ("headword", "pattern", "correct_form", "target_text"):
+        value = fields.get(key)
+        if value:
+            return value
+    return card_path.stem
+
+
+def _mutation_for_existing_item(
+    root: Path,
+    card_path: Path,
+    item: dict[str, Any],
+    review_date: str,
+    title: str,
+    *,
+    action_role: str,
+) -> FileMutation | Finding:
+    text = card_path.read_text(encoding="utf-8")
+    fields, body = _frontmatter_and_body(text)
+    item_type = str(fields.get("item_type") or _infer_review_item_type(item))
+    for key, value in _item_fields(item_type, item, title).items():
+        if value and key not in {"status", "done_today", "review_stage", "next_review", "last_reviewed"}:
+            fields[key] = value
+    fields["source_notes"] = _merged_source_notes(str(fields.get("source_notes", "")), item.get("source_note"))
+    if fields.get("status") == "mastered":
+        fields["status"] = "active"
+        fields["done_today"] = "false"
+        fields["review_stage"] = "day0"
+        fields["next_review"] = review_date
+        fields["last_reviewed"] = ""
+    validation_error = _review_material_validation_error(fields, card_path.relative_to(root).as_posix())
+    if validation_error is not None:
+        return validation_error
+    action = "reactivate_review_card" if fields.get("review_stage") == "day0" and fields.get("next_review") == review_date else "update_review_card"
+    if action_role == "focus":
+        action = "update_focus_card" if action == "update_review_card" else "reactivate_focus_card"
+    return FileMutation(
+        path=card_path.relative_to(root).as_posix(),
+        content=_render_markdown(fields, body),
+        action=action,
+        reason="existing review material matched structured item",
+    )
+
+
+def _path_collision_error(root: Path, relative_path: str, title: str) -> Finding | None:
+    target = root / relative_path
+    if not target.exists():
+        return None
+    fields = _frontmatter(target)
+    if _review_match_key(fields, target) == title:
+        return None
+    return Finding(
+        code="review_material_path_collision",
+        message="Target review material path already exists for a different learning point.",
+        path=relative_path,
+    )
+
+
+def _review_material_validation_error(fields: dict[str, Any], path: str) -> Finding | None:
+    validation = validate_review_materials(fields)
+    if validation.accepted:
+        return None
+    error = validation.errors[0]
+    return Finding(code=error.code, message=error.message, path=path)
+
+
+def _initialized_review_fields(item_type: str, title: str, item: dict[str, Any], review_date: str) -> dict[str, Any]:
+    track = "pronunciation" if item_type == "pronunciation" else "class_review"
+    fields: dict[str, Any] = {
+        "track": track,
+        "item_type": item_type,
+        "status": "active",
+        "priority": str(item.get("priority") or "normal"),
+        "done_today": "false",
+        "review_stage": "day0",
+        "next_review": review_date,
+        "last_reviewed": "",
+    }
+    fields.update(_item_fields(item_type, item, title))
+    fields["source_notes"] = _merged_source_notes("", item.get("source_note"))
+    return fields
+
+
+def _item_fields(item_type: str, item: dict[str, Any], title: str) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    key_by_type = {
+        "vocab": "headword",
+        "grammar": "pattern",
+        "error": "correct_form",
+        "pronunciation": "target_text",
+    }
+    fields[key_by_type[item_type]] = title
+    allowed = {
+        "vocab": ("reading", "accent_display", "meaning_zh", "collocations", "confusable_with", "contrast_with", "kanji_diff", "kanji_diff_pairs"),
+        "grammar": ("meaning_zh", "formation", "usage", "examples", "contrast_with"),
+        "error": ("wrong_form", "reason", "meaning_zh", "source_sentence"),
+        "pronunciation": ("pronunciation_kind", "issue_tags", "meaning_zh"),
+    }[item_type]
+    for key in allowed:
+        value = item.get(key)
+        if value not in (None, ""):
+            fields[key] = value if isinstance(value, bool) else str(value)
+    return fields
+
+
+def _merged_source_notes(existing: str, new_source: Any) -> str:
+    sources = [part.strip() for part in existing.split(",") if part.strip()]
+    if isinstance(new_source, str) and new_source.strip() and new_source.strip() not in sources:
+        sources.append(new_source.strip())
+    return ", ".join(sources)
+
+
+def _generated_review_body(item_type: str, fields: dict[str, Any]) -> str:
+    if item_type == "grammar":
+        return f"## {fields.get('pattern', '')}\n{fields.get('meaning_zh', '')}".rstrip()
+    if item_type == "error":
+        return f"## 正确\n{fields.get('correct_form', '')}\n\n## 错误\n{fields.get('wrong_form', '')}".rstrip()
+    if item_type == "pronunciation":
+        return f"## {fields.get('target_text', '')}\n{fields.get('issue_tags', '')}".rstrip()
+    return f"## {fields.get('headword', '')}\n{fields.get('meaning_zh', '')}".rstrip()
+
+
+def _safe_card_filename(title: str) -> str:
+    cleaned = title.strip().replace(" / ", "-").replace("/", "-").replace("\\", "-")
+    for char in (":", "*", "?", '"', "<", ">", "|"):
+        cleaned = cleaned.replace(char, "-")
+    return "-".join(cleaned.split()) or "review-material"
+
+
+def _frontmatter_and_body(text: str) -> tuple[dict[str, str], str]:
+    if not text.startswith("---\n"):
+        return {}, text
+    parts = text.split("---\n", 2)
+    if len(parts) < 3:
+        return {}, text
+    fields: dict[str, str] = {}
+    for line in parts[1].splitlines():
+        if not line or line.startswith(" ") or line.startswith("- ") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        fields[key.strip()] = value.strip().strip('"')
+    return fields, parts[2].lstrip("\n")
 
 
 def _render_markdown(fields: dict[str, Any], body: str) -> str:

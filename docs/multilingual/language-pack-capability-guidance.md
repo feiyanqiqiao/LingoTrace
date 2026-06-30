@@ -47,7 +47,7 @@ Before starting or reviewing a language-pack PR:
 | `total_training_dashboard` | Reference Guidance | `docs/multilingual/total-training-dashboard-user-stories.md` |
 | `listening_notes` | Planned Reference Guidance | `listening-notes-user-stories.md` is not created yet |
 | `source_notes` | Planned Reference Guidance | `source-notes-user-stories.md` is not created yet |
-| `review_materials` | Planned Reference Guidance | `review-materials-user-stories.md` is not created yet |
+| `review_materials` | Reference Guidance | `docs/multilingual/review-materials-user-stories.md` |
 | `speaking_cards` | Planned Reference Guidance | `speaking-cards-user-stories.md` is not created yet |
 | `agent_skill_policy` | Planned Reference Guidance | `agent-skill-policy-user-stories.md` is not created yet |
 
