@@ -57,6 +57,32 @@ def create_target_context(root: Path) -> None:
     )
 
 
+def review_card(
+    *,
+    track: str = "class_review",
+    item_type: str = "vocab",
+    status: str = "active",
+    done_today: str = "true",
+    review_stage: str = "day0",
+    next_review: str = "2026-06-21",
+    last_reviewed: str = "",
+) -> str:
+    return f"""---
+track: {track}
+item_type: {item_type}
+status: {status}
+done_today: {done_today}
+review_stage: {review_stage}
+next_review: {next_review}
+last_reviewed: {last_reviewed}
+headword: synthetic
+meaning_zh: synthetic
+---
+
+# synthetic
+"""
+
+
 class JapaneseWorkflowPreviewTests(unittest.TestCase):
     def test_workflows_fail_explicitly_without_vault_root(self) -> None:
         for workflow in (
@@ -321,6 +347,53 @@ meaning_zh: 合成词
         self.assertIn("next_review: 2026-06-24", body)
         self.assertIn("last_reviewed: 2026-06-21", body)
 
+    def test_review_rollover_second_preview_has_no_remaining_planned_writes_after_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/second-preview.md",
+                review_card(review_stage="day1", next_review="2026-06-21"),
+            )
+
+            apply_report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            second_preview = workflows.review_rollover(vault_root=root, run_date="2026-06-21")
+
+        self.assertTrue(apply_report.accepted, apply_report.to_dict())
+        self.assertTrue(second_preview.accepted, second_preview.to_dict())
+        self.assertEqual([], second_preview.to_dict()["planned_writes"])
+
+    def test_review_rollover_applies_every_memory_curve_transition_from_run_date(self) -> None:
+        cases = [
+            ("day0", "day1", "2026-06-22"),
+            ("day1", "day3", "2026-06-24"),
+            ("day3", "day7", "2026-06-28"),
+            ("day7", "day14", "2026-07-05"),
+            ("day14", "day30", "2026-07-21"),
+            ("day30", "day90", "2026-09-19"),
+            ("day90", "day180", "2026-12-18"),
+            ("day180", "mastered", ""),
+        ]
+
+        for current_stage, next_stage, next_review in cases:
+            with self.subTest(current_stage=current_stage):
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    create_target_context(root)
+                    card_path = root / "review/focus/vocab/curve.md"
+                    write(card_path, review_card(review_stage=current_stage, next_review="2026-06-21"))
+
+                    report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+                    body = card_path.read_text(encoding="utf-8")
+
+                self.assertTrue(report.accepted, report.to_dict())
+                self.assertIn("done_today: false", body)
+                self.assertIn(f"review_stage: {next_stage}", body)
+                self.assertIn(f"next_review: {next_review}", body)
+                self.assertIn("last_reviewed: 2026-06-21", body)
+                if next_stage == "mastered":
+                    self.assertIn("status: mastered", body)
+
     def test_review_rollover_reschedules_overdue_card_without_advancing_stage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -350,6 +423,121 @@ last_reviewed: 2026-05-29
         self.assertEqual("day3", planned["to_review_stage"])
         self.assertTrue(planned["delay_rescheduled"])
         self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("done_today: false", body)
+        self.assertIn("review_stage: day3", body)
+        self.assertIn("next_review: 2026-06-24", body)
+        self.assertIn("last_reviewed: 2026-06-21", body)
+
+    def test_review_rollover_advances_when_overdue_days_equal_allowed_delay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/grammar/boundary.md",
+                review_card(item_type="grammar", review_stage="day3", next_review="2026-06-18"),
+            )
+
+            preview = workflows.review_rollover(vault_root=root, run_date="2026-06-21")
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            body = (root / "review/grammar/boundary.md").read_text(encoding="utf-8")
+
+        self.assertTrue(preview.accepted, preview.to_dict())
+        planned = preview.to_dict()["planned_writes"][0]
+        self.assertEqual("day7", planned["to_review_stage"])
+        self.assertNotIn("delay_rescheduled", planned)
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("review_stage: day7", body)
+        self.assertIn("next_review: 2026-06-28", body)
+
+    def test_review_rollover_blocks_unknown_stage_before_any_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            good_path = root / "review/focus/vocab/good.md"
+            bad_path = root / "review/grammar/bad.md"
+            write(good_path, review_card(review_stage="day0", next_review="2026-06-21"))
+            write(bad_path, review_card(item_type="grammar", review_stage="day2", next_review="2026-06-21"))
+
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            good_body = good_path.read_text(encoding="utf-8")
+            bad_body = bad_path.read_text(encoding="utf-8")
+
+        self.assertFalse(report.accepted)
+        self.assertEqual("unknown_review_stage", report.to_dict()["errors"][0]["code"])
+        self.assertEqual([], report.to_dict()["changed_files"])
+        self.assertIn("done_today: true", good_body)
+        self.assertIn("review_stage: day0", good_body)
+        self.assertIn("done_today: true", bad_body)
+        self.assertIn("review_stage: day2", bad_body)
+
+    def test_review_rollover_blocks_invalid_next_review_before_any_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            good_path = root / "review/focus/vocab/good.md"
+            bad_path = root / "review/errors/bad.md"
+            write(good_path, review_card(review_stage="day0", next_review="2026-06-21"))
+            write(bad_path, review_card(item_type="error", review_stage="day1", next_review="not-a-date"))
+
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            good_body = good_path.read_text(encoding="utf-8")
+            bad_body = bad_path.read_text(encoding="utf-8")
+
+        self.assertFalse(report.accepted)
+        self.assertEqual("invalid_next_review", report.to_dict()["errors"][0]["code"])
+        self.assertEqual([], report.to_dict()["changed_files"])
+        self.assertIn("done_today: true", good_body)
+        self.assertIn("next_review: 2026-06-21", good_body)
+        self.assertIn("done_today: true", bad_body)
+        self.assertIn("next_review: not-a-date", bad_body)
+
+    def test_review_rollover_does_not_touch_base_vocab_or_daily_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            focus_path = root / "review/focus/vocab/focus.md"
+            base_path = root / "review/base/vocab/base.md"
+            daily_path = root / "daily/2026-06-21.md"
+            daily_without_anchor_path = root / "daily/2026-06-20.md"
+            write(focus_path, review_card(review_stage="day180", next_review="2026-06-21"))
+            write(base_path, review_card(status="active", done_today="true", review_stage="day1", next_review="2026-06-21"))
+            write(daily_path, "# Daily\n\n- manual note\n")
+            write(daily_without_anchor_path, "# Daily without anchor\n")
+            before_base = base_path.read_text(encoding="utf-8")
+            before_daily = daily_path.read_text(encoding="utf-8")
+            before_daily_without_anchor = daily_without_anchor_path.read_text(encoding="utf-8")
+
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            focus_body = focus_path.read_text(encoding="utf-8")
+            after_base = base_path.read_text(encoding="utf-8")
+            after_daily = daily_path.read_text(encoding="utf-8")
+            after_daily_without_anchor = daily_without_anchor_path.read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual(["review/focus/vocab/focus.md"], report.to_dict()["changed_files"])
+        self.assertNotIn("review/base/vocab/base.md", report.to_dict()["read_files"])
+        self.assertNotIn("daily/2026-06-21.md", report.to_dict()["read_files"])
+        self.assertNotIn("daily/2026-06-20.md", report.to_dict()["read_files"])
+        self.assertIn("status: mastered", focus_body)
+        self.assertEqual(before_base, after_base)
+        self.assertEqual(before_daily, after_daily)
+        self.assertEqual(before_daily_without_anchor, after_daily_without_anchor)
+
+    def test_review_rollover_completes_when_daily_note_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            card_path = root / "review/focus/vocab/no-daily.md"
+            write(card_path, review_card(review_stage="day1", next_review="2026-06-21"))
+
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            body = card_path.read_text(encoding="utf-8")
+
+        envelope = report.to_dict()
+        self.assertTrue(report.accepted, envelope)
+        self.assertEqual(["review/focus/vocab/no-daily.md"], envelope["changed_files"])
+        self.assertEqual([], [write for write in envelope["planned_writes"] if write["path"].startswith("daily/")])
+        self.assertFalse(any(path.startswith("daily/") for path in envelope["read_files"]))
         self.assertIn("done_today: false", body)
         self.assertIn("review_stage: day3", body)
         self.assertIn("next_review: 2026-06-24", body)

@@ -24,6 +24,12 @@ If another phrase could mean more than one intent, ask one short clarification q
 - If the user means today's completed review should be settled, handle it as review rollover.
 - If the user means the table display, filters, columns, formulas, or sort order should change, handle it as dashboard/view maintenance and confirm the intended display change.
 
+Examples:
+
+- "更新总训练表" / "请更新总训练表" -> clear review rollover.
+- "处理一下总训练表" / "总训练表有点问题" -> ambiguous; ask whether the user means review settlement or dashboard/view maintenance.
+- "词汇卡要显示重音和常见搭配" -> dashboard/view maintenance.
+
 Prefer recognizing meaning over wording. Similar requests, abbreviations, typos, mixed Chinese/Japanese/English phrasing, or local habit phrases should be mapped by intent when the intended learning action is clear.
 
 ## User Language

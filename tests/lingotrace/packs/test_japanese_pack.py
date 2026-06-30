@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -40,6 +41,53 @@ EXPECTED_LANGUAGE_FIELDS = {
 
 def read_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_total_training_base() -> str:
+    return (PACK_ROOT / "views" / "total-training.base").read_text(encoding="utf-8")
+
+
+def formula(body: str, name: str) -> str:
+    match = re.search(rf"^  {re.escape(name)}: (.+)$", body, flags=re.MULTILINE)
+    if not match:
+        raise AssertionError(f"Missing formula: {name}")
+    value = match.group(1)
+    if value.startswith("'") and value.endswith("'"):
+        return value[1:-1]
+    return value
+
+
+def view_block(body: str, name: str) -> str:
+    blocks = re.split(r"(?=^  - type: table$)", body, flags=re.MULTILINE)
+    for block in blocks:
+        if re.search(rf"^    name: {re.escape(name)}$", block, flags=re.MULTILINE):
+            return block
+    raise AssertionError(f"Missing view: {name}")
+
+
+def list_values(block: str, section: str) -> list[str]:
+    match = re.search(rf"^    {re.escape(section)}:\n((?:      - .+\n)+)", block, flags=re.MULTILINE)
+    if not match:
+        raise AssertionError(f"Missing list section: {section}")
+    return [line.strip()[2:] for line in match.group(1).splitlines()]
+
+
+def column_size(block: str, property_name: str) -> int:
+    match = re.search(rf"^      {re.escape(property_name)}: (\d+)$", block, flags=re.MULTILINE)
+    if not match:
+        raise AssertionError(f"Missing column size for: {property_name}")
+    return int(match.group(1))
+
+
+def sort_properties(block: str) -> list[tuple[str, str]]:
+    matches = re.findall(
+        r"^      - property: (.+)\n        direction: (ASC|DESC)$",
+        block,
+        flags=re.MULTILINE,
+    )
+    if not matches:
+        raise AssertionError("Missing sort property entries")
+    return matches
 
 
 class JapanesePackTests(unittest.TestCase):
@@ -110,19 +158,53 @@ class JapanesePackTests(unittest.TestCase):
             self.assertTrue(record["path"].startswith(".lingotrace/"))
 
     def test_total_training_dashboard_surfaces_type_specific_review_cues(self) -> None:
-        template = (PACK_ROOT / "views" / "total-training.base").read_text(encoding="utf-8")
+        template = read_total_training_base()
+        core_text = formula(template, "core_text")
+        support_text = formula(template, "support_text")
 
-        self.assertIn("collocations", template)
-        self.assertIn("formation", template)
-        self.assertIn("correct_form", template)
-        self.assertIn("wrong_form", template)
-        self.assertIn("daily_use_sentences", template)
-        self.assertIn('item_type == "vocab"', template)
-        self.assertIn('item_type == "grammar", if(meaning_zh', template)
-        self.assertIn('item_type == "error", if(correct_form', template)
-        self.assertIn('item_type == "error", if(wrong_form', template)
-        self.assertIn("formula.core_text", template)
-        self.assertIn("formula.support_text", template)
+        expected_core_contracts = (
+            'item_type == "vocab", if(accent_display, accent_display, if(headword, headword, file.name))',
+            'item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name))',
+            'item_type == "error", if(correct_form, correct_form, file.name)',
+            'track == "survival_speaking", if(jp_text, jp_text, file.name)',
+            'track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name))',
+            'track == "pronunciation", if(target_text, target_text, file.name)',
+        )
+        expected_support_contracts = (
+            'item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, ""))',
+            'item_type == "grammar", if(formation, formation, "")',
+            'item_type == "error", if(wrong_form, wrong_form, if(reason, reason, ""))',
+            'track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, ""))',
+            'track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, ""))',
+            'track == "pronunciation", if(issue_tags, issue_tags, "")',
+        )
+
+        for contract in expected_core_contracts:
+            self.assertIn(contract, core_text)
+        for contract in expected_support_contracts:
+            self.assertIn(contract, support_text)
+
+    def test_total_training_dashboard_daily_review_contract(self) -> None:
+        template = read_total_training_base()
+        today = view_block(template, "今日总训练")
+        order = list_values(today, "order")
+        sort = sort_properties(today)
+
+        self.assertIn('next_day_flag: if(status == "active" && next_review', template)
+        self.assertIn('date(next_review) <= today() + "1d"', formula(template, "next_day_flag"))
+        self.assertIn('!(last_reviewed && date(last_reviewed) >= today())', formula(template, "next_day_flag"))
+        self.assertIn("formula.next_day_flag == true", today)
+        self.assertEqual(["file.name", "done_today"], order[:2])
+        self.assertEqual(260, column_size(today, "file.name"))
+        self.assertEqual(("file.name", "ASC"), sort[-1])
+
+    def test_total_training_dashboard_uses_card_frontmatter_without_review_state_snapshots(self) -> None:
+        template = read_total_training_base()
+
+        self.assertNotIn("views/review-state", template)
+        self.assertNotIn(".lingotrace/review-state", template)
+        for property_name in ("done_today", "next_review", "last_reviewed", "status"):
+            self.assertIn(property_name, template)
 
     def test_workflows_are_declarative_and_do_not_call_old_jp_skills(self) -> None:
         manifest = read_json(MANIFEST_PATH)

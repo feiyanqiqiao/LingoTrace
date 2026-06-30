@@ -22,7 +22,6 @@ REVIEW_MATERIAL_ROLES = (
 )
 ROLLOVER_ROLES = (
     "focus_vocab_root",
-    "base_vocab_root",
     "grammar_root",
     "error_root",
     "speaking_card_root",

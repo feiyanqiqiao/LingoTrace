@@ -85,6 +85,13 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
         ):
             self.assertIn(phrase, skill)
 
+        for phrase in (
+            "处理一下总训练表",
+            "总训练表有点问题",
+            "词汇卡要显示重音和常见搭配",
+        ):
+            self.assertIn(phrase, skill)
+
     def test_clear_review_rollover_requests_do_not_need_second_confirmation(self) -> None:
         skill = read_required(AGENT_SKILL)
         guide = read_required(USER_GUIDE)
@@ -114,6 +121,12 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
         ):
             self.assertIn(phrase, combined)
 
+        for stale_phrase in (
+            "请更新总训练表”这类可能同时表示复习结算或视图维护",
+            "请更新总训练表”可能表示结算今天的复习",
+        ):
+            self.assertNotIn(stale_phrase, combined)
+
         for forbidden in (
             "写入新框架 Vault",
             "调用 workflow entrypoint",
@@ -125,6 +138,26 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
             "codex-skills/",
         ):
             self.assertNotIn(forbidden, combined)
+
+    def test_total_training_intent_boundary_examples_are_explicit(self) -> None:
+        combined = (
+            read_required(README)
+            + "\n"
+            + read_required(USER_GUIDE)
+            + "\n"
+            + read_required(AGENT_SKILL)
+        )
+
+        for phrase in (
+            "更新总训练表",
+            "请更新总训练表",
+            "明确的每日复习结算请求",
+            "处理一下总训练表",
+            "总训练表有点问题",
+            "Dashboard or view maintenance",
+            "filters, columns, formulas, or sort order",
+        ):
+            self.assertIn(phrase, combined)
 
     def test_agents_doc_points_to_agent_skill_and_hidden_runtime_contract(self) -> None:
         agents = read_required(AGENTS)

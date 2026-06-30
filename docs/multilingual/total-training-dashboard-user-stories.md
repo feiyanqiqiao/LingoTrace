@@ -154,7 +154,7 @@ Japanese reference:
 Regression coverage:
 
 - Existing: `test_total_training_view_has_single_canonical_source`.
-- Required: parse the Base template and assert the `next_day_flag` formula and daily-review-view filter.
+- `test_total_training_dashboard_daily_review_contract`
 
 ### 2. Keep Checkbox Interaction Stable
 
@@ -170,7 +170,7 @@ Acceptance criteria:
 Regression coverage:
 
 - Existing: `test_total_training_view_has_single_canonical_source`.
-- Required: assert the daily review view order begins with `file.name`, then `done_today`, and `columnSize.file.name == 260`.
+- `test_total_training_dashboard_daily_review_contract`
 
 ### 3. Surface Type-Specific Review Cues
 
@@ -196,7 +196,7 @@ Japanese reference mapping:
 Regression coverage:
 
 - Existing: `test_total_training_dashboard_surfaces_type_specific_review_cues`.
-- Required: strengthen the test from string presence to parsed formula-contract assertions for each card type.
+- Strengthened: `test_total_training_dashboard_surfaces_type_specific_review_cues` asserts formula-contract fragments for each Japanese reference card type.
 
 ### 4. Fall Back Gracefully When Optional Fields Are Missing
 
@@ -217,7 +217,7 @@ Japanese reference fallback mapping:
 
 Regression coverage:
 
-- Required: formula-contract tests covering missing optional fields through synthetic expression fixtures or template assertions.
+- `test_total_training_dashboard_surfaces_type_specific_review_cues`
 
 ### 5. Keep Dashboard Source of Truth on Card Frontmatter
 
@@ -227,12 +227,12 @@ Acceptance criteria:
 
 - The Base template does not reference `views/review-state`.
 - The dashboard does not depend on `.lingotrace/review-state/*.json`.
-- The displayed state fields remain ordinary card frontmatter fields such as `done_today`, `next_review`, `review_stage`, `last_reviewed`, and `status`.
+- The source state fields remain ordinary card frontmatter fields such as `done_today`, `next_review`, `review_stage`, `last_reviewed`, and `status`; a dashboard may choose a smaller displayed subset when the field is not needed for the review queue.
 
 Regression coverage:
 
 - Existing: `test_total_training_view_has_single_canonical_source`.
-- Required: assert no `review-state` path references exist in the Base template.
+- `test_total_training_dashboard_uses_card_frontmatter_without_review_state_snapshots`
 
 ### 6. Preserve Intent Boundary Between Settlement and View Maintenance
 
@@ -249,7 +249,7 @@ Acceptance criteria:
 Regression coverage:
 
 - Existing: intent-recognition checks in `test_phase25_switch_completion`.
-- Required: docs/skill tests that preserve the settlement-versus-dashboard clarification rule.
+- Covered by docs/skill checks in `test_phase25_switch_completion`.
 
 ### 7. Keep Pack Template and Real Vault View Aligned
 
@@ -264,18 +264,19 @@ Acceptance criteria:
 Regression coverage:
 
 - Existing: manifest declares `total_training_dashboard` as a recreate-from-pack default view.
-- Required: test that the manifest path exists and the template contains the required formulas, properties, and daily review view.
+- `test_pack_owned_surfaces_are_manifest_declared_and_files_exist`
+- `test_total_training_dashboard_daily_review_contract`
 
 ## Test Matrix
 
-| Behavior | Reference Japanese coverage | Required next coverage |
+| Behavior | Reference Japanese coverage | Coverage status |
 | --- | --- | --- |
 | Canonical dashboard template exists | `test_pack_owned_surfaces_are_manifest_declared_and_files_exist` | Keep |
-| Single source and stable filename column | `test_total_training_view_has_single_canonical_source` | Add parsed order/width assertions |
-| Type-specific cues | `test_total_training_dashboard_surfaces_type_specific_review_cues` | Upgrade to formula-contract assertions |
-| Today/next-day queue filtering | Partial template coverage | Add parsed `next_day_flag` and daily-view-filter assertions |
-| Optional-field fallbacks | None | Add synthetic formula-contract or template assertions |
-| No review-state snapshots | Partial architecture docs | Add direct Base-template assertion |
+| Single source and stable filename column | `test_total_training_dashboard_daily_review_contract` | Covered |
+| Type-specific cues | `test_total_training_dashboard_surfaces_type_specific_review_cues` | Covered by formula-contract assertions |
+| Today/next-day queue filtering | `test_total_training_dashboard_daily_review_contract` | Covered |
+| Optional-field fallbacks | `test_total_training_dashboard_surfaces_type_specific_review_cues` | Covered by template formula assertions |
+| No review-state snapshots | `test_total_training_dashboard_uses_card_frontmatter_without_review_state_snapshots` | Covered |
 | Intent boundary | Intent-recognition tests | Keep and mention dashboard maintenance explicitly |
 
 ## Language-Pack Implementation Checklist

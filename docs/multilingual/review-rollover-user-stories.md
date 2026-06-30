@@ -74,7 +74,7 @@ Acceptance criteria:
 Regression coverage:
 
 - `test_review_rollover_previews_due_target_card_without_writes`
-- Required: second-preview verification after apply
+- `test_review_rollover_second_preview_has_no_remaining_planned_writes_after_apply`
 
 ### 2. Apply fixed memory-curve advancement
 
@@ -94,8 +94,8 @@ Acceptance criteria:
 Regression coverage:
 
 - `test_review_rollover_apply_advances_due_target_card`
-- Required: parameterized coverage for every stage transition in the memory curve
-- Required: unknown-stage blocking coverage
+- `test_review_rollover_applies_every_memory_curve_transition_from_run_date`
+- `test_review_rollover_blocks_unknown_stage_before_any_write`
 
 ### 3. Reschedule overdue cards without advancing
 
@@ -113,7 +113,7 @@ Acceptance criteria:
 Regression coverage:
 
 - `test_review_rollover_reschedules_overdue_card_without_advancing_stage`
-- Required: boundary coverage for `overdue_days == allowed_delay`
+- `test_review_rollover_advances_when_overdue_days_equal_allowed_delay`
 
 ### 4. Complete day180 cards as mastered
 
@@ -130,7 +130,8 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Required: `day180 -> mastered` frontmatter coverage
+- `test_review_rollover_applies_every_memory_curve_transition_from_run_date`
+- `test_apply_updates_done_today_review_stage_next_review_and_mastered_status`
 
 ### 5. Keep base vocabulary content out of settlement
 
@@ -144,7 +145,7 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Required: base vocabulary Markdown untouched during day180 settlement
+- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
 
 ### 6. Do not rewrite daily notes during settlement
 
@@ -158,7 +159,7 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Required: existing daily note remains unchanged during settlement
+- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
 
 ### 7. Leave daily notes without anchors unchanged
 
@@ -171,7 +172,7 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Required: daily note without anchor remains unchanged
+- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
 
 ### 8. Complete settlement when the daily note is missing
 
@@ -185,7 +186,7 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Covered by card-only rollover tests such as `test_review_rollover_apply_advances_due_target_card`
+- `test_review_rollover_completes_when_daily_note_is_missing`
 
 ### 9. Block apply on invalid completed cards
 
@@ -200,7 +201,9 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Required: invalid completed card blocks all writes before apply
+- `test_review_rollover_blocks_unknown_stage_before_any_write`
+- `test_review_rollover_blocks_invalid_next_review_before_any_write`
+- `test_validation_failure_blocks_planning_before_any_write_is_applied`
 
 ### 10. Respect capability and write guards
 
@@ -227,17 +230,17 @@ Regression coverage:
 | --- | --- | --- | --- |
 | Internal preview before write | `test_review_rollover_previews_due_target_card_without_writes` | Covered | Yes |
 | Clear request applies without second confirmation | Agent-skill/docs contract tests | Covered outside workflow unit tests | Yes |
-| Second preview after apply returns zero planned writes | Required workflow/agent regression | Missing | Yes |
-| Fixed memory-curve advancement | `test_review_rollover_apply_advances_due_target_card` | Partially covered | Yes |
-| Every memory-curve transition | Required parameterized workflow regression | Missing | Yes |
+| Second preview after apply returns zero planned writes | `test_review_rollover_second_preview_has_no_remaining_planned_writes_after_apply` | Covered | Yes |
+| Fixed memory-curve advancement | `test_review_rollover_apply_advances_due_target_card` | Covered | Yes |
+| Every memory-curve transition | `test_review_rollover_applies_every_memory_curve_transition_from_run_date` | Covered | Yes |
 | Delayed overdue reschedule | `test_review_rollover_reschedules_overdue_card_without_advancing_stage` | Covered | Yes |
-| `overdue_days == allowed_delay` advances | Required boundary regression | Missing | Yes |
-| day180 card becomes mastered | Required workflow regression | Missing | Yes |
-| Existing base-card untouched | Required day180/content-boundary regression | Missing | Yes |
-| Existing daily note untouched | Required daily-note regression | Missing | Yes |
-| Daily note without anchor untouched | Required daily-note regression | Missing | Yes |
-| Missing daily note | Card-only apply tests | Covered indirectly | Yes |
-| Invalid card blocks apply | Required invalid-state regression | Missing | Yes |
+| `overdue_days == allowed_delay` advances | `test_review_rollover_advances_when_overdue_days_equal_allowed_delay` | Covered | Yes |
+| day180 card becomes mastered | `test_review_rollover_applies_every_memory_curve_transition_from_run_date` | Covered | Yes |
+| Existing base-card untouched | `test_review_rollover_does_not_touch_base_vocab_or_daily_notes` | Covered | Yes |
+| Existing daily note untouched | `test_review_rollover_does_not_touch_base_vocab_or_daily_notes` | Covered | Yes |
+| Daily note without anchor untouched | `test_review_rollover_does_not_touch_base_vocab_or_daily_notes` | Covered | Yes |
+| Missing daily note | `test_review_rollover_completes_when_daily_note_is_missing` | Covered | Yes |
+| Invalid card blocks apply | `test_review_rollover_blocks_unknown_stage_before_any_write`, `test_review_rollover_blocks_invalid_next_review_before_any_write` | Covered | Yes |
 | Capability/write guard | Core mutation and capability tests | Covered | Yes |
 
 ## Language-Pack Implementation Checklist
