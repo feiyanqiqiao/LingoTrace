@@ -126,26 +126,33 @@ Acceptance criteria:
 - `done_today` is cleared.
 - `last_reviewed` is set to the settlement run date.
 - `next_review` is cleared because mastered cards are no longer scheduled by the normal active-review queue.
+- A completed focus vocabulary card is promoted into the base vocabulary layer while preserving existing base-card manual content.
 - If a future language pack needs type-specific mastery behavior, it must update this contract and its tests before changing implementation.
 
 Regression coverage:
 
 - `test_review_rollover_applies_every_memory_curve_transition_from_run_date`
 - `test_apply_updates_done_today_review_stage_next_review_and_mastered_status`
+- `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`
+- `test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match`
 
-### 5. Keep base vocabulary content out of settlement
+### 5. Restrict base vocabulary writes to mastery sink
 
-As a learner, I want settlement to avoid rewriting base vocabulary content, so iCloud content-file synchronization cannot block review closeout.
+As a learner, I want settlement to update base vocabulary only when a focus vocabulary card completes the full review cycle, so long-term vocabulary remains aligned without broad base rewrites.
 
 Acceptance criteria:
 
-- Existing base vocabulary Markdown remains unchanged during review settlement.
-- Focus-card or active review-card SRS frontmatter can still become `mastered`.
-- Any base-vocabulary creation or merge must run through a separate explicit content-maintenance workflow.
+- Existing base vocabulary Markdown remains unchanged for non-mastered cards and non-vocabulary cards.
+- When a focus vocabulary card advances from `day180` to `mastered`, stable vocabulary fields are written to the base vocabulary layer.
+- Existing base vocabulary manual body content is preserved.
+- Base source references are merged with the completed focus card's source references.
+- Any broad base-vocabulary merge, move, deletion, or rewrite outside mastery sink must run through a separate explicit content-maintenance workflow.
 
 Regression coverage:
 
-- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
+- `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`
+- `test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match`
+- `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab`
 
 ### 6. Do not rewrite daily notes during settlement
 
@@ -159,7 +166,7 @@ Acceptance criteria:
 
 Regression coverage:
 
-- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
+- `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab`
 
 ### 7. Leave daily notes without anchors unchanged
 
@@ -172,7 +179,7 @@ Acceptance criteria:
 
 Regression coverage:
 
-- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
+- `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab`
 
 ### 8. Complete settlement when the daily note is missing
 
@@ -236,9 +243,11 @@ Regression coverage:
 | Delayed overdue reschedule | `test_review_rollover_reschedules_overdue_card_without_advancing_stage` | Covered | Yes |
 | `overdue_days == allowed_delay` advances | `test_review_rollover_advances_when_overdue_days_equal_allowed_delay` | Covered | Yes |
 | day180 card becomes mastered | `test_review_rollover_applies_every_memory_curve_transition_from_run_date` | Covered | Yes |
-| Existing base-card untouched | `test_review_rollover_does_not_touch_base_vocab_or_daily_notes` | Covered | Yes |
-| Existing daily note untouched | `test_review_rollover_does_not_touch_base_vocab_or_daily_notes` | Covered | Yes |
-| Daily note without anchor untouched | `test_review_rollover_does_not_touch_base_vocab_or_daily_notes` | Covered | Yes |
+| day180 focus vocab sinks to base | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`; `test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match` | Covered | Yes |
+| Existing base-card manual body preserved during sink | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body` | Covered | Yes |
+| Non-mastered base-card untouched | `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab` | Covered | Yes |
+| Existing daily note untouched | `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab` | Covered | Yes |
+| Daily note without anchor untouched | `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab` | Covered | Yes |
 | Missing daily note | `test_review_rollover_completes_when_daily_note_is_missing` | Covered | Yes |
 | Invalid card blocks apply | `test_review_rollover_blocks_unknown_stage_before_any_write`, `test_review_rollover_blocks_invalid_next_review_before_any_write` | Covered | Yes |
 | Capability/write guard | Core mutation and capability tests | Covered | Yes |

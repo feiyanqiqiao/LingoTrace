@@ -116,4 +116,4 @@ Do not promote unstable ASR text, raw transcript fragments, or unnatural textboo
 
 For requests such as "今天复习结束了，帮我结算", run an internal preview first. If the preview is accepted and has no errors, apply the rollover immediately and run a second preview to verify no planned review writes remain.
 
-After settlement, report the count of cards advanced, cards that became mastered, delayed reschedules, blocked cards, and the second-preview result. Settlement should not rewrite daily notes or base vocabulary Markdown unless the user explicitly asks for a separate content-maintenance task.
+After settlement, report the count of cards advanced, cards that became mastered, day180 focus vocabulary cards promoted into base vocabulary, delayed reschedules, blocked cards, and the second-preview result. Settlement may write base vocabulary only for the controlled day180 vocabulary mastery sink; broad base vocabulary merges, moves, deletions, rewrites, and daily-note summaries require a separate explicit content-maintenance task.

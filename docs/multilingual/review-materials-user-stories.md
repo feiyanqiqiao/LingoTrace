@@ -163,27 +163,27 @@ Regression coverage:
 - `test_lookup_cases_preserve_focus_first_and_routing_decisions`
 - `test_review_materials_item_reactivates_mastered_focus_card`
 
-### 6. Keep Base Lexicon Sink Separate From Daily Extraction
+### 6. Keep Base Lexicon Sink Out Of Daily Extraction
 
-As a learner, I want ordinary classroom extraction to create active focus cards first, so the base lexicon remains a long-term memory layer rather than another active queue.
+As a learner, I want ordinary classroom extraction to create active focus cards first, so base vocabulary promotion happens only after review mastery, not during material extraction.
 
 Acceptance criteria:
 
 - Ordinary new vocabulary extraction creates or updates the focus review layer first.
-- Base lexicon creation or update is used for sink/history alignment, not for every new word.
-- Sinking a completed focus card preserves stable vocabulary content and marks the base record as promoted.
-- Sinking must not erase manual base-card content.
+- A base-only match restores or creates an active focus card instead of treating the item as already handled.
+- Daily extraction must not directly sink new vocabulary into base vocabulary.
+- Focus-to-base promotion is owned by `review_rollover` when a focus vocabulary card completes the full memory curve.
+- Extraction must not erase existing base-card manual content.
 
 Japanese reference:
 
-- Completed focus vocabulary can sink into the base lexicon with `status: promoted`.
-- Focus cards that complete the full review cycle become `mastered`.
+- Completed focus vocabulary can sink into the base lexicon with `status: promoted` during `review_rollover`.
+- `review_materials` only uses base vocabulary for duplicate detection and focus restoration.
 
 Regression coverage:
 
-- `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body`
-- `test_review_rollover_does_not_touch_base_vocab_or_daily_notes`
 - `test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base`
+- `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`
 
 ### 7. Preserve Language-Specific Review Cues
 
@@ -299,7 +299,8 @@ Regression coverage:
 | Pronunciation routing | `test_review_materials_item_routes_grammar_error_and_pronunciation_cards` | Covered for structured items | Yes, if the pack supports pronunciation cards |
 | Source provenance | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered | Yes |
 | New active card initialization | `test_review_materials_item_creates_initialized_focus_vocab_card` | Covered for structured items | Yes |
-| Base lexicon sink preserves manual body | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered | Yes |
+| Base-only restore does not rewrite base card | `test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base` | Covered | Yes |
+| Focus-to-base sink on mastery | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body` | Covered by `review_rollover` | Yes |
 | Japanese kanji-difference metadata | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered for Japanese | No, language-specific |
 | Image-backed vocabulary extraction | `test_review_materials_item_blocks_uncertain_image_backed_extraction`; `test_review_materials_item_accepts_clearly_readable_image_backed_extraction` | Covered for structured items | If supported |
 | Daily checklist separation | `test_review_materials_item_does_not_touch_daily_checklist` | Covered for default extraction | If supported |

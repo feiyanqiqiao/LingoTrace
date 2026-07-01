@@ -932,7 +932,107 @@ last_reviewed: 2026-05-29
         self.assertIn("done_today: true", bad_body)
         self.assertIn("next_review: not-a-date", bad_body)
 
-    def test_review_rollover_does_not_touch_base_vocab_or_daily_notes(self) -> None:
+    def test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            focus_path = root / "review/focus/vocab/focus.md"
+            base_path = root / "review/base/vocab/base.md"
+            write(
+                focus_path,
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: true
+review_stage: day180
+next_review: 2026-06-21
+last_reviewed:
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+accent_display: ごうせいご⓪
+source_notes: [[focus-source]]
+---
+
+## Focus
+合成词。
+""",
+            )
+            write(
+                base_path,
+                """---
+track: base_vocab
+item_type: vocab
+status: active
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 旧解释
+source_notes: [[base-source]]
+seen_count: 2
+---
+
+## 人工整理
+这段必须保留。
+""",
+            )
+
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            focus_body = focus_path.read_text(encoding="utf-8")
+            base_body = base_path.read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual(["review/base/vocab/base.md", "review/focus/vocab/focus.md"], sorted(report.to_dict()["changed_files"]))
+        self.assertIn("status: mastered", focus_body)
+        self.assertIn("status: promoted", base_body)
+        self.assertIn("meaning_zh: 合成词", base_body)
+        self.assertIn("accent_display: ごうせいご⓪", base_body)
+        self.assertIn("source_notes: [[base-source]], [[focus-source]]", base_body)
+        self.assertIn("seen_count: 2", base_body)
+        self.assertIn("这段必须保留。", base_body)
+
+    def test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            focus_path = root / "review/focus/vocab/new-base.md"
+            base_path = root / "review/base/vocab/合成語.md"
+            write(
+                focus_path,
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: true
+review_stage: day180
+next_review: 2026-06-21
+last_reviewed:
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+source_notes: [[focus-source]]
+---
+
+## Focus
+合成词。
+""",
+            )
+
+            report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
+            focus_body = focus_path.read_text(encoding="utf-8")
+            base_body = base_path.read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual(["review/base/vocab/合成語.md", "review/focus/vocab/new-base.md"], sorted(report.to_dict()["changed_files"]))
+        self.assertIn("status: mastered", focus_body)
+        self.assertIn("track: base_vocab", base_body)
+        self.assertIn("status: promoted", base_body)
+        self.assertIn("headword: 合成語", base_body)
+        self.assertIn("reading: ごうせいご", base_body)
+        self.assertIn("meaning_zh: 合成词", base_body)
+        self.assertIn("source_notes: [[focus-source]]", base_body)
+
+    def test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
@@ -940,7 +1040,7 @@ last_reviewed: 2026-05-29
             base_path = root / "review/base/vocab/base.md"
             daily_path = root / "daily/2026-06-21.md"
             daily_without_anchor_path = root / "daily/2026-06-20.md"
-            write(focus_path, review_card(review_stage="day180", next_review="2026-06-21"))
+            write(focus_path, review_card(review_stage="day1", next_review="2026-06-21"))
             write(base_path, review_card(status="active", done_today="true", review_stage="day1", next_review="2026-06-21"))
             write(daily_path, "# Daily\n\n- manual note\n")
             write(daily_without_anchor_path, "# Daily without anchor\n")
@@ -949,7 +1049,6 @@ last_reviewed: 2026-05-29
             before_daily_without_anchor = daily_without_anchor_path.read_text(encoding="utf-8")
 
             report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
-            focus_body = focus_path.read_text(encoding="utf-8")
             after_base = base_path.read_text(encoding="utf-8")
             after_daily = daily_path.read_text(encoding="utf-8")
             after_daily_without_anchor = daily_without_anchor_path.read_text(encoding="utf-8")
@@ -959,7 +1058,6 @@ last_reviewed: 2026-05-29
         self.assertNotIn("review/base/vocab/base.md", report.to_dict()["read_files"])
         self.assertNotIn("daily/2026-06-21.md", report.to_dict()["read_files"])
         self.assertNotIn("daily/2026-06-20.md", report.to_dict()["read_files"])
-        self.assertIn("status: mastered", focus_body)
         self.assertEqual(before_base, after_base)
         self.assertEqual(before_daily, after_daily)
         self.assertEqual(before_daily_without_anchor, after_daily_without_anchor)

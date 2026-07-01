@@ -285,6 +285,22 @@ def review_rollover(
                 ),
             )
         )
+        if next_stage == "mastered" and fields.get("item_type") == "vocab":
+            base_mutation = _base_vocab_sink_mutation(root, paths, card_path, fields)
+            if isinstance(base_mutation, Finding):
+                errors.append(base_mutation)
+                continue
+            if base_mutation is not None:
+                planned_writes.append(
+                    {
+                        "path": base_mutation.path,
+                        "action": "preview_base_vocab_sink",
+                        "reason": "day180 focus vocabulary would be promoted into the base lexicon",
+                        "from_focus_path": card_path.relative_to(root).as_posix(),
+                        "status": "promoted",
+                    }
+                )
+                mutations.append(base_mutation)
 
     if mode == "apply":
         if errors:
@@ -607,6 +623,72 @@ def _path_collision_error(root: Path, relative_path: str, title: str) -> Finding
         message="Target review material path already exists for a different learning point.",
         path=relative_path,
     )
+
+
+def _base_vocab_sink_mutation(
+    root: Path,
+    paths: dict[str, str],
+    focus_path: Path,
+    focus_fields: dict[str, str],
+) -> FileMutation | Finding | None:
+    base_root = paths.get("base_vocab_root")
+    if not base_root:
+        return Finding(code="missing_path_role", message="Base vocabulary path role is required for day180 vocabulary sink.", path="base_vocab_root")
+    title = str(focus_fields.get("headword") or focus_path.stem)
+    base_match = _single_review_match(root / base_root, title)
+    if isinstance(base_match, Finding):
+        return base_match
+    stable_fields = _base_vocab_fields_from_focus(focus_fields, title)
+    if base_match is not None:
+        base_text = base_match.read_text(encoding="utf-8")
+        base_fields, base_body = _frontmatter_and_body(base_text)
+        merged_fields = dict(base_fields)
+        merged_fields.update(stable_fields)
+        merged_fields["source_notes"] = _merged_source_notes(
+            str(base_fields.get("source_notes", "")),
+            focus_fields.get("source_notes"),
+        )
+        return FileMutation(
+            path=base_match.relative_to(root).as_posix(),
+            content=_render_markdown(merged_fields, base_body),
+            action="sink_focus_vocab_to_base",
+            reason="day180 focus vocabulary completed and updates the base lexicon",
+        )
+
+    target_path = f"{base_root}/{_safe_card_filename(title)}.md"
+    collision_error = _path_collision_error(root, target_path, title)
+    if collision_error is not None:
+        return collision_error
+    return FileMutation(
+        path=target_path,
+        content=_render_markdown(stable_fields, _generated_review_body("vocab", stable_fields)),
+        action="sink_focus_vocab_to_base",
+        reason="day180 focus vocabulary completed and creates a base lexicon record",
+    )
+
+
+def _base_vocab_fields_from_focus(focus_fields: dict[str, str], title: str) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "track": "base_vocab",
+        "item_type": "vocab",
+        "status": "promoted",
+        "headword": title,
+    }
+    for key in (
+        "reading",
+        "accent_display",
+        "meaning_zh",
+        "collocations",
+        "confusable_with",
+        "contrast_with",
+        "kanji_diff",
+        "kanji_diff_pairs",
+        "source_notes",
+    ):
+        value = focus_fields.get(key)
+        if value not in (None, ""):
+            fields[key] = value
+    return fields
 
 
 def _review_material_validation_error(fields: dict[str, Any], path: str) -> Finding | None:
