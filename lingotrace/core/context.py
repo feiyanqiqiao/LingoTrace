@@ -10,7 +10,7 @@ from .reports import CommandReport, Finding
 
 CONTEXT_RELATIVE_PATH = ".lingotrace/vault-context.json"
 SUPPORTED_SCHEMA_VERSION = 1
-SUPPORTED_TARGET_LANGUAGE = "ja"
+SUPPORTED_TARGET_LANGUAGES = ("ja", "en")
 SUPPORTED_EXPLANATION_LANGUAGE = "zh"
 
 
@@ -79,7 +79,7 @@ def _parse_context(payload: dict[str, Any], findings: list[Finding]) -> VaultCon
 
     if schema_version != SUPPORTED_SCHEMA_VERSION:
         findings.append(Finding(code="unsupported_vault_schema", message="Unsupported Vault schema version."))
-    if target_language != SUPPORTED_TARGET_LANGUAGE:
+    if target_language not in SUPPORTED_TARGET_LANGUAGES:
         findings.append(Finding(code="unsupported_target_language", message="Unsupported target language."))
     if explanation_language != SUPPORTED_EXPLANATION_LANGUAGE:
         findings.append(Finding(code="unsupported_explanation_language", message="Unsupported explanation language."))

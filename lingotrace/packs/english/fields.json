@@ -19,6 +19,11 @@
       "name": "collocations",
       "owner": "English language pack",
       "purpose": "Common collocations and phrases for the headword."
+    },
+    {
+      "name": "english_definition",
+      "owner": "English language pack",
+      "purpose": "Primary English-to-English definition fallback."
     }
   ]
 }

@@ -14,18 +14,18 @@
   "capabilities": [
     {
       "id": "source_notes",
-      "maturity": "experimental",
+      "maturity": "stable",
       "depends_on": [],
       "read_path_roles": ["source_notes_root"],
       "write_path_roles": ["source_notes_root"],
       "external_tools": [],
-      "behavior_evidence": [],
+      "behavior_evidence": ["EN-SOURCE-001"],
       "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
       "manual_review_cases": ["English source note creation from reading material"]
     },
     {
       "id": "review_materials",
-      "maturity": "experimental",
+      "maturity": "stable",
       "depends_on": [],
       "read_path_roles": [
         "focus_vocab_root",
@@ -41,13 +41,13 @@
         "error_root"
       ],
       "external_tools": [],
-      "behavior_evidence": [],
+      "behavior_evidence": ["EN-MAT-001"],
       "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
       "manual_review_cases": ["English vocabulary card creation with IPA and collocations"]
     },
     {
       "id": "review_rollover",
-      "maturity": "experimental",
+      "maturity": "stable",
       "depends_on": [],
       "read_path_roles": [
         "focus_vocab_root",
@@ -64,7 +64,22 @@
         "daily_notes_root"
       ],
       "external_tools": [],
-      "behavior_evidence": [],
+      "behavior_evidence": ["EN-ROLL-001"],
+      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
+      "manual_review_cases": []
+    },
+    {
+      "id": "total_training_dashboard",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": [
+        "daily_notes_root", "focus_vocab_root", "base_vocab_root",
+        "grammar_root", "error_root", "pronunciation_accent_root",
+        "pronunciation_phoneme_root"
+      ],
+      "write_path_roles": [],
+      "external_tools": [],
+      "behavior_evidence": ["EN-DASH-001"],
       "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
       "manual_review_cases": []
     }
@@ -132,6 +147,12 @@
       "id": "daily_checklist",
       "capability_id": "review_rollover",
       "path": "lingotrace/packs/english/templates/daily-checklist.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "total_training_base",
+      "capability_id": "total_training_dashboard",
+      "path": "lingotrace/packs/english/views/total-training.base",
       "artifact_class": "recreate-from-pack"
     }
   ],

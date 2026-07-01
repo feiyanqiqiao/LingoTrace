@@ -13,6 +13,7 @@ PHASE0_CAPABILITY_IDS = {
     "review_materials",
     "speaking_cards",
     "review_rollover",
+    "total_training_dashboard",
 }
 
 

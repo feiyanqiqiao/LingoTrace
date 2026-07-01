@@ -1,0 +1,69 @@
+filters:
+  and:
+    - file.ext == "md"
+formulas:
+  due_flag: 'if(status == "active" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
+  next_day_flag: 'if(status == "active" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
+  core_text: 'if(item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, meaning_zh))), if(item_type == "grammar", if(meaning_zh, meaning_zh, pattern), if(item_type == "error", correct_form, if(item_type == "pronunciation", target_text, file.name))))'
+  support_text: 'if(item_type == "vocab", if(collocations, collocations, meaning_zh), if(item_type == "grammar", formation, if(item_type == "error", if(wrong_form, wrong_form, reason), if(item_type == "pronunciation", issue_tags, ""))))'
+properties:
+  file.name:
+    displayName: 文件名
+  done_today:
+    displayName: 今日完成
+  review_stage:
+    displayName: 复习阶段
+  formula.core_text:
+    displayName: 核心内容
+  formula.support_text:
+    displayName: 辅助说明
+  item_type:
+    displayName: 题型
+  next_review:
+    displayName: 下次复习
+  formula.due_flag:
+    displayName: 到期标记
+  formula.next_day_flag:
+    displayName: 次日入口
+views:
+  - type: table
+    name: 今日总训练
+    filters:
+      and:
+        - formula.next_day_flag == true
+    order:
+      - file.name
+      - done_today
+      - item_type
+      - formula.core_text
+      - formula.support_text
+      - next_review
+    sort:
+      - property: done_today
+        direction: DESC
+      - property: next_review
+        direction: ASC
+      - property: item_type
+        direction: ASC
+      - property: file.name
+        direction: ASC
+    columnSize:
+      file.name: 260
+      done_today: 96
+      formula.core_text: 320
+      formula.support_text: 420
+  - type: table
+    name: 最近新增
+    filters:
+      and:
+        - status == "active"
+    order:
+      - file.name
+      - item_type
+      - formula.core_text
+      - next_review
+    sort:
+      - property: file.name
+        direction: ASC
+    columnSize:
+      file.name: 260

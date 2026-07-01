@@ -50,7 +50,7 @@ class VaultContextLoaderTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             payload = valid_context()
-            payload["target_language"] = "en"
+            payload["target_language"] = "fr"
             write_context(root, payload)
 
             result = load_vault_context(root)
