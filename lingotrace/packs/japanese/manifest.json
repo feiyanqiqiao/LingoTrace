@@ -145,6 +145,25 @@
       ],
       "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
       "manual_review_cases": []
+    },
+    {
+      "id": "total_training_dashboard",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": [
+        "daily_notes_root",
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root"
+      ],
+      "write_path_roles": [],
+      "external_tools": [],
+      "behavior_evidence": ["JP-DASH-001"],
+      "conformance_tests": ["tests/lingotrace/packs/test_japanese_pack.py"],
+      "manual_review_cases": []
     }
   ],
   "unsupported_capabilities": [],
@@ -302,7 +321,7 @@
   "default_views": [
     {
       "id": "total_training_dashboard",
-      "capability_id": "review_rollover",
+      "capability_id": "total_training_dashboard",
       "path": "lingotrace/packs/japanese/views/total-training.base",
       "artifact_class": "recreate-from-pack"
     }
