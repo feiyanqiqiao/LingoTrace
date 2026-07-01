@@ -52,6 +52,7 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
                 "review_materials",
                 "speaking_cards",
                 "review_rollover",
+                "total_training_dashboard",
             ],
             context["enabled_capabilities"],
         )
