@@ -5,6 +5,10 @@
 
 ---
 
+## [20260701-143000]
+### 新增 (Added)
+- `docs/user-guide.md`: 新增面向普通语言学习者的《LingoTrace 用户使用指南》，以纯用户视角介绍原理解构、输入输出闭环与全景训练看板（Total Training Dashboard）的使用方法，并更新了 `README.md` 提供显眼导流入口。
+
 ## [20260701-135000]
 ### 新增 (Added)
 - `lingotrace.packs.english`: 英语包完成 Phase 2.1 实施与契约对齐：
