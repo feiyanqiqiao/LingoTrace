@@ -28,6 +28,29 @@ This document is a shared contract for:
 
 Language packs must provide their own card-type display mapping. The Japanese fields in this document are the current reference mapping, not mandatory field names for English or future language packs.
 
+## Language Applicability Matrix
+
+Labels:
+
+- `Required`: every language pack implementing this capability should satisfy the behavior.
+- `Optional`: the behavior is useful but only required when the pack declares the supporting feature.
+- `Language-Specific`: the behavior depends on language-owned fields, templates, or pedagogy.
+- `Covered`: current implementation or regression evidence exists.
+- `Partial`: current support exists, but not all acceptance criteria are proven.
+- `Planned`: expected for future implementation, but not currently covered.
+- `Unsupported`: the pack does not currently support this behavior.
+- `N/A`: not applicable to the pack.
+
+| User story                                    | Shared              | Japanese  | English   | Notes                                                           |
+| --------------------------------------------- | ------------------- | --------- | --------- | --------------------------------------------------------------- |
+| `US-1` Today's review queue                   | `Required`          | `Covered` | `Covered` | Query scope and local view names are language-owned.            |
+| `US-2` Stable checkbox interaction            | `Required`          | `Covered` | `Covered` | Stable row targeting is shared dashboard behavior.              |
+| `US-3` Type-specific review cues              | `Language-Specific` | `Covered` | `Covered` | Each pack defines its own card-type fields and cue mapping.     |
+| `US-4` Optional-field fallback behavior       | `Required`          | `Covered` | `Covered` | Field names differ, but fallback behavior is shared.            |
+| `US-5` Card frontmatter as source of truth    | `Required`          | `Covered` | `Covered` | Dashboard must not read generated review-state snapshots.       |
+| `US-6` Settlement versus dashboard boundary   | `Required`          | `Covered` | `Covered` | Agent phrasing is localized, but the intent boundary is shared. |
+| `US-7` Pack template and vault view alignment | `Required`          | `Covered` | `Covered` | Template deployment mechanics are shared pack maintenance work. |
+
 ## Ownership Boundary
 
 Core owns:
@@ -197,6 +220,7 @@ Regression coverage:
 
 - Existing: `test_total_training_dashboard_surfaces_type_specific_review_cues`.
 - Strengthened: `test_total_training_dashboard_surfaces_type_specific_review_cues` asserts formula-contract fragments for each Japanese reference card type.
+- English reference: `test_total_training_dashboard_surfaces_english_type_specific_review_cues` asserts formula-contract fragments for English vocabulary, grammar, error, and pronunciation cards.
 
 ### 4. Fall Back Gracefully When Optional Fields Are Missing
 
@@ -218,6 +242,7 @@ Japanese reference fallback mapping:
 Regression coverage:
 
 - `test_total_training_dashboard_surfaces_type_specific_review_cues`
+- `test_total_training_dashboard_surfaces_english_type_specific_review_cues`
 
 ### 5. Keep Dashboard Source of Truth on Card Frontmatter
 
@@ -248,8 +273,8 @@ Acceptance criteria:
 
 Regression coverage:
 
-- Existing: intent-recognition checks in `test_phase25_switch_completion`.
-- Covered by docs/skill checks in `test_phase25_switch_completion`.
+- Existing: intent-recognition checks in `test_total_training_intent_boundary_examples_are_explicit`.
+- Covered by docs/skill checks in `test_clear_review_rollover_requests_do_not_need_second_confirmation`.
 
 ### 7. Keep Pack Template and Real Vault View Aligned
 
@@ -273,9 +298,9 @@ Regression coverage:
 | --- | --- | --- |
 | Canonical dashboard template exists | `test_pack_owned_surfaces_are_manifest_declared_and_files_exist` | Keep |
 | Single source and stable filename column | `test_total_training_dashboard_daily_review_contract` | Covered |
-| Type-specific cues | `test_total_training_dashboard_surfaces_type_specific_review_cues` | Covered by formula-contract assertions |
+| Type-specific cues | `test_total_training_dashboard_surfaces_type_specific_review_cues`; `test_total_training_dashboard_surfaces_english_type_specific_review_cues` | Covered by formula-contract assertions |
 | Today/next-day queue filtering | `test_total_training_dashboard_daily_review_contract` | Covered |
-| Optional-field fallbacks | `test_total_training_dashboard_surfaces_type_specific_review_cues` | Covered by template formula assertions |
+| Optional-field fallbacks | `test_total_training_dashboard_surfaces_type_specific_review_cues`; `test_total_training_dashboard_surfaces_english_type_specific_review_cues` | Covered by template formula assertions |
 | No review-state snapshots | `test_total_training_dashboard_uses_card_frontmatter_without_review_state_snapshots` | Covered |
 | Intent boundary | Intent-recognition tests | Keep and mention dashboard maintenance explicitly |
 

@@ -194,6 +194,17 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertNotIn("发音焦点：", package)
         self.assertNotIn("打磨提示：", package)
 
+    def test_learning_package_renders_kana_accent_as_downstep_marker(self) -> None:
+        package = MODULE.build_learning_package(
+            ["こいしいです。"],
+            {},
+            MODULE.StaticAccentDictionary({"こいしい": "こいしい③"}),
+            ["lesson_S01.m4a"],
+        )
+
+        self.assertIn("こいし＼いです。", package)
+        self.assertNotIn("こいしい③", package)
+
     def test_offline_dictionary_lookup_uses_unidic_accent_type(self) -> None:
         class Feature:
             kana = "コウエン"
@@ -464,6 +475,49 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertEqual(candidate.slice_profile.grouping, "sentence")
         self.assertEqual(candidate.slice_profile.padding_seconds, 0.5)
 
+    def test_compare_engine_persists_asr_disagreement_report_without_replacing_primary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "attach" / "lesson.mp3"
+            audio_path.parent.mkdir()
+            audio_path.write_bytes(b"audio")
+            payloads = {
+                "apple": {
+                    "engine": "apple",
+                    "full_text": "今日は良い天気です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "今日は良い天気です。"}],
+                },
+                "faster-whisper": {
+                    "engine": "faster-whisper",
+                    "full_text": "今日はいい天気です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "今日はいい天気です。"}],
+                },
+            }
+
+            def fake_build_candidate(*args, **kwargs):
+                engine = args[3]
+                route_label = args[2]
+                return MODULE.candidate_from_payload(audio_path, payloads[engine], route_label)
+
+            with mock.patch.object(MODULE, "build_candidate", side_effect=fake_build_candidate):
+                candidate, route_label = MODULE.transcribe_with_heuristics(
+                    audio_path,
+                    "ja-JP",
+                    engine="apple",
+                    compare_engine="faster-whisper",
+                )
+
+            report_path = root / "artifacts" / "lesson.asr-comparison.json"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(route_label, "apple")
+        self.assertEqual(candidate.full_text, "今日は良い天気です。")
+        self.assertEqual(report["schema_version"], 1)
+        self.assertEqual(report["primary"]["engine"], "apple")
+        self.assertEqual(report["secondary"]["engine"], "faster-whisper")
+        self.assertEqual(report["disagreements"][0]["primary_text"], "今日は良い天気です。")
+        self.assertEqual(report["disagreements"][0]["secondary_text"], "今日はいい天気です。")
+
     def test_unnumbered_dialogue_groups_continuous_four_turn_exchange(self) -> None:
         chunks = [
             MODULE.Chunk(start=0.0, end=1.0, text="お名前は？"),
@@ -679,6 +733,12 @@ class TranscribeListeningTests(unittest.TestCase):
             args = MODULE.parse_args()
 
         self.assertEqual(args.slice_profile, "dialogue")
+
+    def test_parse_args_accepts_compare_engine(self) -> None:
+        with mock.patch.object(sys, "argv", ["transcribe-listening", "audio.mp3", "--compare-engine", "faster-whisper"]):
+            args = MODULE.parse_args()
+
+        self.assertEqual(args.compare_engine, "faster-whisper")
 
     def test_review_sidecar_records_resolved_slice_profile(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1232,6 +1292,27 @@ class TranscribeListeningTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertIn("--output-dir is required", stderr.getvalue())
+
+    def test_url_rejects_compare_engine_until_final_audio_cross_check_is_supported(self) -> None:
+        stderr = StringIO()
+        with mock.patch.object(
+            sys,
+            "argv",
+            [
+                "transcribe-listening",
+                "--url",
+                "https://example.com/a.mp4",
+                "--output-dir",
+                "/tmp/listening",
+                "--compare-engine",
+                "apple",
+            ],
+        ):
+            with mock.patch("sys.stderr", stderr):
+                exit_code = MODULE.main()
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("--compare-engine is currently supported only for local audio files", stderr.getvalue())
 
     def test_url_input_generates_note_from_finalized_audio(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

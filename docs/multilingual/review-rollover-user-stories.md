@@ -32,6 +32,32 @@ Language packs may define their own path roles, card-type fields, templates, and
 
 The Japanese pack is the current reference implementation and test source for this contract.
 
+## Language Applicability Matrix
+
+Labels:
+
+- `Required`: every language pack implementing this capability should satisfy the behavior.
+- `Optional`: the behavior is useful but only required when the pack declares the supporting feature.
+- `Language-Specific`: the behavior depends on language-owned fields, templates, or pedagogy.
+- `Covered`: current implementation or regression evidence exists.
+- `Partial`: current support exists, but not all acceptance criteria are proven.
+- `Planned`: expected for future implementation, but not currently covered.
+- `Unsupported`: the pack does not currently support this behavior.
+- `N/A`: not applicable to the pack.
+
+| User story | Shared | Japanese | English | Notes |
+| --- | --- | --- | --- | --- |
+| `US-1` Internal preview before settlement | `Required` | `Covered` | `Covered` | Local clear-settlement phrases are language/agent owned. |
+| `US-2` Fixed memory-curve advancement | `Required` | `Covered` | `Covered` | The stage names and SRS fields are shared unless a pack documents an exception. |
+| `US-3` Delayed overdue rescheduling | `Required` | `Covered` | `Covered` | Delay thresholds are part of the shared rollover rule. |
+| `US-4` day180 mastered transition | `Required` | `Covered` | `Covered` | Type-specific mastery effects must stay explicit. |
+| `US-5` Base vocabulary writes only through mastery sink | `Required` | `Covered` | `Covered` | Vocabulary-field mapping remains language-owned. |
+| `US-6` Daily-note independence | `Required` | `Covered` | `Covered` | Normal settlement should not depend on daily-note writes. |
+| `US-7` Daily notes without anchors unchanged | `Optional` | `Covered` | `N/A` | Required only for packs that maintain dated daily notes. |
+| `US-8` Missing daily note resilience | `Optional` | `Covered` | `N/A` | Required only for packs with daily-note integration. |
+| `US-9` Invalid-state blocking | `Required` | `Covered` | `Covered` | Invalid completed cards must block before any write. |
+| `US-10` Capability and write guards | `Required` | `Covered` | `Covered` | Core guardrails apply to every language pack. |
+
 ## Ownership Boundary
 
 Core owns:

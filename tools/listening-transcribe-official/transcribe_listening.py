@@ -143,7 +143,10 @@ class OfflineDictionaryError(RuntimeError):
 
 CIRCLED_ACCENT_MARKS = "⓪①②③④⑤⑥⑦⑧⑨"
 ACCENT_TYPE_TO_MARK = {str(index): mark for index, mark in enumerate(CIRCLED_ACCENT_MARKS)}
+ACCENT_MARK_TO_TYPE = {mark: index for index, mark in enumerate(CIRCLED_ACCENT_MARKS)}
 KANJI_CHAR_RE = re.compile(r"[\u3400-\u9fff々〆ヵヶ]")
+KANA_ONLY_RE = re.compile(r"^[ぁ-んァ-ヶー]+$")
+SMALL_KANA = set("ゃゅょャュョぁぃぅぇぉァィゥェォゎヮ")
 
 
 def accent_marks_from_type(value: str) -> str | None:
@@ -339,6 +342,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--locale", default="ja-JP")
     parser.add_argument("--title")
     parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper"], default="auto")
+    parser.add_argument("--compare-engine", choices=["apple", "faster-whisper"])
     parser.add_argument("--format", choices=["mp3", "m4a", "wav", "flac"], default="m4a")
     parser.add_argument("--faster-whisper-python")
     parser.add_argument("--faster-whisper-model", default=DEFAULT_FASTER_WHISPER_MODEL)
@@ -1114,6 +1118,63 @@ def candidate_from_payload(audio_path: Path, payload: dict, route_label: str) ->
     )
 
 
+def build_asr_comparison_report(
+    primary: TranscriptionCandidate,
+    secondary: TranscriptionCandidate,
+) -> dict:
+    primary_texts = primary.sentences or split_sentences_from_text(primary.full_text)
+    secondary_texts = secondary.sentences or split_sentences_from_text(secondary.full_text)
+    disagreements: list[dict] = []
+    for index in range(max(len(primary_texts), len(secondary_texts))):
+        primary_text = primary_texts[index] if index < len(primary_texts) else ""
+        secondary_text = secondary_texts[index] if index < len(secondary_texts) else ""
+        if clean_transcript_text(primary_text) == clean_transcript_text(secondary_text):
+            continue
+        if not primary_text:
+            status = "missing_primary"
+        elif not secondary_text:
+            status = "missing_secondary"
+        else:
+            status = "different"
+        disagreements.append(
+            {
+                "index": index + 1,
+                "status": status,
+                "primary_text": primary_text,
+                "secondary_text": secondary_text,
+            }
+        )
+    return {
+        "schema_version": 1,
+        "kind": "asr_comparison",
+        "primary": {
+            "route": primary.route_label,
+            "engine": str(primary.payload.get("engine", primary.route_label)),
+            "segment_count": len(primary.segments),
+        },
+        "secondary": {
+            "route": secondary.route_label,
+            "engine": str(secondary.payload.get("engine", secondary.route_label)),
+            "segment_count": len(secondary.segments),
+        },
+        "disagreement_count": len(disagreements),
+        "disagreements": disagreements,
+    }
+
+
+def write_asr_comparison_report(
+    audio_path: Path,
+    primary: TranscriptionCandidate,
+    secondary: TranscriptionCandidate,
+) -> Path:
+    artifact_dir = material_dir_for_audio(audio_path) / "artifacts"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    report_path = artifact_dir / f"{audio_path.stem}.asr-comparison.json"
+    report = build_asr_comparison_report(primary, secondary)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return report_path
+
+
 def transcript_view_for_profile(
     payload: dict,
     chunks: list[Chunk],
@@ -1160,6 +1221,7 @@ def transcribe_with_heuristics(
     faster_whisper_model: str = DEFAULT_FASTER_WHISPER_MODEL,
     faster_whisper_compute_type: str = DEFAULT_FASTER_WHISPER_COMPUTE_TYPE,
     persist_artifacts: bool = True,
+    compare_engine: str | None = None,
 ) -> tuple[TranscriptionCandidate, str]:
     artifact_dir = material_dir_for_audio(audio_path) / "artifacts" if persist_artifacts else None
     artifact_stem = audio_path.stem
@@ -1179,6 +1241,20 @@ def transcribe_with_heuristics(
         raise RuntimeError(f"ListenKit transcript generation failed. Original error: {exc}") from exc
 
     if not is_short_choice_mode(audio_path):
+        if compare_engine and compare_engine != str(base_candidate.payload.get("engine", engine)):
+            secondary_candidate = build_candidate(
+                audio_path,
+                locale,
+                f"compare-{compare_engine}",
+                compare_engine,
+                faster_whisper_python,
+                faster_whisper_model,
+                faster_whisper_compute_type,
+                artifact_dir,
+                artifact_stem,
+            )
+            if persist_artifacts:
+                write_asr_comparison_report(audio_path, base_candidate, secondary_candidate)
         return base_candidate, str(base_candidate.payload.get("engine", "base"))
 
     slow_path = build_slow_copy(audio_path)
@@ -1417,16 +1493,23 @@ def select_focus_terms(
     offline_dictionary: StaticAccentDictionary,
     limit: int = 5,
 ) -> list[str]:
-    candidates: list[str] = []
+    trusted_candidates: list[str] = []
+    rough_candidates: list[str] = []
     for term in sorted(confirmed_accent_index, key=lambda item: (-len(item), item)):
         if term and term in sentence:
-            candidates.append(term)
+            trusted_candidates.append(term)
     for term in offline_dictionary.known_terms():
         if term in sentence:
-            candidates.append(term)
-    candidates.extend(offline_dictionary.tokenize_terms(sentence))
-    candidates.extend(rough_extract_focus_terms(sentence))
-    return [term for term in dedupe_preserve_order(candidates) if is_focus_term(term)][:limit]
+            trusted_candidates.append(term)
+    rough_candidates.extend(offline_dictionary.tokenize_terms(sentence))
+    rough_candidates.extend(rough_extract_focus_terms(sentence))
+    candidates = dedupe_preserve_order(
+        [
+            *[term for term in trusted_candidates if len(term.strip()) >= 2],
+            *[term for term in rough_candidates if is_focus_term(term)],
+        ]
+    )
+    return candidates[:limit]
 
 
 def render_follow_along_split(sentence: str) -> str:
@@ -1470,23 +1553,67 @@ def accent_mark_from_display(value: str) -> str | None:
     return None
 
 
+def accent_number_from_display(value: str) -> int | None:
+    mark = accent_mark_from_display(value)
+    if mark is None:
+        return None
+    return ACCENT_MARK_TO_TYPE.get(mark)
+
+
+def kana_mora_boundary_index(text: str, mora_count: int) -> int | None:
+    if mora_count <= 0:
+        return None
+    count = 0
+    last_boundary = 0
+    for index, char in enumerate(text):
+        if char in SMALL_KANA and index > 0:
+            last_boundary = index + 1
+            continue
+        count += 1
+        last_boundary = index + 1
+        if count == mora_count:
+            return last_boundary
+    return None
+
+
+def downstep_accent_display(term: str, accent_display: str) -> str | None:
+    if not KANA_ONLY_RE.fullmatch(term):
+        return None
+    accent_number = accent_number_from_display(accent_display)
+    if accent_number is None or accent_number <= 0:
+        return None
+    boundary = kana_mora_boundary_index(term, accent_number)
+    if boundary is None or boundary >= len(term):
+        return None
+    return f"{term[:boundary]}＼{term[boundary:]}"
+
+
 def resolve_accent_note(
     term: str,
     confirmed_accent_index: dict[str, str],
     offline_dictionary: StaticAccentDictionary,
+    accent_style: str = "circled",
 ) -> tuple[str | None, str]:
     confirmed = confirmed_accent_index.get(term)
     if confirmed:
+        if accent_style == "downstep":
+            downstep = downstep_accent_display(term, confirmed)
+            if downstep:
+                return downstep, f"{downstep}（已确认）"
         mark = accent_mark_from_display(confirmed)
         if mark:
-            return mark, f"{term}{mark}（已确认）"
+            return f"{term}{mark}", f"{term}{mark}（已确认）"
         return None, f"{term}：{confirmed}（已确认）"
 
     candidate = offline_dictionary.lookup(term)
     if candidate:
+        if accent_style == "downstep":
+            downstep = downstep_accent_display(term, candidate)
+            if downstep:
+                return downstep, f"{downstep}（本地候选）"
         mark = accent_mark_from_display(candidate)
         if mark:
-            return mark, f"{term}{mark}（本地候选）"
+            return f"{term}{mark}", f"{term}{mark}（本地候选）"
         return None, f"{term}：{candidate}（本地候选）"
 
     return None, f"{term}：待确认"
@@ -1497,15 +1624,16 @@ def inline_accent_marks(
     terms: list[str],
     confirmed_accent_index: dict[str, str],
     offline_dictionary: StaticAccentDictionary,
+    accent_style: str = "circled",
 ) -> tuple[str, list[str]]:
     rendered = sentence
     notes: list[str] = []
     replacements: list[tuple[str, str]] = []
     for term in terms:
-        mark, note = resolve_accent_note(term, confirmed_accent_index, offline_dictionary)
+        replacement, note = resolve_accent_note(term, confirmed_accent_index, offline_dictionary, accent_style)
         notes.append(note)
-        if mark:
-            replacements.append((term, f"{term}{mark}"))
+        if replacement:
+            replacements.append((term, replacement))
 
     replacement_terms = [term for term, _ in replacements]
     replacements = [
@@ -1539,6 +1667,7 @@ def build_learning_package(
             terms,
             confirmed_accent_index,
             offline_dictionary,
+            "downstep",
         )
         audio_slice_ref = audio_slice_refs[idx - 1] if audio_slice_refs and idx - 1 < len(audio_slice_refs) else None
         blocks.append(
@@ -2311,6 +2440,7 @@ def process_one(
     listening_mode: str | None = None,
     slice_manifest_override: str | None = None,
     slice_profile_request: str = "auto",
+    compare_engine: str | None = None,
 ) -> str:
     preflight_source_audio(audio_path)
     if listening_mode == "intensive":
@@ -2324,6 +2454,7 @@ def process_one(
             faster_whisper_model,
             faster_whisper_compute_type,
             persist_artifacts=not dry_run,
+            compare_engine=compare_engine,
         )
     else:
         candidate, route_label = candidate_route
@@ -2549,6 +2680,9 @@ def main() -> int:
     if args.url and not args.output_dir:
         print("--output-dir is required when using --url.", file=sys.stderr)
         return 1
+    if args.url and args.compare_engine:
+        print("--compare-engine is currently supported only for local audio files.", file=sys.stderr)
+        return 1
 
     try:
         offline_dictionary = load_offline_dictionary(required=True)
@@ -2590,6 +2724,7 @@ def main() -> int:
             listening_mode=args.listening_mode,
             slice_manifest_override=args.slice_manifest,
             slice_profile_request=args.slice_profile,
+            compare_engine=args.compare_engine,
         )
         print(result)
         return 0
