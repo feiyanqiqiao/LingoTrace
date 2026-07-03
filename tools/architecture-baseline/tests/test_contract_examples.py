@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PHASE0_ROOT = REPO_ROOT / "docs" / "multilingual" / "phase-0"
+PHASE0_ROOT = REPO_ROOT / "docs" / "multilingual" / "history" / "phase-0"
 EXAMPLES_ROOT = PHASE0_ROOT / "examples" / "v1"
 
 CAPABILITIES = {

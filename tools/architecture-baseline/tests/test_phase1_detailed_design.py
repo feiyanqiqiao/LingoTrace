@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PHASE1_DESIGN = REPO_ROOT / "docs" / "multilingual" / "phase-1" / "detailed-design.md"
+PHASE1_DESIGN = REPO_ROOT / "docs" / "multilingual" / "history" / "phase-1" / "detailed-design.md"
 
 PRIVATE_PATH_MARKERS = {
     "/" + "Users" + "/",

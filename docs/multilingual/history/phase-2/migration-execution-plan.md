@@ -71,13 +71,13 @@ Phase 2 execution should be split into dependency-ordered PRs. The following fil
 
 | Stage | Public files | Responsibility |
 |---|---|---|
-| PR 2.0 Planning Gate | `docs/multilingual/phase-2/migration-execution-plan.md`, `tools/architecture-baseline/tests/test_phase2_migration_execution_plan.py` | Freeze this execution plan and document the gates. |
+| PR 2.0 Planning Gate | `docs/multilingual/history/phase-2/migration-execution-plan.md`, `tools/architecture-baseline/tests/test_phase2_migration_execution_plan.py` | Freeze this execution plan and document the gates. |
 | PR 2.1 Migration Schema And Private Artifact Guard | `lingotrace/migration/schema.py`, `lingotrace/migration/private_artifacts.py`, `tests/lingotrace/migration/test_schema.py`, `tests/lingotrace/migration/test_private_artifacts.py` | Validate manifest shape and reject personal absolute paths in public reports. |
 | PR 2.2 Final Source Inventory Runner | `lingotrace/migration/source_inventory.py`, `tests/lingotrace/migration/test_source_inventory.py` | Generate a private final source manifest from an explicit source Vault during write freeze. |
 | PR 2.3 Target Vault Rehearsal Runner | `lingotrace/migration/target_rehearsal.py`, `tests/lingotrace/migration/test_target_rehearsal.py` | Create a dry-run target plan from the Japanese pack and compare it with generated target system assets. |
 | PR 2.4 Data Copy And Transform Preview | `lingotrace/migration/copy_plan.py`, `lingotrace/migration/transform_plan.py`, `tests/lingotrace/migration/test_copy_plan.py`, `tests/lingotrace/migration/test_transform_plan.py` | Plan byte-preserving copies and reviewed transforms without committing private output. |
 | PR 2.5 Comparator And Workflow Acceptance | `lingotrace/migration/verification.py`, `lingotrace/migration/workflow_acceptance.py`, `tests/lingotrace/migration/test_verification.py`, `tests/lingotrace/migration/test_workflow_acceptance.py` | Verify hashes, fields, links, attachments, SRS fields, and the five Japanese workflows on synthetic fixtures. |
-| PR 2.6 Cutover And Observation Runbook | `docs/multilingual/phase-2/cutover-runbook.md`, `docs/multilingual/phase-2/read-only-observation-runbook.md`, architecture-baseline doc tests | Define owner approval, daily-use switch, observation, rollback, and final-removal gates. |
+| PR 2.6 Cutover And Observation Runbook | `docs/multilingual/history/phase-2/cutover-runbook.md`, `docs/multilingual/history/phase-2/read-only-observation-runbook.md`, architecture-baseline doc tests | Define owner approval, daily-use switch, observation, rollback, and final-removal gates. |
 
 No PR may combine real private migration artifacts with public code or documentation.
 
@@ -87,7 +87,7 @@ No PR may combine real private migration artifacts with public code or documenta
 
 **Files:**
 
-- Create: `docs/multilingual/phase-2/migration-execution-plan.md`
+- Create: `docs/multilingual/history/phase-2/migration-execution-plan.md`
 - Create: `tools/architecture-baseline/tests/test_phase2_migration_execution_plan.py`
 
 - [ ] **Step 1: Write the documentation guard test**
@@ -106,7 +106,7 @@ Expected result before the plan file exists: FAIL with a missing document assert
 
 - [ ] **Step 3: Add the Phase 2 migration execution plan**
 
-Create this plan under `docs/multilingual/phase-2/migration-execution-plan.md` and include the required gates, PR sequence, validation commands, and non-goals.
+Create this plan under `docs/multilingual/history/phase-2/migration-execution-plan.md` and include the required gates, PR sequence, validation commands, and non-goals.
 
 - [ ] **Step 4: Run architecture baseline tests**
 
@@ -123,7 +123,7 @@ Expected result: all tests pass.
 Run:
 
 ```bash
-git add docs/multilingual/phase-2/migration-execution-plan.md tools/architecture-baseline/tests/test_phase2_migration_execution_plan.py
+git add docs/multilingual/history/phase-2/migration-execution-plan.md tools/architecture-baseline/tests/test_phase2_migration_execution_plan.py
 git commit -m "docs: add phase 2 migration execution plan"
 ```
 
@@ -333,8 +333,8 @@ git commit -m "feat: add migration verification and workflow acceptance"
 
 **Files:**
 
-- Create: `docs/multilingual/phase-2/cutover-runbook.md`
-- Create: `docs/multilingual/phase-2/read-only-observation-runbook.md`
+- Create: `docs/multilingual/history/phase-2/cutover-runbook.md`
+- Create: `docs/multilingual/history/phase-2/read-only-observation-runbook.md`
 - Create: `tools/architecture-baseline/tests/test_phase2_cutover_runbooks.py`
 
 - [ ] **Step 1: Write runbook guard tests**
@@ -364,7 +364,7 @@ Expected result: all architecture baseline tests pass.
 Run:
 
 ```bash
-git add docs/multilingual/phase-2/cutover-runbook.md docs/multilingual/phase-2/read-only-observation-runbook.md tools/architecture-baseline/tests/test_phase2_cutover_runbooks.py
+git add docs/multilingual/history/phase-2/cutover-runbook.md docs/multilingual/history/phase-2/read-only-observation-runbook.md tools/architecture-baseline/tests/test_phase2_cutover_runbooks.py
 git commit -m "docs: add phase 2 cutover runbooks"
 ```
 

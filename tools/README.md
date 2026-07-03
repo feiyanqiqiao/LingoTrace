@@ -4,7 +4,7 @@
 
 ## Phase 1 Runtime
 
-Phase 1 的公共 runtime 入口位于 `lingotrace/`，测试位于 `tests/lingotrace/`。贡献者应从 `docs/multilingual/phase-1/contributor-guide.md` 了解可修改范围、禁止范围、测试命令与公开提交检查。
+Phase 1 的公共 runtime 入口位于 `lingotrace/`，测试位于 `tests/lingotrace/`。贡献者应从 `docs/multilingual/language-pack-contributor-guide.md` 了解可修改范围、禁止范围、测试命令与公开提交检查。
 
 这一阶段只建立核心契约、Japanese pack 边界、新 Japanese Vault dry-run scaffold、migration inventory dry-run 和贡献者文档；不代表英语支持、真实私有资料迁移、日常切换或旧框架移除已交付。
 

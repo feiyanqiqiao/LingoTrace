@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PHASE2_ROOT = REPO_ROOT / "docs/multilingual/phase-2"
+PHASE2_ROOT = REPO_ROOT / "docs/multilingual/history/phase-2"
 CUTOVER_RUNBOOK = PHASE2_ROOT / "cutover-runbook.md"
 OBSERVATION_RUNBOOK = PHASE2_ROOT / "read-only-observation-runbook.md"
 

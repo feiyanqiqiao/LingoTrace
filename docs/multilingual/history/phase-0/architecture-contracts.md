@@ -5,9 +5,9 @@ This document freezes the Phase 0 multilingual architecture contracts for review
 Related Phase 0 sources:
 
 - `docs/lingotrace_multilingual_architecture_plan.md`
-- `docs/multilingual/phase-0/current-state-baseline.md`
-- `docs/multilingual/phase-0/workflow-evidence-index.md`
-- `docs/multilingual/phase-0/migration-scope-and-asset-inventory.md`
+- `docs/multilingual/history/phase-0/current-state-baseline.md`
+- `docs/multilingual/history/phase-0/workflow-evidence-index.md`
+- `docs/multilingual/history/phase-0/migration-scope-and-asset-inventory.md`
 - `tools/architecture-baseline/README.md`
 
 ## Current, Target, And Route

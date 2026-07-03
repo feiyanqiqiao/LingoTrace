@@ -551,7 +551,7 @@ class EnglishPackTests(unittest.TestCase):
 3. `bash tools/git/check-public-staged-files.sh`
 
 ### Conformance Checklist Compliance
-基于 `docs/multilingual/phase-0/language-pack-conformance-checklist.md`，执行全面逐项对照：
+基于 `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md`，执行全面逐项对照：
 
 **Identity And Versions**
 - [x] 包 ID 为 `lingo-<language>` 格式 (`lingo-english`)。

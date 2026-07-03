@@ -12,15 +12,15 @@
 
 ## 1. 文档定位
 
-本文是 [LingoTrace 多语言架构总体规划方案](lingotrace_multilingual_architecture_plan.md) 的阶段 0 实施来源，负责定义阶段 0 的交付物、Pull Request 顺序、测试策略、协作门槛和完成标准。
+本文是 [LingoTrace 多语言架构总体规划方案](../../../lingotrace_multilingual_architecture_plan.md) 的阶段 0 实施来源，负责定义阶段 0 的交付物、Pull Request 顺序、测试策略、协作门槛和完成标准。
 
 文档状态：**规划已确认，尚未进入实施阶段**。
 
 相关现状来源：
 
-- [功能模块与用户旅程审计报告](lingotrace_audit_report.md)
-- [产品需求与架构白皮书](lingotrace_product_document.md)
-- [多语言与多 Agent 早期研究](lingotrace_multilingual_multiagent_design.md)
+- [功能模块与用户旅程审计报告](../../../lingotrace_audit_report.md)
+- [产品需求与架构白皮书](../../../lingotrace_product_document.md)
+- [多语言与多 Agent 早期研究](../../../lingotrace_multilingual_multiagent_design.md)
 - `codex-skills/jp-listening-script-generator/SKILL.md`
 - `codex-skills/jp-source-note-generator/SKILL.md`
 - `codex-skills/jp-review-material-maintainer/SKILL.md`
@@ -117,10 +117,10 @@ PR C：目标契约与阶段 1 门槛
 
 ### 4.1 预定新增文件
 
-- `docs/multilingual/phase-0/current-state-baseline.md`
-- `docs/multilingual/phase-0/workflow-evidence-index.md`
-- `docs/multilingual/phase-0/baseline-discrepancies.md`
-- `docs/multilingual/phase-0/migration-scope-and-asset-inventory.md`
+- `docs/multilingual/history/phase-0/current-state-baseline.md`
+- `docs/multilingual/history/phase-0/workflow-evidence-index.md`
+- `docs/multilingual/history/phase-0/baseline-discrepancies.md`
+- `docs/multilingual/history/phase-0/migration-scope-and-asset-inventory.md`
 
 `current-state-baseline.md` 记录工作流事实；`workflow-evidence-index.md` 维护行为编号与 Skill、模板、脚本、测试之间的证据映射；`baseline-discrepancies.md` 记录实现、Skill、模板和测试之间的差异及其处理结论；`migration-scope-and-asset-inventory.md` 记录公开系统资产和私人数据类别在迁移中的去向。即使未发现差异，也保留差异文件并明确记录审查结果为无未解决项。
 
@@ -482,15 +482,15 @@ bash tools/git/check-public-staged-files.sh --range origin/main...HEAD
 ### 6.1 预定新增文件
 
 ```text
-docs/multilingual/phase-0/architecture-contracts.md
-docs/multilingual/phase-0/language-pack-conformance-checklist.md
-docs/multilingual/phase-0/japanese-migration-contract.md
-docs/multilingual/phase-0/old-framework-exit-checklist.md
-docs/multilingual/phase-0/phase-1-entry-gate.md
-docs/multilingual/phase-0/examples/v1/japanese-vault-context.example.md
-docs/multilingual/phase-0/examples/v1/japanese-language-pack-manifest.example.md
-docs/multilingual/phase-0/examples/v1/review-card-shell.example.md
-docs/multilingual/phase-0/examples/v1/japanese-migration-manifest.example.md
+docs/multilingual/history/phase-0/architecture-contracts.md
+docs/multilingual/history/phase-0/language-pack-conformance-checklist.md
+docs/multilingual/history/phase-0/japanese-migration-contract.md
+docs/multilingual/history/phase-0/old-framework-exit-checklist.md
+docs/multilingual/history/phase-0/phase-1-entry-gate.md
+docs/multilingual/history/phase-0/examples/v1/japanese-vault-context.example.md
+docs/multilingual/history/phase-0/examples/v1/japanese-language-pack-manifest.example.md
+docs/multilingual/history/phase-0/examples/v1/review-card-shell.example.md
+docs/multilingual/history/phase-0/examples/v1/japanese-migration-manifest.example.md
 tools/architecture-baseline/tests/test_contract_examples.py
 ```
 

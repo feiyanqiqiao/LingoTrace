@@ -11,7 +11,7 @@
 - [产品需求与架构白皮书](lingotrace_product_document.md)：记录当前以日语为主的产品能力和数据模型。
 - [功能模块与用户旅程审计报告](lingotrace_audit_report.md)：记录当前五个工作流和学习闭环。
 - [多语种与多 Agent 终端演进方案](lingotrace_multilingual_multiagent_design.md)：保留为早期研究材料，本文取代其中的多语言总体架构决策。
-- [用户操作指南](USER_GUIDE.md)：记录当前公开版本的实际使用方式和安全边界。
+- [系统操作手册](operator-manual.md)：记录当前公开版本的实际使用方式和安全边界。
 
 文档解释顺序如下：
 

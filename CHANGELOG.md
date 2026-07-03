@@ -5,6 +5,19 @@
 
 ---
 
+## [20260703-164000]
+### 变更 (Changed)
+- `docs/multilingual/`: 对历史阶段文档进行了结构重构。创建了 `docs/multilingual/history/` 目录并将已完成的 `phase-0`、`phase-1` 和 `phase-2` 完整移入归档。
+- `docs/multilingual/phase-1/contributor-guide.md`: 添加了明确的 `[OBSOLETE]` 弃用声明，重定向至正式的语言包贡献指南。
+- `docs/lingotrace_multilingual_phase0_implementation_plan.md`: 将其移至 `docs/multilingual/history/phase-0/implementation-plan.md`，修复了脱离其专属阶段目录的问题。
+- `docs/runtime-snapshot-lingotrace-python314.txt`: 从文档根目录移至 `tools/architecture-baseline/` 目录下。
+- `tools/README.md` 与全项目其余 Markdown 文档均执行了全局相对路径链接修复。
+
+## [20260703-162500]
+### 变更 (Changed)
+- `docs/user-guide.md` 与 `docs/USER_GUIDE.md`: 为了消除文件名相近导致的混淆，将其分别重命名为更具有自解释性的 `docs/getting-started.md` (面向新手的入门与故事指南) 与 `docs/operator-manual.md` (面向 Agent 及高阶极客的系统与操作手册)。
+- `README.md`: 更新了对应指南文档的导流入口，为普通用户和 Agent 分别指明了阅读路径。
+
 ## [20260702-212405]
 ### 新增 (Added)
 - `docs/multilingual/listening-notes-user-stories.md`: 对照旧版听力素材模板、当前 `jp-listening-script-generator` 和 listening contract tests，补充听力剧本生成模块的多语言 user story、验收标准、Agent use cases、覆盖矩阵和开放缺口。

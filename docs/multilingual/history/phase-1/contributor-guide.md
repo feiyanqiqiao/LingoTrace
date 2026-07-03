@@ -1,3 +1,5 @@
+> **[OBSOLETE]** 本文档已过时。有关当前 LingoTrace 语言包贡献指南，请参阅正式版：[Language Pack Contributor Guide](../../language-pack-contributor-guide.md)。
+
 # LingoTrace Phase 1 Contributor Guide
 
 This guide explains how to contribute to the Phase 1 runtime skeleton after PR 1 through PR 4 have created real public entry points. It is a routing document for public repository work, not a user migration manual.

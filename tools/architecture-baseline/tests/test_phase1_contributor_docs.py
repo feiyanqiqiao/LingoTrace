@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-GUIDE = REPO_ROOT / "docs" / "multilingual" / "phase-1" / "contributor-guide.md"
+GUIDE = REPO_ROOT / "docs" / "multilingual" / "history" / "phase-1" / "contributor-guide.md"
 TOOLS_README = REPO_ROOT / "tools" / "README.md"
 
 PRIVATE_PATH_MARKERS = {
@@ -61,11 +61,11 @@ class Phase1ContributorDocsTests(unittest.TestCase):
         ):
             self.assertIn(token, guide)
 
-    def test_tools_readme_points_to_phase1_contributor_guide(self) -> None:
+    def test_tools_readme_points_to_language_pack_contributor_guide(self) -> None:
         tools = read(TOOLS_README)
 
         self.assertIn("Phase 1 Runtime", tools)
-        self.assertIn("docs/multilingual/phase-1/contributor-guide.md", tools)
+        self.assertIn("docs/multilingual/language-pack-contributor-guide.md", tools)
 
 
 if __name__ == "__main__":
