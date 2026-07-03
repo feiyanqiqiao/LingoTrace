@@ -71,7 +71,7 @@
 3. 检查白名单：`bash tools/git/check-public-staged-files.sh`
 
 ### Conformance Checklist Compliance
-对照 `docs/multilingual/phase-0/language-pack-conformance-checklist.md` 进行以下检查：
+对照 `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md` 进行以下检查：
 - [x] Manifest 结构完整且合法。
 - [x] 包内部不存在任何 `japanese` 硬编码引用。
 - [x] `fields.json` 未越权占用其它语言的特有字段（放弃占用 `meaning_zh`）。

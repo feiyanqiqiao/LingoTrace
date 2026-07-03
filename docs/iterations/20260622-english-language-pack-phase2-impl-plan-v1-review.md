@@ -6,7 +6,7 @@
 - 上游日语包参考实现 `lingotrace/packs/japanese/`（11 个文件）
 - `docs/multilingual/language-pack-contributor-guide.md`
 - `docs/multilingual/language-pack-agent-handoff-template.md`
-- `docs/multilingual/phase-0/language-pack-conformance-checklist.md`
+- `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md`
 - `tests/lingotrace/packs/test_japanese_pack.py`（6 个测试）
 - `lingotrace/core/manifests.py` 的 manifest 加载器
 - `lingotrace/core/capabilities.py` 的能力检查逻辑
@@ -223,7 +223,7 @@ if capability.maturity != "stable":
 
 ### 缺陷 V2：未对照合规检查清单
 
-**问题**：`docs/multilingual/phase-0/language-pack-conformance-checklist.md` 包含 4 大类 25+ 个检查项。计划的验证部分完全没有引用这个清单。
+**问题**：`docs/multilingual/history/phase-0/language-pack-conformance-checklist.md` 包含 4 大类 25+ 个检查项。计划的验证部分完全没有引用这个清单。
 
 **建议**：在验证计划中添加一个 "Conformance Checklist Compliance" 小节，逐项声明每个检查点的通过/跳过/不适用状态。
 
@@ -812,7 +812,7 @@ class EnglishPackTests(unittest.TestCase):
 
 ### 6.12 合规检查清单对照
 
-逐项声明 `docs/multilingual/phase-0/language-pack-conformance-checklist.md` 的合规状态：
+逐项声明 `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md` 的合规状态：
 
 | 检查项 | 状态 | 说明 |
 |--------|------|------|

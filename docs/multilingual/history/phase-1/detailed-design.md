@@ -6,14 +6,14 @@ Related inputs:
 
 - `docs/lingotrace_multilingual_architecture_plan.md`
 - `docs/lingotrace_multilingual_phase0_implementation_plan.md`
-- `docs/multilingual/phase-0/architecture-contracts.md`
-- `docs/multilingual/phase-0/language-pack-conformance-checklist.md`
-- `docs/multilingual/phase-0/japanese-migration-contract.md`
-- `docs/multilingual/phase-0/old-framework-exit-checklist.md`
-- `docs/multilingual/phase-0/phase-1-entry-gate.md`
-- `docs/multilingual/phase-0/current-state-baseline.md`
-- `docs/multilingual/phase-0/workflow-evidence-index.md`
-- `docs/multilingual/phase-0/migration-scope-and-asset-inventory.md`
+- `docs/multilingual/history/phase-0/architecture-contracts.md`
+- `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md`
+- `docs/multilingual/history/phase-0/japanese-migration-contract.md`
+- `docs/multilingual/history/phase-0/old-framework-exit-checklist.md`
+- `docs/multilingual/history/phase-0/phase-1-entry-gate.md`
+- `docs/multilingual/history/phase-0/current-state-baseline.md`
+- `docs/multilingual/history/phase-0/workflow-evidence-index.md`
+- `docs/multilingual/history/phase-0/migration-scope-and-asset-inventory.md`
 - `tools/architecture-baseline/README.md`
 
 ## 1. Design Position

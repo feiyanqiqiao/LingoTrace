@@ -13,7 +13,7 @@ CAPABILITY_GUIDANCE_ZH = REPO_ROOT / "docs/multilingual/language-pack-capability
 REVIEW_MATERIALS_GUIDANCE = REPO_ROOT / "docs/multilingual/review-materials-user-stories.md"
 LISTENING_GUIDANCE = REPO_ROOT / "docs/multilingual/listening-notes-user-stories.md"
 README = REPO_ROOT / "README.md"
-PHASE1_CONTRIBUTOR_GUIDE = REPO_ROOT / "docs/multilingual/phase-1/contributor-guide.md"
+PHASE1_CONTRIBUTOR_GUIDE = REPO_ROOT / "docs/multilingual/history/phase-1/contributor-guide.md"
 
 UNRESOLVED_MARKER_PATTERN = r"\b(" + "|".join(("TB" + "D", "TO" + "DO")) + r")\b"
 PRIVATE_PATH_MARKERS = {
@@ -122,7 +122,7 @@ class LanguagePackContributorKitTests(unittest.TestCase):
         for relative_path in (
             "docs/multilingual/language-pack-contributor-guide.md",
             "docs/lingotrace_multilingual_architecture_plan.md",
-            "docs/multilingual/phase-0/language-pack-conformance-checklist.md",
+            "docs/multilingual/history/phase-0/language-pack-conformance-checklist.md",
             "docs/multilingual/listening-notes-user-stories.md",
             "docs/multilingual/review-materials-user-stories.md",
             "lingotrace/packs/japanese/manifest.json",

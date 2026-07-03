@@ -115,7 +115,7 @@ V3 是一份完整的、自包含的实施规格文档。所有文件内容已�
 
 ## 四、合规检查清单逐项验证
 
-对照 `docs/multilingual/phase-0/language-pack-conformance-checklist.md`：
+对照 `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md`：
 
 ### Identity And Versions
 

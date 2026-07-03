@@ -9,7 +9,7 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 ---
 
 > 🌟 **如果你是普通外语学习者（非开发者），请首先阅读 [👉 LingoTrace 新手入门指南](docs/getting-started.md)，了解如何像指挥私人助理一样在 Obsidian 中沉浸式学习！**
-> 
+>
 > ⚙️ **如果你是负责驱动系统的 AI Agent，或是想了解系统约束的进阶极客，请务必查阅 [👉 系统与 Agent 操作手册](docs/operator-manual.md)，其中定义了自然语言指令规范与护栏边界。**
 
 ---

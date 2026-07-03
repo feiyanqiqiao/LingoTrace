@@ -6,10 +6,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PHASE25_GATE = REPO_ROOT / "docs/multilingual/phase-2/phase-2-5-switch-completion.md"
+PHASE25_GATE = REPO_ROOT / "docs/multilingual/history/phase-2/phase-2-5-switch-completion.md"
 README = REPO_ROOT / "README.md"
 AGENTS = REPO_ROOT / "AGENTS.md"
-USER_GUIDE = REPO_ROOT / "docs/USER_GUIDE.md"
+USER_GUIDE = REPO_ROOT / "docs/operator-manual.md"
 AGENT_SKILL = REPO_ROOT / "lingotrace/packs/japanese/agent_skills/SKILL.md"
 PACK_VIEW = REPO_ROOT / "lingotrace/packs/japanese/views/total-training.base"
 

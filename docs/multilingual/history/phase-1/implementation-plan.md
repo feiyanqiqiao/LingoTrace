@@ -14,14 +14,14 @@
 
 This plan is executable guidance for the design already accepted in:
 
-- `docs/multilingual/phase-1/detailed-design.md`
-- `docs/multilingual/phase-0/architecture-contracts.md`
-- `docs/multilingual/phase-0/language-pack-conformance-checklist.md`
-- `docs/multilingual/phase-0/japanese-migration-contract.md`
-- `docs/multilingual/phase-0/old-framework-exit-checklist.md`
-- `docs/multilingual/phase-0/phase-1-entry-gate.md`
-- `docs/multilingual/phase-0/current-state-baseline.md`
-- `docs/multilingual/phase-0/workflow-evidence-index.md`
+- `docs/multilingual/history/phase-1/detailed-design.md`
+- `docs/multilingual/history/phase-0/architecture-contracts.md`
+- `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md`
+- `docs/multilingual/history/phase-0/japanese-migration-contract.md`
+- `docs/multilingual/history/phase-0/old-framework-exit-checklist.md`
+- `docs/multilingual/history/phase-0/phase-1-entry-gate.md`
+- `docs/multilingual/history/phase-0/current-state-baseline.md`
+- `docs/multilingual/history/phase-0/workflow-evidence-index.md`
 - `tools/architecture-baseline/README.md`
 
 The Phase 1 detailed design remains the source of truth for interfaces. This document turns it into PR-sized execution.
@@ -343,7 +343,7 @@ PR 5 documents the Phase 1 public entry points after they exist. It does not int
 
 Create or modify:
 
-- `docs/multilingual/phase-1/contributor-guide.md`
+- `docs/multilingual/history/phase-1/contributor-guide.md`
 - `tools/README.md`
 - `README.md` only if a short pointer is useful.
 

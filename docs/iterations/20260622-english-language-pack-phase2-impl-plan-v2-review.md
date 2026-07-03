@@ -48,7 +48,7 @@ V2 对 V1 的全部 9 个缺陷做出了回应，概念层面已完全合规。�
 - [x] 测试覆盖率达标，包含独立于 test_japanese_pack 的测试文件。
 ```
 
-但 `docs/multilingual/phase-0/language-pack-conformance-checklist.md` 包含 **4 大类 25+ 个检查项**。V2 只覆盖了其中约 4 项，且措辞模糊（如"测试覆盖率达标"未定义具体标准）。
+但 `docs/multilingual/history/phase-0/language-pack-conformance-checklist.md` 包含 **4 大类 25+ 个检查项**。V2 只覆盖了其中约 4 项，且措辞模糊（如"测试覆盖率达标"未定义具体标准）。
 
 **V1 替代方案（6.12 节）的处理方式**：逐项声明每个检查点的通过/跳过/不适用状态，包含 Identity And Versions（7 项）、Capabilities（7 项）、Pack-Owned Surface（7 项）、Core Boundary（6 项）。
 
