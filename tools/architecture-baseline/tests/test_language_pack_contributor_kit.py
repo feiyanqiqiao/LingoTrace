@@ -257,9 +257,14 @@ class LanguagePackContributorKitTests(unittest.TestCase):
 
         for doc in user_story_docs:
             text = read_required(doc)
+            table_headers = [
+                [cell.strip() for cell in line.strip().strip("|").split("|")]
+                for line in text.splitlines()
+                if line.startswith("|") and "User story" in line
+            ]
             with self.subTest(doc=doc.name):
                 self.assertIn("## Language Applicability Matrix", text)
-                self.assertIn("| User story | Shared | Japanese | English | Notes |", text)
+                self.assertIn(["User story", "Shared", "Japanese", "English", "Notes"], table_headers)
                 self.assertRegex(text, r"\| `US-\d+")
                 for label in (
                     "`Required`",
