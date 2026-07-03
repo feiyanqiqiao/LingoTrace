@@ -45,7 +45,7 @@
 | --- | --- | --- |
 | `review_rollover` | Reference Guidance | `docs/multilingual/review-rollover-user-stories.md` |
 | `total_training_dashboard` | Reference Guidance | `docs/multilingual/total-training-dashboard-user-stories.md` |
-| `listening_notes` | Planned Reference Guidance | `listening-notes-user-stories.md` 尚未创建 |
+| `listening_notes` | Reference Guidance | `docs/multilingual/listening-notes-user-stories.md` |
 | `source_notes` | Planned Reference Guidance | `source-notes-user-stories.md` 尚未创建 |
 | `review_materials` | Reference Guidance | `docs/multilingual/review-materials-user-stories.md` |
 | `speaking_cards` | Planned Reference Guidance | `speaking-cards-user-stories.md` 尚未创建 |

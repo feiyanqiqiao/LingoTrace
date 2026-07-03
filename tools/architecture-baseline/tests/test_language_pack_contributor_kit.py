@@ -11,6 +11,7 @@ HANDOFF = REPO_ROOT / "docs/multilingual/language-pack-agent-handoff-template.md
 CAPABILITY_GUIDANCE = REPO_ROOT / "docs/multilingual/language-pack-capability-guidance.md"
 CAPABILITY_GUIDANCE_ZH = REPO_ROOT / "docs/multilingual/language-pack-capability-guidance.zh.md"
 REVIEW_MATERIALS_GUIDANCE = REPO_ROOT / "docs/multilingual/review-materials-user-stories.md"
+LISTENING_GUIDANCE = REPO_ROOT / "docs/multilingual/listening-notes-user-stories.md"
 README = REPO_ROOT / "README.md"
 PHASE1_CONTRIBUTOR_GUIDE = REPO_ROOT / "docs/multilingual/phase-1/contributor-guide.md"
 
@@ -122,6 +123,7 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "docs/multilingual/language-pack-contributor-guide.md",
             "docs/lingotrace_multilingual_architecture_plan.md",
             "docs/multilingual/phase-0/language-pack-conformance-checklist.md",
+            "docs/multilingual/listening-notes-user-stories.md",
             "docs/multilingual/review-materials-user-stories.md",
             "lingotrace/packs/japanese/manifest.json",
             "lingotrace/packs/japanese/agent_skills/SKILL.md",
@@ -155,6 +157,126 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "daily checklist",
         ):
             self.assertIn(token, review_materials)
+
+    def test_listening_guidance_is_indexed_as_reference_guidance(self) -> None:
+        guide = read_required(CAPABILITY_GUIDANCE)
+        guide_zh = read_required(CAPABILITY_GUIDANCE_ZH)
+        listening = read_required(LISTENING_GUIDANCE)
+
+        self.assertIn(
+            "| `listening_notes` | Reference Guidance | `docs/multilingual/listening-notes-user-stories.md` |",
+            guide,
+        )
+        self.assertIn(
+            "| `listening_notes` | Reference Guidance | `docs/multilingual/listening-notes-user-stories.md` |",
+            guide_zh,
+        )
+        self.assertNotIn("`listening_notes` | Planned Reference Guidance", guide)
+        self.assertNotIn("`listening_notes` | Planned Reference Guidance", guide_zh)
+        for token in (
+            "jp-listening-script-generator",
+            "ListenKit",
+            "extensive",
+            "intensive",
+            "reviewed slice manifest",
+            "common-sentence curation",
+            "pitch-accent markers",
+            "Multi-engine ASR comparison",
+            "unsupported",
+        ):
+            self.assertIn(token, listening)
+
+    def test_japanese_listening_guidance_records_accent_annotation_policy(self) -> None:
+        listening = read_required(LISTENING_GUIDANCE)
+
+        for token in (
+            "Language-Specific Pronunciation Cues",
+            "language-pack-owned behavior",
+            "公園⓪",
+            "京都①",
+            "こいしい③",
+            "こいし＼い",
+            "test_learning_package_renders_kana_accent_as_downstep_marker",
+            "New Japanese intensive listening blocks",
+            "Existing listening notes should not be bulk-rewritten",
+            "## 精听学习包",
+            "## 脚本",
+            "plain by default",
+            "selective high-value annotation",
+            "must not fabricate",
+        ):
+            self.assertIn(token, listening)
+
+    def test_listening_guidance_records_remaining_migrated_skill_rules(self) -> None:
+        listening = read_required(LISTENING_GUIDANCE)
+
+        for token in (
+            "Short-Choice And Exam Listening Structure",
+            "question numbers and `1/2/3` option structure",
+            "slow-copy retry",
+            "Listening Frontmatter And Dashboard Readiness",
+            "weak_points",
+            "practice_focus",
+            "Dialogue And Numbered-Dialogue Rendering Contract",
+            "A：/B：",
+            "must not invent `C：`",
+            "Use Dry-Run, Better Naming, And Uncertain-Output Gate",
+            "topic-bearing filename",
+            "Single-Item Safety And No Default Batch Writes",
+            "Batch mode is not a default user workflow",
+            "`## 素材说明` records the source, generation route, known limits, and review needs",
+            "low-quality `extensive` note as an intermediate artifact",
+            "Legacy notes that already contain `## 精听学习包` are treated as `intensive`",
+            "test_compare_engine_persists_asr_disagreement_report_without_replacing_primary",
+            "lightweight artifact schema",
+            "本地候选",
+            "待确认",
+            "Shadowing common sentences remain candidates",
+        ):
+            self.assertIn(token, listening)
+
+    def test_user_story_test_references_point_to_real_tests(self) -> None:
+        user_story_docs = sorted((REPO_ROOT / "docs" / "multilingual").glob("*user-stories.md"))
+        test_sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for parent in (REPO_ROOT / "tests", REPO_ROOT / "tools")
+            for path in parent.rglob("test_*.py")
+        )
+
+        missing: list[str] = []
+        for doc in user_story_docs:
+            for test_name in sorted(set(re.findall(r"`(test_[A-Za-z0-9_]+)`", read_required(doc)))):
+                if f"def {test_name}" not in test_sources:
+                    missing.append(f"{doc.relative_to(REPO_ROOT)}::{test_name}")
+
+        self.assertEqual([], missing)
+
+    def test_user_story_docs_declare_language_applicability_matrix(self) -> None:
+        user_story_docs = sorted((REPO_ROOT / "docs" / "multilingual").glob("*user-stories.md"))
+        self.assertGreater(len(user_story_docs), 0)
+
+        for doc in user_story_docs:
+            text = read_required(doc)
+            table_headers = [
+                [cell.strip() for cell in line.strip().strip("|").split("|")]
+                for line in text.splitlines()
+                if line.startswith("|") and "User story" in line
+            ]
+            with self.subTest(doc=doc.name):
+                self.assertIn("## Language Applicability Matrix", text)
+                self.assertIn(["User story", "Shared", "Japanese", "English", "Notes"], table_headers)
+                self.assertRegex(text, r"\| `US-\d+")
+                for label in (
+                    "`Required`",
+                    "`Optional`",
+                    "`Language-Specific`",
+                    "`Covered`",
+                    "`Partial`",
+                    "`Planned`",
+                    "`Unsupported`",
+                    "`N/A`",
+                ):
+                    self.assertIn(label, text)
 
     def test_public_entry_docs_point_to_language_pack_contributor_kit(self) -> None:
         combined = read_required(README) + "\n" + read_required(PHASE1_CONTRIBUTOR_GUIDE)

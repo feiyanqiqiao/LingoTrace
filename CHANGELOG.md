@@ -5,6 +5,20 @@
 
 ---
 
+## [20260702-212405]
+### 新增 (Added)
+- `docs/multilingual/listening-notes-user-stories.md`: 对照旧版听力素材模板、当前 `jp-listening-script-generator` 和 listening contract tests，补充听力剧本生成模块的多语言 user story、验收标准、Agent use cases、覆盖矩阵和开放缺口。
+- `docs/multilingual/listening-notes-user-stories.md`: 补充日语重音标记与多 ASR 交叉比对 user story，明确重音标记属于语言包自有发音提示；新生成的日语精听块默认采用 `こいし＼い` 这类下跌点写法，历史笔记不批量回填，双转写更适合作为高价值精听或低置信场景的质量门。
+- `docs/multilingual/listening-notes-user-stories.md`: 补齐旧听力 skill 中尚未落入 user story 的短选择题结构、听力 frontmatter/总训练表可见性、对话与编号对话渲染、dry-run/命名/不确定输出门禁、单条处理与默认禁用批量写入规则。
+- `docs/multilingual/*user-stories.md`: 为现有多语言 user story 补充 Language Applicability Matrix，按用例标记共享要求、日语覆盖、英语覆盖和语言包例外，并新增文档测试防止后续指引遗漏适用语言声明。
+
+### 变更 (Changed)
+- `docs/multilingual/language-pack-capability-guidance.md` 与中文索引：将 `listening_notes` 从 planned guidance 升级为 Reference Guidance，并把 handoff 模板加入该指引。
+- `tools/listening-transcribe-official/transcribe_listening.py`: 精听学习包对可信来源命中的纯假名重音词优先渲染为划断式下跌点（如 `こいし＼い`），同时保留圆圈重音号作为词卡/看板稳定显示样式；新增测试覆盖该行为，并补齐素材说明、低质量泛听中间产物、旧精听笔记模式推断等迁移规则的文档契约断言。
+- `tools/listening-transcribe-official/transcribe_listening.py`: 本地音频转写新增可选 `--compare-engine` 对比入口，生成 `artifacts/<audio>.asr-comparison.json`，记录主/副 ASR 的引擎、片段数量和句级差异；默认仍以主转写作为生成来源。
+- `lingotrace/packs/english/views/total-training.base`: 补强英语总训练表 `core_text` / `support_text` 的类型化显示和空值兜底，确保 vocabulary、grammar、error、pronunciation 卡片均符合 dashboard user story；新增英语公式契约测试。
+- `tools/architecture-baseline/tests/test_language_pack_contributor_kit.py`: 新增 user story 测试引用一致性检查，确保多语言 user story 文档中引用的 `test_*` 名称都对应真实测试函数。
+
 ## [20260701-143000]
 ### 新增 (Added)
 - `docs/user-guide.md`: 新增面向普通语言学习者的《LingoTrace 用户使用指南》，以纯用户视角介绍原理解构、输入输出闭环与全景训练看板（Total Training Dashboard）的使用方法，并更新了 `README.md` 提供显眼导流入口。

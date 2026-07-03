@@ -1,0 +1,587 @@
+# Multilingual Listening Notes User Stories and Acceptance Tests
+
+Status: `Reference Guidance`
+
+Maturity path: `Reference Guidance -> Candidate Contract -> Enforced Contract`
+
+Related guidance index: [Language Pack Capability Guidance](language-pack-capability-guidance.md)
+
+## Purpose
+
+This document defines the user-facing behavior that should survive migration of the listening script generation workflow across language packs. It is based on the old Japanese listening note template, the `jp-listening-script-generator` skill, and the current public listening contract tests.
+
+The migration rule is simple: listening-note behavior is not considered migrated until it has a user story, acceptance criteria, and regression or manual-review evidence.
+
+## Applicability
+
+All language packs that implement `listening_notes` should index, reference, and satisfy this document before the capability is considered complete.
+
+This document is shared guidance for:
+
+- Turning one local audio file or media URL into a traceable listening note.
+- Separating fixed listening-script generation from flexible source-note generation.
+- Supporting extensive listening notes and intensive sentence or dialogue slice notes.
+- Preserving transcript artifacts, source audio references, and manually curated sentence selections.
+- Blocking incomplete intensive notes when reliable slice evidence is missing.
+- Keeping review-card extraction and speaking-card promotion as downstream workflows.
+
+Language packs may define their own transcript engines, pronunciation cues, fields, templates, and sentence-selection standards. Japanese pitch accent, `accent_display`, `Shadowing_*` conventions, and Chinese explanation labels are reference behavior, not generic core fields.
+
+## Language Applicability Matrix
+
+Labels:
+
+- `Required`: every language pack implementing this capability should satisfy the behavior.
+- `Optional`: the behavior is useful but only required when the pack declares the supporting feature.
+- `Language-Specific`: the behavior depends on language-owned fields, templates, or pedagogy.
+- `Covered`: current implementation or regression evidence exists.
+- `Partial`: current support exists, but not all acceptance criteria are proven.
+- `Planned`: expected for future implementation, but not currently covered.
+- `Unsupported`: the pack does not currently support this behavior.
+- `N/A`: not applicable to the pack.
+
+| User story | Shared | Japanese | English | Notes |
+| --- | --- | --- | --- | --- |
+| `US-1` One audio or URL to a traceable note | `Required` | `Covered` | `Unsupported` | English currently declares listening transcription unsupported. |
+| `US-2` Separate listening from source notes and review cards | `Required` | `Covered` | `Covered` | Unsupported packs still need to avoid falling back to another pack's workflow. |
+| `US-3` Extensive listening without slices | `Optional` | `Covered` | `Unsupported` | Required only when a pack implements listening-note generation. |
+| `US-4` Intensive notes from reliable slice evidence | `Optional` | `Covered` | `Unsupported` | Slice validation is required only for intensive listening support. |
+| `US-5` Reviewed manifest for unreliable timestamps | `Optional` | `Covered` | `Unsupported` | Required when automatic segmentation is used for intensive notes. |
+| `US-6` Preserve manual sentence selection on rerun | `Required` | `Covered` | `Unsupported` | Required for packs that can regenerate existing listening notes. |
+| `US-7` Curate directly memorizable sentences | `Optional` | `Partial` | `Unsupported` | Naturalness remains manual or model-reviewed. |
+| `US-8` Preserve provenance and raw artifacts | `Required` | `Covered` | `Unsupported` | Artifact locations are pack-owned. |
+| `US-9` Clear runtime/resource failure | `Required` | `Covered` | `Unsupported` | Unsupported packs should fail clearly without invoking Japanese tooling. |
+| `US-10` Explicit unsupported declaration | `Required` | `N/A` | `Covered` | Applies to packs that do not implement listening notes. |
+| `US-11` Language-specific pronunciation cues | `Language-Specific` | `Covered` | `Planned` | Japanese pitch accent is reference behavior, not core. |
+| `US-12` Multi-ASR cross-check | `Optional` | `Partial` | `Unsupported` | Current evidence covers artifact reporting, not real ASR quality. |
+| `US-13` Short-choice exam structure | `Optional` | `Covered` | `Unsupported` | Required only for packs that support exam-style listening notes. |
+| `US-14` Listening frontmatter and dashboard readiness | `Required` | `Covered` | `Unsupported` | Required for packs that render listening notes into the review dashboard. |
+| `US-15` Conservative dialogue rendering | `Optional` | `Covered` | `Unsupported` | Required only when dialogue listening is supported. |
+| `US-16` Dry-run, naming, and uncertain-output gate | `Required` | `Partial` | `Unsupported` | Naming quality still needs manual review for real media. |
+| `US-17` Single-item safety and no default batch writes | `Required` | `Covered` | `Unsupported` | Applies to any future listening implementation. |
+
+## Ownership Boundary
+
+Core owns:
+
+- Vault context loading.
+- Language-pack manifest loading.
+- Capability enablement and stability checks.
+- Vault-relative write guards.
+- `FileMutation` preview/apply execution.
+- Atomic file-application semantics and blocked-write reporting.
+
+External audio tooling owns:
+
+- Media download or capture.
+- Speech recognition.
+- Raw transcript JSON or Markdown artifacts.
+- Deterministic audio clipping when a slice manifest is provided.
+
+Language packs own:
+
+- Natural-language agent instructions for listening-note tasks.
+- Path roles for listening material roots.
+- Listening note templates and required fields.
+- Extensive vs intensive routing policy.
+- Pronunciation or accent rendering rules.
+- Slice grouping rules for sentence, dialogue, or numbered-dialogue material.
+- Second-phase common-sentence curation.
+- Pack-level regression tests and manual review cases.
+
+## User Stories
+
+### 1. Convert One Audio Or URL Into A Traceable Listening Note
+
+As a learner, I want one audio file or media URL to become a readable listening note, so I can inspect the transcript without juggling external tools.
+
+Acceptance criteria:
+
+- The workflow accepts one local audio file or one URL plus a target listening directory.
+- Local audio remains embedded or referenced from the listening material directory.
+- URL input persists the finalized local audio and raw transcript artifacts before rendering the note.
+- The note records transcript status and transcript reference.
+- The workflow stops before writing when the audio, URL output, transcript tool, or target path is missing.
+
+Japanese reference:
+
+- The daily request is "请把这段音频做成精听稿 / 听力笔记 / 泛听笔记".
+- Transcript acquisition is delegated to ListenKit.
+- Rendered notes use `track: listening`, `transcript_status`, `transcript_ref`, and a source-audio embed.
+
+Regression coverage:
+
+- `test_japanese_pack_contains_skill_first_agent_entry`
+- `test_public_user_docs_are_natural_language_first`
+
+### 2. Keep Listening Notes Separate From Source Notes And Review Cards
+
+As a learner, I want fixed listening-script work to stay separate from flexible study-note and card workflows, so each workflow has a clear purpose.
+
+Acceptance criteria:
+
+- Listening script generation creates or updates a listening note, not a source note.
+- Flexible article, video-summary, or transcript-backed study notes are routed to `source_notes`.
+- Vocabulary, grammar, pronunciation, and error cards are routed to `review_materials`.
+- Useful sentence promotion to speaking cards is routed to `speaking_cards`.
+- The listening workflow may report downstream candidates but must not silently create review cards or speaking cards.
+
+Japanese reference:
+
+- `jp-listening-script-generator` is for fixed listening-practice notes.
+- `jp-source-note-generator` owns flexible source notes.
+- `jp-review-material-maintainer` owns review cards.
+- `jp-survival-speaking-card-generator` owns speaking-card promotion.
+
+Regression coverage:
+
+- `test_japanese_pack_contains_skill_first_agent_entry`
+- `test_review_material_agent_skill_requires_confirmation_for_risky_writes`
+
+### 3. Default To Extensive Listening Without Sentence Slices
+
+As a learner, I want ordinary listening material to become a complete script without extra slice artifacts, so the note stays lightweight when I only need broad comprehension.
+
+Acceptance criteria:
+
+- Extensive mode is the default when the user does not explicitly ask for intensive listening.
+- Extensive notes include the transcript script.
+- Extensive notes do not render an intensive learning package.
+- Extensive notes do not create sentence slice blocks or slice embeds.
+- Pronunciation or accent cues may be rendered inline according to the language pack's policy.
+
+Japanese reference:
+
+- Extensive notes use `listening_mode: extensive`.
+- They render `## 脚本` and omit `## 精听学习包`.
+- Japanese may annotate known pitch accent candidates in the script.
+
+Regression coverage:
+
+- `test_extensive_note_has_no_intensive_blocks_or_slices`
+
+### 4. Build Intensive Notes Only From Reliable Slice Evidence
+
+As a learner, I want intensive listening notes to contain real sentence or dialogue clips, so I can repeat one short unit without dragging through a long recording.
+
+Acceptance criteria:
+
+- Intensive mode is used only when the user asks for intensive listening or the pack has an explicit equivalent policy.
+- Intensive notes render a learning package before or alongside the transcript according to the pack template.
+- Every learning block has a stable slice id, slice text, and a real non-empty audio reference.
+- `segment_count`, headings, manifest entries, and audio embeds agree.
+- A note with missing clips, placeholders, or mismatched slice counts is incomplete.
+
+Japanese reference:
+
+- Intensive notes use `listening_mode: intensive`.
+- Each block uses `### SNN`.
+- Audio clips are embedded as material-local slice files.
+
+Regression coverage:
+
+- `test_intensive_note_segments_match_manifest_and_nonempty_slice_files`
+
+### 5. Require A Reviewed Manifest When Timestamps Are Unreliable
+
+As a learner, I want the workflow to stop when automatic timestamps are unreliable, so the system does not fabricate precision.
+
+Acceptance criteria:
+
+- If automatic segmentation cannot produce reliable slice boundaries, the workflow blocks completion.
+- The user-facing report names the missing resolution, such as a reviewed slice manifest.
+- The workflow does not write a finished intensive note when the required manifest is missing.
+- Generic normalization may clean punctuation or spacing, but material-specific transcript corrections belong in reviewed artifacts.
+- The workflow must not use a low-quality `extensive` note as an intermediate artifact for intensive repair; it should use saved transcript artifacts and a reviewed manifest instead.
+
+Japanese reference:
+
+- A blocked intensive run asks for `--slice-manifest` with explicit ranges and text.
+- Numbered dialogue, dialogue exchange, and sentence material are classified from transcript structure, not path names.
+
+Regression coverage:
+
+- `test_unreliable_timestamps_require_reviewed_manifest`
+
+### 6. Preserve Manual Sentence Selection On Rerun
+
+As a learner, I want rerunning transcription to preserve hand-curated sentence selections and notes, so regeneration does not erase my review work.
+
+Acceptance criteria:
+
+- Existing curated common sentences are preserved unless the user explicitly asks to reset them.
+- Existing manual note sections are preserved unless the user explicitly asks to replace them.
+- Existing listening mode is preserved when rerunning an existing note unless the user asks to change mode.
+- Legacy notes that already contain `## 精听学习包` are treated as `intensive`; unmarked existing notes default to `extensive`.
+- The workflow asks before overwriting or merging when the target note already exists and the write is risky.
+
+Japanese reference:
+
+- Preserve `## 可直接背的常用句`.
+- Preserve frontmatter `daily_use_sentences`.
+- Preserve extra manual sections such as personal notes.
+
+Regression coverage:
+
+- `test_rerun_preserves_manual_sentence_selection_and_sections`
+
+### 7. Curate A Small Set Of Directly Memorizable Sentences
+
+As a learner, I want the note to highlight only a few reusable sentences, so listening input can become active output without creating filler.
+
+Acceptance criteria:
+
+- After transcript rendering, the agent performs a second-phase sentence-selection pass.
+- The selected set may contain 0 to 5 sentences.
+- Selection favors reusable patterns, scenes, dialogue exchanges, or structures worth memorizing.
+- Empty selection is acceptable when no sentence is genuinely useful.
+- The selected sentence list and any frontmatter summary stay aligned.
+
+Japanese reference:
+
+- The section is `## 可直接背的常用句`.
+- Each item records `原句`, `可替换骨架`, `使用场景`, and `选入理由`.
+- No Chinese translation field is added to that section.
+- Dialogue material prefers reusable questions, responses, greetings, requests, confirmations, refusals, and social formulas.
+
+Regression coverage:
+
+- `test_rerun_preserves_manual_sentence_selection_and_sections`
+- Manual review remains required for sentence quality and naturalness.
+
+### 8. Preserve Provenance And Raw Artifacts
+
+As a learner, I want the note and its artifacts to make the transcript auditable later, so I can trace the note back to the original source.
+
+Acceptance criteria:
+
+- Raw transcript artifacts are stored in a material-local artifact location or another pack-approved location.
+- URL-derived audio keeps the original URL or tool artifact when available.
+- Local audio notes retain a stable source-audio reference.
+- Intensive runs keep the resolved slice manifest or export report needed to audit slice boundaries.
+- `## 素材说明` records the source, generation route, known limits, and review needs.
+- Generated notes must not depend on private cache paths as the only provenance.
+
+Japanese reference:
+
+- ListenKit `.listenkit.md` and `.listenkit.json` artifacts are kept under `artifacts/`.
+- Intensive runs keep slice export and review artifacts.
+
+Regression coverage:
+
+- `test_intensive_note_segments_match_manifest_and_nonempty_slice_files`
+- Manual review of artifact paths is still needed for real media runs.
+
+### 9. Fail Clearly When Runtime Or Language Resources Are Missing
+
+As a learner, I want the workflow to fail with a clear reason when the audio or language runtime is unavailable, so I know what must be fixed before trying again.
+
+Acceptance criteria:
+
+- Missing ASR, media, clipping, dictionary, or pronunciation resources cause a clear blocking error.
+- The workflow does not install or upgrade packages during ordinary generation.
+- Language-specific pronunciation data is treated as a candidate source unless the pack has confirmed data.
+- The workflow must not invent plausible-looking pronunciation or accent information.
+
+Japanese reference:
+
+- LingoTrace listening rendering uses a dedicated cache-backed Python runtime.
+- ListenKit uses its own dedicated runtime.
+- Japanese pitch accent candidates come from confirmed vault data or offline dictionary candidates; unknown values remain confirmable instead of fabricated.
+
+Regression coverage:
+
+- `tools/listening-transcribe-official/tests/test_transcribe_listening.py`
+- `test_unreliable_timestamps_require_reviewed_manifest`
+
+### 10. Declare Unsupported Listening Capability Explicitly
+
+As a learner, I want a language pack without listening tooling to say so plainly, so the agent does not silently fall back to another language's workflow.
+
+Acceptance criteria:
+
+- A language pack that cannot transcribe listening material declares `listening_notes` unsupported.
+- The user-facing failure reason is clear and language-pack specific.
+- Unsupported packs must not call Japanese runtime, Japanese dictionaries, Japanese path names, or Japanese templates.
+- A future implementation must cite this guidance and document language-specific exceptions.
+
+Japanese reference:
+
+- Japanese is the current reference implementation.
+- English currently declares listening transcription unsupported rather than reusing the Japanese listening chain.
+
+Regression coverage:
+
+- `test_contributor_guide_records_current_infrastructure_limits`
+
+### 11. Render Language-Specific Pronunciation Cues Without Making Them Core Fields
+
+As a learner, I want the listening note to show the pronunciation cues that matter for the target language, so I can shadow the recording with the right sound pattern.
+
+Acceptance criteria:
+
+- Pronunciation, stress, tone, pitch accent, or prosody annotation is language-pack-owned behavior.
+- A language pack may render pronunciation cues in intensive learning blocks when they directly support listening and shadowing.
+- A language pack should keep the plain transcript readable; when two views are useful, the practice block can be annotated while the full script remains plain.
+- Annotation must use confirmed pack data first, then clearly handled local candidates according to pack policy.
+- The workflow must not fabricate plausible-looking pronunciation, tone, stress, or accent values.
+- Unknown or disputed pronunciation cues should remain unmarked or be routed to a review process rather than shown as confirmed.
+
+Japanese reference:
+
+- Japanese intensive notes should use inline pitch-accent markers such as `公園⓪` or `京都①` in `## 精听学习包`.
+- Japanese intensive notes should keep `## 脚本` plain by default, so the full transcript remains easy to read.
+- Japanese vocabulary cards may store canonical `accent_display` as kana plus accent marker, while listening notes may render compact inline cues on the sentence surface.
+- New Japanese intensive listening blocks should prefer explicit downstep notation, such as `こいし＼い`, because it shows the pitch drop directly during shadowing and reduces the mental conversion from accent number to sound movement.
+- Compact kana plus accent number, such as `こいしい③`, remains the stable storage and dashboard/review-card display style for `accent_display`.
+- Existing listening notes should not be bulk-rewritten only to change accent notation style; apply the downstep style to newly generated or explicitly regenerated listening-practice blocks.
+- Recent monologue notes and earlier Shadowing notes both support the same broad rule: annotated practice blocks, plain script, and no source labels inside the note body.
+- The better default is selective high-value annotation for listening practice rather than marking every possible token. Dense annotation can be useful for focused repair, but it should not make the sentence hard to read.
+
+Regression coverage:
+
+- `test_japanese_listening_guidance_records_accent_annotation_policy`
+- `test_learning_package_renders_kana_accent_as_downstep_marker`
+- Manual review remains required for disputed Japanese pitch accent.
+
+### 12. Cross-Check High-Risk Transcripts With More Than One ASR Route
+
+As a learner, I want difficult recordings to be checked by more than one transcription route when practical, so the final script is more accurate and the agent spends less effort guessing from one unstable transcript.
+
+Acceptance criteria:
+
+- Multi-engine ASR comparison is optional by default and recommended for high-value intensive notes, unclear audio, dense dialogue, proper names, short-choice listening, or low-confidence transcript segments.
+- The primary ASR output and secondary ASR output should be persisted as separate artifacts when both are used.
+- The workflow should align the two transcripts by timestamp, sentence, or segment id and produce a disagreement report or reviewed transcript artifact.
+- The final note should use reviewed consensus text, not a blind merge of two transcripts.
+- Disagreements around names, numbers, homophones, particles, endings, or slice boundaries should be surfaced for review.
+- If the secondary ASR route requires GUI permission, network access, paid services, or unavailable language support, the workflow may proceed with a single engine and report the limitation.
+
+Japanese reference:
+
+- The current Japanese chain already supports `faster-whisper` and Apple Speech routes through ListenKit.
+- Some existing Shadowing artifacts keep both Apple and faster-whisper transcript files for comparison.
+- Cross-checking should reduce manual transcript correction, but it does not replace reviewed manifests for intensive slice boundaries.
+
+Regression coverage:
+
+- `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`
+- Current tests cover comparison artifact schema and disagreement reporting; real ASR quality still requires manual or fixture-backed review.
+
+### 13. Preserve Short-Choice And Exam Listening Structure
+
+As a learner, I want exam-style short-choice listening to keep its question and option structure, so the note remains useful for review and not just as a paragraph transcript.
+
+Acceptance criteria:
+
+- Short-choice or exam listening material should preserve question numbers and `1/2/3` option structure when the transcript supports it.
+- The workflow may use a slow-copy retry or equivalent second pass when the first transcript loses option structure.
+- When an existing note already has a clearly better short-choice script, the workflow should preserve it instead of overwriting it with a weaker retranscription.
+- The note should keep the prompt, choices, and answer-relevant phrasing easy to compare.
+- If the option structure is unstable, the workflow should report uncertainty rather than forcing a misleading layout.
+
+Japanese reference:
+
+- Japanese `実力アップ` / JLPT-style listening files may trigger short-choice mode.
+- The current Japanese tool uses a short-choice score and slow-copy retry to protect question numbers and option structure.
+
+Regression coverage:
+
+- `test_listening_guidance_records_remaining_migrated_skill_rules`
+- Existing renderer tests cover short-choice scoring and preservation; capability guidance now records the user-facing rule.
+
+### 14. Initialize Listening Frontmatter And Dashboard Readiness
+
+As a learner, I want generated listening notes to appear correctly in the training dashboard, so listening practice can be reviewed and settled alongside other learning work.
+
+Acceptance criteria:
+
+- Generated listening notes include the pack-owned listening track marker.
+- Listening notes include status and scheduling fields when the language pack's dashboard or review flow expects them.
+- `segment_count` reflects the number of intensive learning blocks, or zero for non-sliced extensive notes.
+- `weak_points` records the listening difficulty or likely failure points.
+- `practice_focus` states the next concrete listening action.
+- `daily_use_sentences` stays aligned with the final common-sentence section and contains only the pack-approved original/core sentence text.
+- Dashboard-facing fields should be stable and concise; long explanations belong in the note body.
+
+Japanese reference:
+
+- Japanese listening notes use `track: listening`, `status`, `priority`, `done_today`, `review_stage`, `next_review`, `segment_count`, `weak_points`, `practice_focus`, and `daily_use_sentences`.
+- The total-training dashboard includes listening notes through `track == "listening"`.
+
+Regression coverage:
+
+- `test_listening_guidance_records_remaining_migrated_skill_rules`
+- Renderer tests cover frontmatter defaults for ordinary, short-choice, and dialogue material.
+
+### 15. Apply A Conservative Dialogue And Numbered-Dialogue Rendering Contract
+
+As a learner, I want dialogue listening notes to keep speaker turns and numbered groups only when they are reliable, so shadowing practice follows the real recording instead of an invented structure.
+
+Acceptance criteria:
+
+- Dialogue rendering is based on transcript structure, not folder name, lesson title, or material series.
+- Use `A：/B：` only when question/answer or response alternation is clearly visible.
+- The workflow must not invent `C：` or additional speakers unless the transcript artifact provides reliable speaker metadata.
+- Numbered dialogue uses one complete numbered group per learning block when the group boundaries are reliable.
+- The spoken group number belongs to its own `SNN` text/audio block and must not be merged into the previous or next block.
+- Dialogue/exchange blocks should keep coherent two-turn or four-turn exchanges where the timing supports them.
+- Unstable numbering, missing group numbers, mixed monologue/dialogue, or unreliable order should fall back to sentence mode or require a reviewed manifest.
+
+Japanese reference:
+
+- Shadowing numbered dialogues use `dialogue/numbered`.
+- Unnumbered question/answer exchanges use `dialogue/exchange`.
+- Ordinary monologues remain `sentence/sentence` even under a `Shadowing_*` path.
+
+Regression coverage:
+
+- `test_listening_guidance_records_remaining_migrated_skill_rules`
+- Renderer tests cover numbered dialogue detection, conservative A/B rendering, forced-dialogue blocking, and path-independent routing.
+
+### 16. Use Dry-Run, Better Naming, And Uncertain-Output Gate
+
+As a learner, I want uncertain listening generation to pause before writing and use meaningful note names, so the library stays readable and bad transcripts do not overwrite useful notes.
+
+Acceptance criteria:
+
+- When title quality, transcript stability, option structure, dialogue structure, or slice boundaries are uncertain, the workflow should run as preview/dry-run before writing.
+- A generated note should prefer a topic-bearing filename, not a generic transcription name.
+- If a target note exists, the workflow preserves manual sections and asks before risky overwrite, merge, or mode conversion.
+- Existing scripts that are clearly better than a retranscription should be preserved.
+- Generic punctuation, whitespace, and digit normalization is acceptable; material-specific corrections belong in reviewed transcript or manifest artifacts.
+
+Japanese reference:
+
+- Prefer names like `manabo_cz18_土用の丑の日とうなぎ.md` rather than a generic `识别稿`.
+- Use `--dry-run` when title quality or recognition stability is uncertain.
+
+Regression coverage:
+
+- `test_listening_guidance_records_remaining_migrated_skill_rules`
+- Existing renderer tests cover rerun preservation and CLI dry-run routes; naming remains partly manual-reviewed.
+
+### 17. Prefer Single-Item Safety And No Default Batch Writes
+
+As a learner, I want the agent to process one listening item at a time by default, so a broad scan cannot accidentally rewrite many notes or media artifacts.
+
+Acceptance criteria:
+
+- One audio file or one URL is the normal listening-note workflow.
+- Batch mode is not a default user workflow.
+- Directory scanning or batch processing, if implemented by a tool, must be explicit, previewable, and bounded.
+- Broad batch writes should not run just because the user asked for one listening note.
+- Internal source labels such as `本地候选` or `待确认` should not appear in the final note body; they may be used internally or in separate review workflows.
+- Shadowing common sentences remain candidates for speaking cards and must not be automatically promoted.
+
+Japanese reference:
+
+- The installed Japanese listening skill says batch mode is intentionally disabled in the current single-item workflow.
+- Japanese accent source labels are internal selection labels, not final listening-note body text.
+- Shadowing common sentences require an explicit speaking-card conversion request.
+
+Regression coverage:
+
+- `test_listening_guidance_records_remaining_migrated_skill_rules`
+- Renderer tests cover absence of source labels in the practice package; speaking-card promotion remains a separate workflow boundary.
+
+## Agent Use Cases
+
+### Clear Listening Note Request
+
+User says: "请把这段音频做成听力笔记。"
+
+Expected agent behavior:
+
+- Confirm the audio or URL and target listening directory.
+- Run the listening chain preflight.
+- Generate or reuse transcript artifacts.
+- Save a listening note if the target is new or the write is low risk.
+- Report the note path, mode, transcript status, and any follow-up review needed.
+
+### Clear Intensive Listening Request
+
+User says: "请把 23.mp3 做成精听稿。"
+
+Expected agent behavior:
+
+- Treat the request as `listening_notes`.
+- Check slice tooling before writing.
+- Generate real learning-block audio clips.
+- Block completion if a reviewed manifest is required.
+- Report slice count and unresolved timestamp issues.
+
+### Existing Note Rerun
+
+User says: "这个听力笔记重新转写一下。"
+
+Expected agent behavior:
+
+- Detect the existing note.
+- Preserve curated common sentences and manual sections by default.
+- Ask before risky overwrite or mode conversion.
+- Regenerate transcript-backed sections only within the declared scope.
+
+### Downstream Speaking Card Request
+
+User says: "把这几句常用句做成口语卡。"
+
+Expected agent behavior:
+
+- Do not handle it as listening transcription.
+- Route to `speaking_cards`.
+- Require reviewed or user-supplied usable expressions before creating cards.
+
+### Short-Choice Exam Listening Request
+
+User says: "把这道 N2 听力题做成笔记。"
+
+Expected agent behavior:
+
+- Preserve question numbers and answer choices when the transcript supports them.
+- Use a second transcription or slow-copy pass when structure is weak and the tool supports it.
+- Preserve an existing better script instead of overwriting it.
+- Report unresolved question/choice uncertainty.
+
+### Uncertain Transcript Request
+
+User says: "这个录音识别不太准，帮我重新做。"
+
+Expected agent behavior:
+
+- Prefer dry-run or preview first.
+- Compare available ASR artifacts when practical.
+- Keep a reviewed transcript or disagreement report before final write.
+- Preserve manual sections and ask before risky replacement.
+
+## Coverage Matrix
+
+| User story | Current evidence |
+| --- | --- |
+| One audio or URL to listening note | Japanese Agent Skill and user docs |
+| Workflow separation | Japanese Agent Skill routing tests |
+| Extensive mode has no slices | `test_extensive_note_has_no_intensive_blocks_or_slices` |
+| Intensive slices are real and counted | `test_intensive_note_segments_match_manifest_and_nonempty_slice_files` |
+| Unreliable timestamps block completion | `test_unreliable_timestamps_require_reviewed_manifest` |
+| Rerun preserves manual curation | `test_rerun_preserves_manual_sentence_selection_and_sections` |
+| Common sentence curation | Manual review plus rerun preservation test |
+| Provenance and artifacts | Listening fixtures and real-run manual review |
+| Runtime/resource failure clarity | Listening renderer tests and manual chain check |
+| Unsupported packs fail explicitly | Contributor guide and English pack behavior |
+| Language-specific pronunciation cues | `test_japanese_listening_guidance_records_accent_annotation_policy`, `test_learning_package_renders_kana_accent_as_downstep_marker`, plus manual pitch-accent review |
+| Multi-engine ASR cross-check | `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`; real ASR quality remains manual-reviewed |
+| Short-choice exam structure | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer short-choice tests |
+| Listening frontmatter and dashboard readiness | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer frontmatter tests |
+| Dialogue and numbered-dialogue rendering | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer dialogue tests |
+| Dry-run, naming, and uncertain-output gate | `test_listening_guidance_records_remaining_migrated_skill_rules`; naming remains manual-reviewed |
+| Single-item safety and no default batch writes | `test_listening_guidance_records_remaining_migrated_skill_rules` |
+
+## Open Gaps
+
+- The public contract tests use fixture files and do not prove real ASR quality.
+- Common-sentence naturalness still requires manual or model-assisted review.
+- Japanese pitch-accent annotation needs better automated checks for density, confidence, and script-vs-practice placement.
+- Multi-engine ASR comparison now has a lightweight artifact schema and regression test, but real-engine agreement quality still needs fixture-backed or manual review before it can become required.
+- Topic-bearing filename quality and short-choice answer correctness still need human review for real learning material.
+- Batch scanning exists as a tool-level affordance but should not be treated as a default agent workflow until preview and write bounds are stricter.
+- Non-Japanese listening implementations need their own transcript engine, pronunciation policy, and slice validation before this guidance can become a candidate contract.

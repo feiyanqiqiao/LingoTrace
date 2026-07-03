@@ -735,6 +735,28 @@ Review card body.
         # Must use if() not ifs()
         self.assertNotIn("ifs(", content)
 
+    def test_total_training_dashboard_surfaces_english_type_specific_review_cues(self) -> None:
+        dashboard_path = PACK_ROOT / "views" / "total-training.base"
+        content = dashboard_path.read_text(encoding="utf-8")
+
+        expected_core_contracts = (
+            'item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, if(meaning_zh, meaning_zh, file.name))))',
+            'item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name))',
+            'item_type == "error", if(correct_form, correct_form, file.name)',
+            'item_type == "pronunciation", if(target_text, target_text, file.name)',
+        )
+        expected_support_contracts = (
+            'item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, ""))',
+            'item_type == "grammar", if(formation, formation, "")',
+            'item_type == "error", if(wrong_form, wrong_form, if(reason, reason, ""))',
+            'item_type == "pronunciation", if(issue_tags, issue_tags, "")',
+        )
+
+        for contract in expected_core_contracts:
+            self.assertIn(contract, content)
+        for contract in expected_support_contracts:
+            self.assertIn(contract, content)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,8 +4,8 @@ filters:
 formulas:
   due_flag: 'if(status == "active" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
   next_day_flag: 'if(status == "active" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
-  core_text: 'if(item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, meaning_zh))), if(item_type == "grammar", if(meaning_zh, meaning_zh, pattern), if(item_type == "error", correct_form, if(item_type == "pronunciation", target_text, file.name))))'
-  support_text: 'if(item_type == "vocab", if(collocations, collocations, meaning_zh), if(item_type == "grammar", formation, if(item_type == "error", if(wrong_form, wrong_form, reason), if(item_type == "pronunciation", issue_tags, ""))))'
+  core_text: 'if(item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, if(meaning_zh, meaning_zh, file.name)))), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(item_type == "pronunciation", if(target_text, target_text, file.name), file.name))))'
+  support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(item_type == "pronunciation", if(issue_tags, issue_tags, ""), ""))))'
 properties:
   file.name:
     displayName: 文件名

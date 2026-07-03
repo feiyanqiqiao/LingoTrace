@@ -27,6 +27,33 @@ This document is shared guidance for:
 
 Language packs may define their own card types, fields, paths, templates, and display rules. Japanese fields such as `reading`, `accent_display`, `kanji_diff`, and `kanji_diff_pairs` are reference behavior, not generic core fields.
 
+## Language Applicability Matrix
+
+Labels:
+
+- `Required`: every language pack implementing this capability should satisfy the behavior.
+- `Optional`: the behavior is useful but only required when the pack declares the supporting feature.
+- `Language-Specific`: the behavior depends on language-owned fields, templates, or pedagogy.
+- `Covered`: current implementation or regression evidence exists.
+- `Partial`: current support exists, but not all acceptance criteria are proven.
+- `Planned`: expected for future implementation, but not currently covered.
+- `Unsupported`: the pack does not currently support this behavior.
+- `N/A`: not applicable to the pack.
+
+| User story                                             | Shared              | Japanese  | English   | Notes                                                                                         |
+| ------------------------------------------------------ | ------------------- | --------- | --------- | --------------------------------------------------------------------------------------------- |
+| `US-1` Search before creating review cards             | `Required`          | `Covered` | `Partial` | English has structured creation paths; full focus/base lookup parity needs explicit coverage. |
+| `US-2` Route items to the correct card type            | `Required`          | `Covered` | `Partial` | Card families differ by language pack; pronunciation routing is optional when unsupported.    |
+| `US-3` Preserve source provenance                      | `Required`          | `Covered` | `Partial` | Provenance fields may use pack-owned names.                                                   |
+| `US-4` Initialize new active review cards              | `Required`          | `Covered` | `Covered` | Shared SRS initialization fields are expected for active review cards.                        |
+| `US-5` Reactivate known material                       | `Required`          | `Covered` | `Planned` | English should add explicit mastered/base reactivation tests before claiming parity.          |
+| `US-6` Keep base lexicon sink out of extraction        | `Required`          | `Covered` | `Partial` | The shared boundary is required; pack-specific base restore details need coverage.            |
+| `US-7` Preserve language-specific review cues          | `Language-Specific` | `Covered` | `Partial` | Japanese accent/kanji fields are not shared; English needs its own cue policy.                |
+| `US-8` Image-backed vocabulary extraction              | `Optional`          | `Covered` | `Planned` | Required only for packs that accept image-backed review extraction.                           |
+| `US-9` Daily checklist separation                      | `Optional`          | `Covered` | `N/A`     | Required only for packs with daily checklist integration.                                     |
+| `US-10` Confirm before risky merge, move, or overwrite | `Required`          | `Covered` | `Partial` | Agent confirmation policy is shared; each pack needs local examples.                          |
+| `US-11` Core write guardrails                          | `Required`          | `Covered` | `Covered` | Core mutation and capability checks apply to all packs.                                       |
+
 ## Ownership Boundary
 
 Core owns:
@@ -266,7 +293,6 @@ Regression coverage:
 - `test_review_materials_item_blocks_duplicate_existing_matches`
 - `test_review_materials_item_blocks_target_path_collision`
 - `test_review_materials_item_blocks_missing_core_title`
-- Agent-skill contract checks in `test_phase25_switch_completion`
 - `test_review_material_agent_skill_requires_confirmation_for_risky_writes`
 
 ### 11. Route Writes Through Core Guardrails
