@@ -5,6 +5,11 @@
 
 ---
 
+## [20260703-162500]
+### 变更 (Changed)
+- `docs/user-guide.md` 与 `docs/USER_GUIDE.md`: 为了消除文件名相近导致的混淆，将其分别重命名为更具有自解释性的 `docs/getting-started.md` (面向新手的入门与故事指南) 与 `docs/operator-manual.md` (面向 Agent 及高阶极客的系统与操作手册)。
+- `README.md`: 更新了对应指南文档的导流入口，为普通用户和 Agent 分别指明了阅读路径。
+
 ## [20260702-212405]
 ### 新增 (Added)
 - `docs/multilingual/listening-notes-user-stories.md`: 对照旧版听力素材模板、当前 `jp-listening-script-generator` 和 listening contract tests，补充听力剧本生成模块的多语言 user story、验收标准、Agent use cases、覆盖矩阵和开放缺口。
