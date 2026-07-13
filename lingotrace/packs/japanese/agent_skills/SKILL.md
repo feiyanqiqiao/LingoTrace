@@ -78,11 +78,11 @@ For requests such as "请把 23.mp3 做成精听稿", the agent should provide t
 2. Check the listening chain and slice tooling before intensive listening work.
 3. Generate or reuse the transcript and slice evidence with dual-ASR validation enabled by default for every listening note, including ordinary extensive listening. Do not pass `--single-asr` unless the user explicitly requests a single engine; a runtime fallback caused by an unavailable secondary engine must be reported.
 4. If the generator returns `status: llm_merge_required`, complete the ASR merge automatically in the same user task:
-   - read the Vault-relative `llm_merge_request_path`; it contains both ASR candidates, neighboring context, risk categories, and `reviewed_transcript_template`;
+   - read the absolute, stable temporary `llm_merge_request_path`; it remains available after preview cleanup and contains both ASR candidates, neighboring context, risk categories, and `reviewed_transcript_template`;
    - use the current agent model's Japanese-language judgment, whether the caller is Codex, Gemini, or another compatible agent; do not call a provider-specific API from the listening script;
    - copy the template to a temporary file outside the Vault, preserve `audio_sha256`, `merge_request_id`, `segment_id`, `start`, and `end`, and fill `selected_text`, `decision`, `confidence`, and concise `rationale_zh` for every segment;
    - record `reviewer.kind: llm`, `reviewer.provider: agent-runtime`, the actual model name, and `completed_at`; set `review_status: accepted` only when every segment is resolved with high or medium confidence;
-   - rerun the original command with `--reviewed-transcript <temporary-file>` so the core guard validates and applies the consensus; do not edit the Vault's pending consensus artifact directly.
+   - rerun the original command with both `--reviewed-transcript <temporary-file>` and `--merge-request <llm_merge_request_path>` so the core guard validates and applies the exact pending request; do not edit the Vault's pending consensus artifact directly.
 5. If any name, number, homophone, particle, ending, or slice-boundary decision remains low-confidence, keep it unresolved, block the final note, and tell the user exactly which segment still needs confirmation.
 6. Build a listening note body with real audio slice references for intensive notes.
 7. Save the note to the user's Japanese learning library through `listening_notes`.

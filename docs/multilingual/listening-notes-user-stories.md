@@ -357,7 +357,9 @@ Acceptance criteria:
 - The final note should use reviewed consensus text, not a blind merge of two transcripts.
 - Disagreements around names, numbers, homophones, particles, endings, or slice boundaries should be surfaced for review.
 - When the caller is an LLM-capable agent, disagreement handling should continue automatically in the same task: the agent reads a structured merge request, judges each segment with context, produces a temporary consensus, and reruns the guarded workflow.
+- Preview-only runs must materialize the merge request at a stable read-only temporary path that remains available after staging cleanup; the rerun supplies both that request and the reviewed transcript.
 - The deterministic runtime must validate audio hash, merge-request identity, segment ids, timestamps, confidence, and completion status before accepting an LLM consensus.
+- An LLM-reviewed transcript without its exact pending merge request must be rejected. Decisions selecting the primary, secondary, or agreed text must match the corresponding ASR candidate.
 - The agent must tell the learner how many differences were merged, which model performed the merge, and whether any uncertainty remains; low-confidence decisions still block the final note.
 - If the secondary ASR route requires GUI permission, network access, paid services, or unavailable language support, the workflow may proceed with a single engine and report the limitation.
 
@@ -377,6 +379,7 @@ Regression coverage:
 - `test_llm_merge_request_contains_provider_neutral_review_template`
 - `test_japanese_agent_skill_auto_merges_asr_disagreements`
 - `test_llm_reviewed_consensus_skips_retranscription_and_finishes_note`
+- `test_provider_neutral_two_pass_merge_survives_preview_cleanup`
 
 ### 13. Preserve Short-Choice And Exam Listening Structure
 

@@ -163,6 +163,7 @@ class PreparedListeningBundle:
     llm_merge_request_path: str | None = None
     disagreement_count: int = 0
     merge_model: str | None = None
+    asr_validation_status: str = "single"
 
     def workflow_payload(self, *, overwrite_confirmed: bool = False) -> dict:
         files = self.files
@@ -400,6 +401,10 @@ def parse_args() -> argparse.Namespace:
         help="Explicitly opt out of the default dual-ASR validation.",
     )
     parser.add_argument("--reviewed-transcript")
+    parser.add_argument(
+        "--merge-request",
+        help="Stable merge-request artifact paired with an LLM-reviewed transcript.",
+    )
     parser.add_argument("--format", choices=["mp3", "m4a", "wav", "flac"], default="m4a")
     parser.add_argument("--faster-whisper-python")
     parser.add_argument("--faster-whisper-model", default=DEFAULT_FASTER_WHISPER_MODEL)
@@ -1635,19 +1640,20 @@ def load_reviewed_transcript(
         merge_request_id = str(payload.get("merge_request_id", ""))
         if not re.fullmatch(r"[0-9a-f]{64}", merge_request_id):
             raise RuntimeError("LLM-reviewed transcript must preserve a valid merge_request_id.")
-        if merge_request_path is not None and merge_request_path.is_file():
-            request = json.loads(merge_request_path.read_text(encoding="utf-8"))
-            if request.get("kind") != "asr_llm_merge_request":
-                raise RuntimeError("LLM merge request has an unsupported artifact kind.")
-            request_audio = request.get("audio", {})
-            if request_audio.get("sha256") != sha256_file(audio_path):
-                raise RuntimeError("LLM merge request does not match the source audio hash.")
-            if request.get("merge_request_id") != merge_request_id:
-                raise RuntimeError("LLM-reviewed transcript does not match the pending merge-request identity.")
-            request_segments = request.get("segments")
-            if not isinstance(request_segments, list) or len(request_segments) != len(raw_segments):
-                raise RuntimeError("LLM-reviewed transcript must preserve every merge-request segment.")
-            expected_segments = request_segments
+        if merge_request_path is None or not merge_request_path.is_file():
+            raise RuntimeError("LLM-reviewed transcript requires its pending merge-request artifact.")
+        request = json.loads(merge_request_path.read_text(encoding="utf-8"))
+        if request.get("kind") != "asr_llm_merge_request":
+            raise RuntimeError("LLM merge request has an unsupported artifact kind.")
+        request_audio = request.get("audio", {})
+        if request_audio.get("sha256") != sha256_file(audio_path):
+            raise RuntimeError("LLM merge request does not match the source audio hash.")
+        if request.get("merge_request_id") != merge_request_id:
+            raise RuntimeError("LLM-reviewed transcript does not match the pending merge-request identity.")
+        request_segments = request.get("segments")
+        if not isinstance(request_segments, list) or len(request_segments) != len(raw_segments):
+            raise RuntimeError("LLM-reviewed transcript must preserve every merge-request segment.")
+        expected_segments = request_segments
     segments: list[dict] = []
     previous_end: float | None = None
     llm_segment_ids: set[str] = set()
@@ -1679,6 +1685,17 @@ def load_reviewed_transcript(
                 raise RuntimeError("Accepted LLM-reviewed segments require high or medium confidence.")
             if not rationale:
                 raise RuntimeError("Every LLM-reviewed segment needs rationale_zh.")
+            selected_text = clean_transcript_text(str(item.get("selected_text", "")))
+            primary_text = clean_transcript_text(str(expected.get("primary_text", "")))
+            secondary_text = clean_transcript_text(str(expected.get("secondary_text", "")))
+            if decision == "primary" and selected_text != primary_text:
+                raise RuntimeError("LLM decision primary must preserve primary_text.")
+            if decision == "secondary" and selected_text != secondary_text:
+                raise RuntimeError("LLM decision secondary must preserve secondary_text.")
+            if decision == "agreement" and not (
+                primary_text == secondary_text == selected_text
+            ):
+                raise RuntimeError("LLM decision agreement requires equal ASR text and selected_text.")
         start = item.get("start")
         end = item.get("end")
         if (
@@ -3056,6 +3073,7 @@ def process_one(
     slice_profile_request: str = "auto",
     compare_engine: str | None = None,
     reviewed_transcript_override: str | None = None,
+    merge_request_override: str | None = None,
     accent_vault_root: Path | None = None,
     rename_generated_note: bool = True,
 ) -> str:
@@ -3068,16 +3086,20 @@ def process_one(
     if listening_mode == "intensive":
         preflight_intensive_slice_tooling()
     reviewed_path = Path(reviewed_transcript_override).expanduser() if reviewed_transcript_override else None
+    merge_request_path = Path(merge_request_override).expanduser() if merge_request_override else None
     comparison_runtime_issue: str | None = None
     comparison_review_issue: str | None = None
     if reviewed_path is not None:
-        pending_merge_request = (
+        canonical_merge_request = (
             material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
+        )
+        pending_merge_request = merge_request_path or (
+            canonical_merge_request if canonical_merge_request.is_file() else None
         )
         candidate = load_reviewed_transcript(
             reviewed_path,
             audio_path,
-            pending_merge_request if pending_merge_request.is_file() else None,
+            pending_merge_request,
         )
         route_label = "reviewed-consensus"
         if not dry_run:
@@ -3085,6 +3107,8 @@ def process_one(
             canonical_reviewed_path.parent.mkdir(parents=True, exist_ok=True)
             if reviewed_path.resolve() != canonical_reviewed_path.resolve():
                 shutil.copy2(reviewed_path, canonical_reviewed_path)
+            if pending_merge_request is not None and pending_merge_request.resolve() != canonical_merge_request.resolve():
+                shutil.copy2(pending_merge_request, canonical_merge_request)
             write_normalized_asr_artifact(audio_path, candidate)
     else:
         if candidate_route is None:
@@ -3301,6 +3325,7 @@ def process_url(
     slice_profile_request: str = "auto",
     compare_engine: str | None = None,
     reviewed_transcript_override: str | None = None,
+    merge_request_override: str | None = None,
     accent_vault_root: Path | None = None,
 ) -> str:
     if discover_vault_root(output_dir) is not None:
@@ -3344,6 +3369,7 @@ def process_url(
         slice_profile_request=slice_profile_request,
         compare_engine=compare_engine,
         reviewed_transcript_override=reviewed_transcript_override,
+        merge_request_override=merge_request_override,
         accent_vault_root=accent_vault_root,
     )
     if dry_run:
@@ -3443,10 +3469,10 @@ def _bundle_from_stage(
     merge_request_paths = [path for path in changed if path.endswith(".llm-merge-request.json")]
     llm_merge_request_path = merge_request_paths[0] if merge_request_paths else None
     disagreement_count = 0
-    if llm_merge_request_path is not None:
-        merge_request = json.loads((stage_vault / llm_merge_request_path).read_text(encoding="utf-8"))
-        disagreement_count = int(merge_request.get("disagreement_count", 0))
-    elif merge_model is not None:
+    asr_validation_status = "single"
+    if merge_model is not None:
+        asr_validation_status = "merged"
+        llm_merge_request_path = None
         for consensus_path in consensus_files:
             payload = json.loads(consensus_path.read_text(encoding="utf-8"))
             disagreement_count += sum(
@@ -3454,6 +3480,19 @@ def _bundle_from_stage(
                 for segment in payload.get("segments", [])
                 if isinstance(segment, dict) and segment.get("decision") != "agreement"
             )
+    elif llm_merge_request_path is not None:
+        merge_request = json.loads((stage_vault / llm_merge_request_path).read_text(encoding="utf-8"))
+        disagreement_count = int(merge_request.get("disagreement_count", 0))
+        asr_validation_status = "disagreement"
+    else:
+        comparison_files = [stage_vault / path for path in changed if path.endswith(".asr-comparison.json")]
+        for comparison_path in comparison_files:
+            comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+            if comparison.get("status") == "secondary_unavailable":
+                asr_validation_status = "secondary_unavailable"
+                break
+            if comparison.get("status") == "complete" and int(comparison.get("disagreement_count", 0)) == 0:
+                asr_validation_status = "agreed"
     return PreparedListeningBundle(
         vault_root=vault_root,
         note_path=note_path,
@@ -3465,7 +3504,27 @@ def _bundle_from_stage(
         llm_merge_request_path=llm_merge_request_path,
         disagreement_count=disagreement_count,
         merge_model=merge_model,
+        asr_validation_status=asr_validation_status,
     )
+
+
+def materialize_llm_merge_request_handoff(bundle: PreparedListeningBundle) -> Path | None:
+    if not bundle.review_required or not bundle.llm_merge_request_path:
+        return None
+    current = Path(bundle.llm_merge_request_path)
+    if current.is_absolute():
+        if not current.is_file():
+            raise RuntimeError(f"LLM merge request is missing: {current}")
+        return current
+    source = bundle.staging_root / "vault" / current
+    if not source.is_file():
+        raise RuntimeError(f"Prepared LLM merge request is missing: {source}")
+    handoff_root = Path(tempfile.mkdtemp(prefix="lingotrace-llm-merge-"))
+    destination = handoff_root / source.name
+    shutil.copy2(source, destination)
+    destination.chmod(0o400)
+    bundle.llm_merge_request_path = str(destination)
+    return destination
 
 
 def prepare_local_listening_bundle(
@@ -3485,6 +3544,7 @@ def prepare_local_listening_bundle(
     slice_manifest_override: Path | None,
     slice_profile: str,
     reviewed_transcript: Path | None,
+    merge_request: Path | None = None,
 ) -> PreparedListeningBundle:
     validate_listening_target(vault_root, audio_path)
     material_dir = material_dir_for_audio(audio_path)
@@ -3511,14 +3571,18 @@ def prepare_local_listening_bundle(
         _copy_preparation_file(slice_manifest_override, stage_manifest)
 
     stage_reviewed: Path | None = None
+    stage_merge_request: Path | None = None
     if reviewed_transcript is not None:
         stage_reviewed = material_dir_for_audio(stage_audio) / "artifacts" / f"{audio_path.stem}.accepted-reviewed-transcript.json"
         _copy_preparation_file(reviewed_transcript, stage_reviewed)
-        merge_request = material_dir / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
-        if merge_request.is_file():
+        source_merge_request = merge_request or (
+            material_dir / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
+        )
+        if source_merge_request.is_file():
+            stage_merge_request = material_dir_for_audio(stage_audio) / "artifacts" / f"{audio_path.stem}.accepted-merge-request.json"
             _copy_preparation_file(
-                merge_request,
-                material_dir_for_audio(stage_audio) / "artifacts" / merge_request.name,
+                source_merge_request,
+                stage_merge_request,
             )
 
     initial = _tree_snapshot(stage_vault)
@@ -3539,6 +3603,7 @@ def prepare_local_listening_bundle(
             slice_profile_request=slice_profile,
             compare_engine=compare_engine,
             reviewed_transcript_override=str(stage_reviewed) if stage_reviewed is not None else None,
+            merge_request_override=str(stage_merge_request) if stage_merge_request is not None else None,
             accent_vault_root=vault_root,
             rename_generated_note=False,
         )
@@ -3570,6 +3635,7 @@ def prepare_url_listening_bundle(
     slice_manifest_override: Path | None,
     slice_profile: str,
     reviewed_transcript: Path | None,
+    merge_request: Path | None = None,
 ) -> PreparedListeningBundle:
     validate_listening_target(vault_root, output_dir)
     staging_root = Path(tempfile.mkdtemp(prefix="lingotrace-listening-url-prepare-"))
@@ -3585,13 +3651,18 @@ def prepare_url_listening_bundle(
         stage_manifest = _mapped_stage_path(stage_vault, vault_root, slice_manifest_override)
         _copy_preparation_file(slice_manifest_override, stage_manifest)
     stage_reviewed: Path | None = None
+    stage_merge_request: Path | None = None
     if reviewed_transcript is not None:
         stage_reviewed = stage_output / "artifacts" / "accepted-reviewed-transcript.json"
         _copy_preparation_file(reviewed_transcript, stage_reviewed)
-        existing_artifact_dir = output_dir / "artifacts"
-        if existing_artifact_dir.is_dir():
-            for merge_request in existing_artifact_dir.glob("*.llm-merge-request.json"):
-                _copy_preparation_file(merge_request, stage_output / "artifacts" / merge_request.name)
+        source_merge_request = merge_request
+        if source_merge_request is None:
+            existing_artifact_dir = output_dir / "artifacts"
+            existing_requests = sorted(existing_artifact_dir.glob("*.llm-merge-request.json")) if existing_artifact_dir.is_dir() else []
+            source_merge_request = existing_requests[0] if len(existing_requests) == 1 else None
+        if source_merge_request is not None and source_merge_request.is_file():
+            stage_merge_request = stage_output / "artifacts" / "accepted-merge-request.json"
+            _copy_preparation_file(source_merge_request, stage_merge_request)
     initial = _tree_snapshot(stage_vault)
     try:
         summary = process_url(
@@ -3610,6 +3681,7 @@ def prepare_url_listening_bundle(
             slice_profile,
             compare_engine,
             str(stage_reviewed) if stage_reviewed is not None else None,
+            str(stage_merge_request) if stage_merge_request is not None else None,
             vault_root,
         )
         return _bundle_from_stage(
@@ -3650,6 +3722,25 @@ def scan_audio_files(directory: Path) -> list[Path]:
     return sorted(files)
 
 
+def listening_status_and_notification(bundle: PreparedListeningBundle) -> tuple[str, str]:
+    if bundle.review_required:
+        return (
+            "llm_merge_required",
+            f"双 ASR 检出 {bundle.disagreement_count} 处差异。调用方大模型应读取合并请求、"
+            "自动生成临时共识文件并以 --reviewed-transcript 和 --merge-request 重跑；最终笔记尚未写入。",
+        )
+    if bundle.merge_model:
+        return (
+            "complete",
+            f"双 ASR 差异已由 {bundle.merge_model} 自动判断并合并，最终笔记使用已校验共识。",
+        )
+    if bundle.asr_validation_status == "agreed":
+        return "complete", "双 ASR 转写一致，无需模型合并；听力笔记已通过写入校验。"
+    if bundle.asr_validation_status == "secondary_unavailable":
+        return "complete", "第二 ASR 不可用，本次已受控降级为单 ASR；限制已记录在比较工件中。"
+    return "complete", "听力笔记已通过转写与写入校验。"
+
+
 def main() -> int:
     args = parse_args()
     if args.apply and args.dry_run:
@@ -3670,6 +3761,9 @@ def main() -> int:
     if args.url and not args.output_dir:
         print("--output-dir is required when using --url.", file=sys.stderr)
         return 1
+    if args.merge_request and not args.reviewed_transcript:
+        print("--merge-request requires --reviewed-transcript.", file=sys.stderr)
+        return 1
 
     try:
         configure_project_roots(lingotrace=args.lingotrace_root, listenkit=args.listenkit_root)
@@ -3683,6 +3777,7 @@ def main() -> int:
         note_path = resolve_vault_relative_path(vault_root, args.note_path) if args.note_path else None
         manifest_path = resolve_vault_relative_path(vault_root, args.slice_manifest) if args.slice_manifest else None
         reviewed_path = resolve_readonly_input_path(vault_root, args.reviewed_transcript) if args.reviewed_transcript else None
+        merge_request_path = resolve_readonly_input_path(vault_root, args.merge_request) if args.merge_request else None
         if args.url:
             output_dir = resolve_vault_relative_path(vault_root, args.output_dir)
             url_compare = None if args.single_asr else args.compare_engine
@@ -3702,6 +3797,7 @@ def main() -> int:
                 slice_manifest_override=manifest_path,
                 slice_profile=args.slice_profile,
                 reviewed_transcript=reviewed_path,
+                merge_request=merge_request_path,
             )
         else:
             audio_path = resolve_vault_relative_path(vault_root, args.audio_path)
@@ -3730,24 +3826,15 @@ def main() -> int:
                 slice_manifest_override=manifest_path,
                 slice_profile=args.slice_profile,
                 reviewed_transcript=reviewed_path,
+                merge_request=merge_request_path,
             )
+        materialize_llm_merge_request_handoff(bundle)
         preview, applied = apply_prepared_bundle(
             bundle,
             apply=args.apply,
             overwrite_confirmed=args.confirm_overwrite,
         )
-        if bundle.review_required:
-            status = "llm_merge_required"
-            notification = (
-                f"双 ASR 检出 {bundle.disagreement_count} 处差异。调用方大模型应读取合并请求、"
-                "自动生成临时共识文件并以 --reviewed-transcript 重跑；最终笔记尚未写入。"
-            )
-        elif bundle.merge_model:
-            status = "complete"
-            notification = f"双 ASR 差异已由 {bundle.merge_model} 自动判断并合并，最终笔记使用已校验共识。"
-        else:
-            status = "complete"
-            notification = "听力笔记已通过转写与写入校验。"
+        status, notification = listening_status_and_notification(bundle)
         output = {
             "status": status,
             "summary": bundle.summary,
@@ -3756,6 +3843,7 @@ def main() -> int:
             "llm_merge_request_path": bundle.llm_merge_request_path,
             "disagreement_count": bundle.disagreement_count,
             "merge_model": bundle.merge_model,
+            "asr_validation_status": bundle.asr_validation_status,
             "notification": notification,
             "preview": preview,
             "apply": applied,

@@ -253,6 +253,8 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "Do not stop at the first `llm_merge_required`",
             "dual-ASR validation enabled by default for every listening note",
             "Do not pass `--single-asr` unless the user explicitly requests",
+            "absolute, stable temporary `llm_merge_request_path`",
+            "`--merge-request <llm_merge_request_path>`",
         ):
             self.assertIn(token, skill)
         for token in (
