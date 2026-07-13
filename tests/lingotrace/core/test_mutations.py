@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from lingotrace.core.mutations import FileMutation, run_file_mutations
 
@@ -170,6 +172,113 @@ class FileMutationTests(unittest.TestCase):
                 report.to_dict()["blocked_files"],
             )
             self.assertFalse((root / "review/focus/vocab/valid.md").exists())
+
+    def test_apply_can_copy_binary_source_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "vault"
+            root.mkdir()
+            create_context(root, "review_materials")
+            manifest = create_manifest(root)
+            source = Path(tmp) / "slice.m4a"
+            source.write_bytes(b"\x00\x01synthetic-audio\xff")
+
+            report = run_file_mutations(
+                vault_root=root,
+                manifest_path=manifest,
+                capability_id="review_materials",
+                mutations=[
+                    FileMutation(
+                        path="review/focus/vocab/slice.m4a",
+                        content=None,
+                        source_path=source,
+                        action="copy_media",
+                        reason="prepared binary artifact",
+                    )
+                ],
+                mode="apply",
+            )
+
+            self.assertTrue(report.accepted, report.to_dict())
+            self.assertEqual(source.read_bytes(), (root / "review/focus/vocab/slice.m4a").read_bytes())
+
+    def test_missing_or_ambiguous_mutation_source_is_rejected_before_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_context(root, "review_materials")
+            manifest = create_manifest(root)
+
+            missing = run_file_mutations(
+                vault_root=root,
+                manifest_path=manifest,
+                capability_id="review_materials",
+                mutations=[
+                    FileMutation(
+                        path="review/focus/vocab/missing.bin",
+                        content=None,
+                        source_path=root / "does-not-exist.bin",
+                        action="copy",
+                        reason="missing source",
+                    )
+                ],
+                mode="apply",
+            )
+            ambiguous = run_file_mutations(
+                vault_root=root,
+                manifest_path=manifest,
+                capability_id="review_materials",
+                mutations=[
+                    FileMutation(
+                        path="review/focus/vocab/ambiguous.md",
+                        content="inline",
+                        source_path=manifest,
+                        action="copy",
+                        reason="ambiguous source",
+                    )
+                ],
+                mode="apply",
+            )
+
+            self.assertEqual(missing.errors[0].code, "mutation_source_missing")
+            self.assertEqual(ambiguous.errors[0].code, "invalid_mutation_source")
+            self.assertFalse((root / "review/focus/vocab/missing.bin").exists())
+            self.assertFalse((root / "review/focus/vocab/ambiguous.md").exists())
+
+    def test_apply_rolls_back_all_targets_when_a_replacement_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_context(root, "review_materials")
+            manifest = create_manifest(root)
+            first = root / "review/focus/vocab/first.md"
+            second = root / "review/focus/vocab/second.md"
+            first.parent.mkdir(parents=True)
+            first.write_text("old-first", encoding="utf-8")
+            second.write_text("old-second", encoding="utf-8")
+            real_replace = os.replace
+
+            def fail_second_stage(source, target):
+                source_path = Path(source)
+                target_path = Path(target)
+                if source_path.name.endswith(".lingotrace-stage") and target_path == second:
+                    raise OSError("synthetic replacement failure")
+                return real_replace(source, target)
+
+            with mock.patch("lingotrace.core.mutations.os.replace", side_effect=fail_second_stage):
+                with self.assertRaisesRegex(OSError, "synthetic replacement failure"):
+                    run_file_mutations(
+                        vault_root=root,
+                        manifest_path=manifest,
+                        capability_id="review_materials",
+                        mutations=[
+                            FileMutation("review/focus/vocab/first.md", "new-first", "update", "atomic test"),
+                            FileMutation("review/focus/vocab/second.md", "new-second", "update", "atomic test"),
+                        ],
+                        mode="apply",
+                    )
+
+            self.assertEqual(first.read_text(encoding="utf-8"), "old-first")
+            self.assertEqual(second.read_text(encoding="utf-8"), "old-second")
+            self.assertEqual(list(first.parent.glob("*.lingotrace-stage")), [])
+            self.assertEqual(list(first.parent.glob("*.lingotrace-backup")), [])
 
 
 if __name__ == "__main__":

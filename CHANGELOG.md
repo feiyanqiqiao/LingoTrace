@@ -5,6 +5,42 @@
 
 ---
 
+## [20260713-144452]
+### 修复 (Fixed)
+- preview/dry-run 检出双 ASR 差异时，将 LLM 合并请求复制到权限隔离的稳定临时路径，避免 staging 清理后 Agent 无法继续同任务合并；第二阶段通过 `--reviewed-transcript` 与 `--merge-request` 成对重跑。
+- 稳定 handoff 同步保留首轮原始 ListenKit、标准化 ASR 与差异报告，并在共识重跑时交由 core write guard 持久化；精听切片报告改用可迁移的 `attach/...` 相对路径，避免 staging 临时路径进入 Vault 工件。
+- LLM 共识必须绑定真实待处理请求，并校验音频哈希、请求 ID、片段身份、时间戳以及 `decision` 与 `selected_text` 的对应关系；不再允许凭格式正确的伪造 ID 绕过双 ASR。
+- 两路 ASR 完全一致时明确通知用户“无需模型合并”，第二引擎不可用时明确报告受控单 ASR 降级。
+
+### 测试 (Tests)
+- 新增 preview 清理后的稳定请求及完整 ASR 工件可读性测试，以及 provider-neutral 的两阶段 Gemini/Codex 形态共识端到端 fixture，覆盖请求读取、模型裁决、跳过重复 ASR、guarded rerun、可迁移切片报告和最终笔记写入。
+
+## [20260713-142905]
+### 变更 (Changed)
+- 日语听力脚本生成统一默认启用双 ASR 验证，不再只对精听、短选择题等高风险素材自动启用；普通泛听、本地音频和 URL 输入均走相同的交叉比对与模型共识流程。
+- `--single-asr` 保留为用户明确要求时的主动降级选项；第二 ASR 运行时不可用时仍可受控降级，并向用户报告限制。
+- 更新日语 Agent Skill、多语言听力 user story 与契约测试，确保 Codex、Gemini 等调用方不会为普通素材绕过双 ASR 默认值。
+
+## [20260713-142300]
+### 新增 (Added)
+- 双 ASR 出现差异时生成 provider-neutral 的 `llm-merge-request.json`，包含两路候选、上下文、风险分类和可直接填写的共识模板；Codex、Gemini 等调用方模型可在同一任务内自动裁决并重跑听力流程，无需在脚本中绑定模型厂商 API。
+- LLM 共识新增音频哈希、合并请求 ID、片段 ID、时间戳、决定、置信度和理由校验；低置信度或被篡改的片段继续阻断最终笔记写入。
+
+### 变更 (Changed)
+- 听力 CLI 以结构化状态和通知报告待合并差异数、完成合并的模型及最终结果；Agent skill 明确不得把内部合并请求直接丢给用户，而应自动处理，仅在确有低置信度时请求确认。
+- 补充双 ASR 一致直通、模型合并请求、模型共识重跑跳过重复 ASR、身份校验、低置信度阻断以及 Codex/Gemini 中立调用契约测试。
+
+## [20260713-134631]
+### 新增 (Added)
+- `tools/listening-transcribe-official/transcribe_listening.py`: 新增显式 Vault、LingoTrace 与 ListenKit 根目录参数，支持从任意工作目录统一准备本地音频和 URL 素材；新增带音频哈希、引擎、语言、完整时间戳的标准化 ASR 工件。
+- `tools/listening-transcribe-official/transcribe_listening.py`: 高风险精听默认使用 faster-whisper 主转写与 Apple 辅助转写，按时间重叠和文本相似度对齐，保存差异分类、比对报告和待审核共识；未解决差异阻止最终笔记写入，辅助引擎不可用时则明确记录单 ASR 降级限制。
+- `lingotrace.core.mutations` 与日语 `listening_notes` workflow：支持 Markdown、JSON、音频切片组成的多文件 bundle，经统一 preview/apply 写入保护进行原子提交和失败回滚。
+
+### 变更 (Changed)
+- 听力生成器不再直接写入已配置的 LingoTrace Vault；本地音频与 URL 均先在临时区生成，再校验 `listening_root` 路径边界、现有笔记覆盖确认和人工共识状态后提交。
+- 精听流程继续保留人工维护的常用句与自定义段落；reviewed manifest 强制非重叠，最终笔记的学习块、音频嵌入、切片报告与 `segment_count` 必须数量一致且对应真实非空音频文件。
+- 补充双 ASR 分段对齐、人工共识门禁、URL 双引擎、本地降级、二进制原子写入、覆盖确认、越界阻断和真实切片不变量的自动化测试。
+
 ## [20260703-164000]
 ### 变更 (Changed)
 - `docs/multilingual/`: 对历史阶段文档进行了结构重构。创建了 `docs/multilingual/history/` 目录并将已完成的 `phase-0`、`phase-1` 和 `phase-2` 完整移入归档。

@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -28,6 +29,46 @@ INIT_RUNTIME_PATH = WRAPPER_PATH.with_name("init-listening-runtime.sh")
 CHECK_CHAIN_PATH = WRAPPER_PATH.with_name("check-listening-chain.sh")
 REQUIREMENTS_PATH = Path(__file__).resolve().parents[1] / "requirements-listening.txt"
 JAPANESE_WORKFLOWS_PATH = Path(__file__).resolve().parents[3] / "lingotrace/packs/japanese/workflows.py"
+
+
+def create_lingotrace_vault(root: Path) -> None:
+    config = root / ".lingotrace"
+    config.mkdir(parents=True, exist_ok=True)
+    (config / "vault-context.json").write_text(
+        json.dumps(
+            {
+                "vault_schema_version": 1,
+                "target_language": "ja",
+                "explanation_language": "zh",
+                "language_pack": "lingo-japanese",
+                "language_pack_version": "0.1.0",
+                "enabled_capabilities": ["listening_notes"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config / "paths.json").write_text(
+        json.dumps(
+            {
+                "path_roles": [
+                    {"role": "listening_root", "relative_path": "listening", "source": "vault_config"},
+                    {"role": "focus_vocab_root", "relative_path": "review/focus/vocab", "source": "vault_config"},
+                    {"role": "base_vocab_root", "relative_path": "review/base/vocab", "source": "vault_config"},
+                    {
+                        "role": "pronunciation_accent_root",
+                        "relative_path": "review/pronunciation/accent",
+                        "source": "vault_config",
+                    },
+                    {
+                        "role": "pronunciation_phoneme_root",
+                        "relative_path": "review/pronunciation/phoneme",
+                        "source": "vault_config",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class TranscribeListeningTests(unittest.TestCase):
@@ -509,14 +550,857 @@ class TranscribeListeningTests(unittest.TestCase):
 
             report_path = root / "artifacts" / "lesson.asr-comparison.json"
             report = json.loads(report_path.read_text(encoding="utf-8"))
+            audio_hash = MODULE.sha256_file(audio_path)
+            primary_artifact_exists = (root / "artifacts" / "lesson.apple.asr.json").is_file()
+            secondary_artifact_exists = (root / "artifacts" / "lesson.faster-whisper.asr.json").is_file()
+            primary_artifact = json.loads(
+                (root / "artifacts" / "lesson.apple.asr.json").read_text(encoding="utf-8")
+            )
+            consensus = json.loads(
+                (root / "artifacts" / "lesson.reviewed-transcript.json").read_text(encoding="utf-8")
+            )
 
         self.assertEqual(route_label, "apple")
         self.assertEqual(candidate.full_text, "今日は良い天気です。")
-        self.assertEqual(report["schema_version"], 1)
+        self.assertEqual(report["schema_version"], 2)
         self.assertEqual(report["primary"]["engine"], "apple")
         self.assertEqual(report["secondary"]["engine"], "faster-whisper")
         self.assertEqual(report["disagreements"][0]["primary_text"], "今日は良い天気です。")
         self.assertEqual(report["disagreements"][0]["secondary_text"], "今日はいい天気です。")
+        self.assertTrue(primary_artifact_exists)
+        self.assertTrue(secondary_artifact_exists)
+        self.assertEqual(primary_artifact["schema_version"], 1)
+        self.assertEqual(primary_artifact["kind"], "lingotrace_asr_artifact")
+        self.assertEqual(primary_artifact["engine"], "apple")
+        self.assertEqual(primary_artifact["audio"]["sha256"], audio_hash)
+        self.assertEqual(primary_artifact["segments"][0]["start"], 0.0)
+        self.assertEqual(primary_artifact["segments"][0]["end"], 1.0)
+        self.assertEqual(consensus["review_status"], "needs_review")
+
+    def test_llm_merge_request_contains_provider_neutral_review_template(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            primary = MODULE.candidate_from_payload(
+                audio_path,
+                {
+                    "engine": "faster-whisper",
+                    "full_text": "三時に京都駅です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "三時に京都駅です。"}],
+                },
+                "faster-whisper",
+            )
+            secondary = MODULE.candidate_from_payload(
+                audio_path,
+                {
+                    "engine": "apple",
+                    "full_text": "四時に京都駅です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "四時に京都駅です。"}],
+                },
+                "apple",
+            )
+
+            MODULE.write_asr_comparison_report(audio_path, primary, secondary)
+            request = json.loads(
+                (root / "artifacts" / "lesson.llm-merge-request.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(request["kind"], "asr_llm_merge_request")
+        self.assertEqual(request["status"], "merge_required")
+        self.assertEqual(request["disagreement_count"], 1)
+        self.assertRegex(request["merge_request_id"], r"^[0-9a-f]{64}$")
+        self.assertIn("number", request["segments"][0]["categories"])
+        template = request["reviewed_transcript_template"]
+        self.assertEqual(template["reviewer"]["provider"], "agent-runtime")
+        self.assertEqual(template["merge_request_id"], request["merge_request_id"])
+        self.assertEqual(template["segments"][0]["decision"], "pending_review")
+        self.assertEqual(template["segments"][0]["segment_id"], "T001")
+
+    def test_matching_asr_outputs_do_not_emit_llm_merge_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            payload = {
+                "engine": "faster-whisper",
+                "full_text": "今日は良い天気です。",
+                "segments": [{"start": 0.0, "end": 1.0, "text": "今日は良い天気です。"}],
+            }
+            primary = MODULE.candidate_from_payload(audio_path, payload, "faster-whisper")
+            secondary = MODULE.candidate_from_payload(audio_path, {**payload, "engine": "apple"}, "apple")
+
+            MODULE.write_asr_comparison_report(audio_path, primary, secondary)
+            consensus = json.loads(
+                (root / "artifacts" / "lesson.reviewed-transcript.json").read_text(encoding="utf-8")
+            )
+
+            self.assertEqual(consensus["review_status"], "accepted")
+            self.assertFalse((root / "artifacts" / "lesson.llm-merge-request.json").exists())
+
+    def test_asr_alignment_groups_timestamp_connected_segments(self) -> None:
+        primary = MODULE.candidate_from_payload(
+            Path("lesson.mp3"),
+            {
+                "engine": "faster-whisper",
+                "full_text": "今日は良い天気です。",
+                "segments": [{"start": 0.0, "end": 2.0, "text": "今日は良い天気です。"}],
+            },
+            "faster-whisper",
+        )
+        secondary = MODULE.candidate_from_payload(
+            Path("lesson.mp3"),
+            {
+                "engine": "apple",
+                "full_text": "今日は良い天気です。",
+                "segments": [
+                    {"start": 0.0, "end": 1.0, "text": "今日は良い"},
+                    {"start": 1.0, "end": 2.0, "text": "天気です。"},
+                ],
+            },
+            "apple",
+        )
+
+        report = MODULE.build_asr_comparison_report(primary, secondary)
+
+        self.assertEqual(report["disagreement_count"], 0)
+        self.assertEqual(len(report["consensus_segments"]), 1)
+        self.assertEqual(report["consensus_segments"][0]["secondary_text"], "今日は良い天気です。")
+
+    def test_reviewed_transcript_requires_accepted_status_and_valid_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            reviewed_path = root / "reviewed.json"
+            payload = {
+                "schema_version": 1,
+                "kind": "reviewed_transcript",
+                "audio_sha256": MODULE.sha256_file(audio_path),
+                "review_status": "needs_review",
+                "segments": [
+                    {
+                        "start": 0.0,
+                        "end": 1.0,
+                        "selected_text": "今日は良い天気です。",
+                        "decision": "accepted",
+                        "needs_review": False,
+                    }
+                ],
+            }
+            reviewed_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "review_status"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path)
+
+            payload["review_status"] = "accepted"
+            payload["segments"].append(
+                {
+                    "start": 0.5,
+                    "end": 1.5,
+                    "selected_text": "重複です。",
+                    "decision": "accepted",
+                    "needs_review": False,
+                }
+            )
+            reviewed_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "non-overlapping"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path)
+
+            payload["segments"] = payload["segments"][:1]
+            reviewed_path.write_text(json.dumps(payload), encoding="utf-8")
+            candidate = MODULE.load_reviewed_transcript(reviewed_path, audio_path)
+
+        self.assertEqual(candidate.payload["engine"], "reviewed-consensus")
+        self.assertEqual(candidate.full_text, "今日は良い天気です。")
+
+    def test_final_note_uses_explicitly_reviewed_consensus(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            primary = MODULE.candidate_from_payload(
+                audio_path,
+                {
+                    "engine": "faster-whisper",
+                    "full_text": "誤った候補です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "誤った候補です。"}],
+                },
+                "faster-whisper",
+            )
+            reviewed_path = root / "accepted.json"
+            reviewed_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "reviewed_transcript",
+                        "audio_sha256": MODULE.sha256_file(audio_path),
+                        "review_status": "accepted",
+                        "segments": [
+                            {
+                                "start": 0.0,
+                                "end": 1.0,
+                                "selected_text": "人工确认后的脚本です。",
+                                "decision": "manual_review",
+                                "needs_review": False,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            MODULE.process_one(
+                audio_path,
+                None,
+                "ja-JP",
+                None,
+                False,
+                candidate_route=(primary, "faster-whisper"),
+                reviewed_transcript_override=str(reviewed_path),
+                offline_dictionary=MODULE.StaticAccentDictionary({}),
+            )
+            note = next(root.glob("lesson_*.md")).read_text(encoding="utf-8")
+
+        self.assertIn("人工确认后的脚本です。", note)
+        self.assertNotIn("誤った候補です。", note)
+
+    def test_llm_reviewed_consensus_skips_retranscription_and_finishes_note(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            request_path = root / "artifacts" / "lesson.llm-merge-request.json"
+            request_path.parent.mkdir()
+            request_path.write_text(
+                json.dumps(
+                    {
+                        "kind": "asr_llm_merge_request",
+                        "merge_request_id": "a" * 64,
+                        "audio": {"sha256": MODULE.sha256_file(audio_path)},
+                        "segments": [
+                            {
+                                "segment_id": "T001",
+                                "start": 0.0,
+                                "end": 1.0,
+                                "primary_text": "三時に行きます。",
+                                "secondary_text": "四時に行きます。",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            reviewed_path = root / "agent-consensus.json"
+            reviewed_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "reviewed_transcript",
+                        "audio_sha256": MODULE.sha256_file(audio_path),
+                        "merge_request_id": "a" * 64,
+                        "review_status": "accepted",
+                        "reviewer": {
+                            "kind": "llm",
+                            "provider": "agent-runtime",
+                            "model": "gemini-test",
+                            "completed_at": "2026-07-13T00:00:00Z",
+                        },
+                        "segments": [
+                            {
+                                "segment_id": "T001",
+                                "start": 0.0,
+                                "end": 1.0,
+                                "primary_text": "三時に行きます。",
+                                "secondary_text": "四時に行きます。",
+                                "selected_text": "三時に行きます。",
+                                "decision": "primary",
+                                "confidence": "medium",
+                                "rationale_zh": "上下文指向三点。",
+                                "needs_review": False,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(
+                MODULE,
+                "transcribe_with_heuristics",
+                side_effect=AssertionError("accepted consensus must skip ASR"),
+            ):
+                MODULE.process_one(
+                    audio_path,
+                    None,
+                    "ja-JP",
+                    None,
+                    False,
+                    compare_engine="apple",
+                    reviewed_transcript_override=str(reviewed_path),
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                )
+            note = next(root.glob("lesson_*.md")).read_text(encoding="utf-8")
+            canonical = json.loads(
+                (root / "artifacts" / "lesson.reviewed-transcript.json").read_text(encoding="utf-8")
+            )
+
+        self.assertIn("三時に行きます。", note)
+        self.assertEqual(canonical["reviewer"]["model"], "gemini-test")
+
+    def test_llm_reviewed_consensus_rejects_low_confidence_or_changed_segment_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            reviewed_path = root / "agent-consensus.json"
+            request_path = root / "merge-request.json"
+            request_path.write_text(
+                json.dumps(
+                    {
+                        "kind": "asr_llm_merge_request",
+                        "merge_request_id": "b" * 64,
+                        "audio": {"sha256": MODULE.sha256_file(audio_path)},
+                        "segments": [
+                            {
+                                "segment_id": "T001",
+                                "start": 0.0,
+                                "end": 1.0,
+                                "primary_text": "三時です。",
+                                "secondary_text": "四時です。",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            payload = {
+                "schema_version": 1,
+                "kind": "reviewed_transcript",
+                "audio_sha256": MODULE.sha256_file(audio_path),
+                "merge_request_id": "b" * 64,
+                "review_status": "accepted",
+                "reviewer": {
+                    "kind": "llm",
+                    "provider": "agent-runtime",
+                    "model": "codex-test",
+                    "completed_at": "2026-07-13T00:00:00Z",
+                },
+                "segments": [
+                    {
+                        "segment_id": "changed",
+                        "start": 0.0,
+                        "end": 1.0,
+                        "selected_text": "三時です。",
+                        "decision": "primary",
+                        "confidence": "low",
+                        "rationale_zh": "无法确定。",
+                        "needs_review": False,
+                    }
+                ],
+            }
+            reviewed_path.write_text(json.dumps(payload), encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "segment_id"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path, request_path)
+
+            payload["segments"][0]["segment_id"] = "T001"
+            reviewed_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "high or medium"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path, request_path)
+
+    def test_llm_reviewed_consensus_requires_pending_merge_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            reviewed_path = root / "accepted.json"
+            reviewed_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "kind": "reviewed_transcript",
+                        "audio_sha256": MODULE.sha256_file(audio_path),
+                        "merge_request_id": "c" * 64,
+                        "review_status": "accepted",
+                        "reviewer": {
+                            "kind": "llm",
+                            "provider": "agent-runtime",
+                            "model": "codex-test",
+                            "completed_at": "2026-07-13T00:00:00Z",
+                        },
+                        "segments": [
+                            {
+                                "segment_id": "T001",
+                                "start": 0.0,
+                                "end": 1.0,
+                                "selected_text": "三時です。",
+                                "decision": "primary",
+                                "confidence": "medium",
+                                "rationale_zh": "上下文支持三点。",
+                                "needs_review": False,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "requires its pending merge-request"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path)
+
+    def test_llm_reviewed_consensus_must_match_pending_merge_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            primary = MODULE.candidate_from_payload(
+                audio_path,
+                {
+                    "engine": "faster-whisper",
+                    "full_text": "三時です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "三時です。"}],
+                },
+                "faster-whisper",
+            )
+            secondary = MODULE.candidate_from_payload(
+                audio_path,
+                {
+                    "engine": "apple",
+                    "full_text": "四時です。",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "四時です。"}],
+                },
+                "apple",
+            )
+            MODULE.write_asr_comparison_report(audio_path, primary, secondary)
+            request_path = root / "artifacts" / "lesson.llm-merge-request.json"
+            request = json.loads(request_path.read_text(encoding="utf-8"))
+            accepted = request["reviewed_transcript_template"]
+            accepted["review_status"] = "accepted"
+            accepted["reviewer"]["model"] = "codex-test"
+            accepted["reviewer"]["completed_at"] = "2026-07-13T00:00:00Z"
+            accepted["segments"][0].update(
+                {
+                    "selected_text": "三時です。",
+                    "decision": "primary",
+                    "confidence": "medium",
+                    "rationale_zh": "上下文支持三点。",
+                    "needs_review": False,
+                }
+            )
+            reviewed_path = root / "accepted.json"
+            reviewed_path.write_text(json.dumps(accepted), encoding="utf-8")
+
+            candidate = MODULE.load_reviewed_transcript(reviewed_path, audio_path, request_path)
+            self.assertEqual(candidate.full_text, "三時です。")
+
+            accepted["segments"][0]["end"] = 1.1
+            reviewed_path.write_text(json.dumps(accepted), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "identity or timestamps"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path, request_path)
+
+            accepted["segments"][0]["end"] = 1.0
+            accepted["segments"][0]["selected_text"] = "四時です。"
+            reviewed_path.write_text(json.dumps(accepted), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "primary must preserve primary_text"):
+                MODULE.load_reviewed_transcript(reviewed_path, audio_path, request_path)
+
+    def test_secondary_asr_failure_persists_limitation_and_keeps_primary_note(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio_path = root / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            primary_payload = {
+                "engine": "faster-whisper",
+                "locale": "ja-JP",
+                "full_text": "今日は良い天気です。",
+                "segments": [{"start": 0.0, "end": 1.0, "text": "今日は良い天気です。"}],
+            }
+            primary = MODULE.candidate_from_payload(audio_path, primary_payload, "faster-whisper")
+
+            with mock.patch.object(
+                MODULE,
+                "build_candidate",
+                side_effect=[primary, RuntimeError("Apple speech permission unavailable")],
+            ):
+                result = MODULE.process_one(
+                    audio_path,
+                    None,
+                    "ja-JP",
+                    None,
+                    False,
+                    engine="faster-whisper",
+                    compare_engine="apple",
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                )
+
+            note_path = next(root.glob("lesson_*.md"))
+            note = note_path.read_text(encoding="utf-8")
+            report = json.loads((root / "artifacts" / "lesson.asr-comparison.json").read_text(encoding="utf-8"))
+
+        self.assertIn("Created", result)
+        self.assertEqual(report["status"], "secondary_unavailable")
+        self.assertIn("降级为单 ASR", note)
+        self.assertIn("lesson.asr-comparison.json", note)
+
+    def test_direct_generator_write_to_configured_vault_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root)
+            audio_path = root / "listening" / "lesson.mp3"
+            audio_path.parent.mkdir()
+            audio_path.write_bytes(b"audio")
+
+            with self.assertRaisesRegex(RuntimeError, "core guard"):
+                MODULE.process_one(
+                    audio_path,
+                    None,
+                    "ja-JP",
+                    None,
+                    False,
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                )
+
+    def test_prepare_bundle_previews_and_applies_note_and_artifacts_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root)
+            audio_path = root / "listening" / "lesson" / "attach" / "lesson.mp3"
+            audio_path.parent.mkdir(parents=True)
+            audio_path.write_bytes(b"audio")
+
+            def fake_process(stage_audio: Path, *_args, **_kwargs) -> str:
+                material_dir = MODULE.material_dir_for_audio(stage_audio)
+                note_path = material_dir / "lesson_天气.md"
+                note_path.write_text("---\ntitle: 天气\n---\n\n# 天气\n", encoding="utf-8")
+                artifact_path = material_dir / "artifacts" / "lesson.faster-whisper.asr.json"
+                artifact_path.parent.mkdir(parents=True)
+                artifact_path.write_text("{}\n", encoding="utf-8")
+                return f"Created {note_path}"
+
+            with mock.patch.object(MODULE, "process_one", side_effect=fake_process):
+                bundle = MODULE.prepare_local_listening_bundle(
+                    vault_root=root,
+                    audio_path=audio_path,
+                    note_override=None,
+                    locale="ja-JP",
+                    title=None,
+                    engine="faster-whisper",
+                    compare_engine="apple",
+                    faster_whisper_python=None,
+                    faster_whisper_model="small",
+                    faster_whisper_compute_type="int8",
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                    listening_mode="extensive",
+                    slice_manifest_override=None,
+                    slice_profile="auto",
+                    reviewed_transcript=None,
+                )
+            try:
+                preview, applied = MODULE.apply_prepared_bundle(bundle, apply=True, overwrite_confirmed=False)
+                self.assertTrue(preview["accepted"], preview)
+                assert applied is not None
+                self.assertTrue(applied["accepted"], applied)
+                self.assertEqual(
+                    sorted(applied["changed_files"]),
+                    [
+                        "listening/lesson/artifacts/lesson.faster-whisper.asr.json",
+                        "listening/lesson/lesson_天气.md",
+                    ],
+                )
+                self.assertTrue((root / "listening" / "lesson" / "lesson_天气.md").is_file())
+                self.assertNotIn("lingotrace-listening-prepare", bundle.summary)
+            finally:
+                bundle.cleanup()
+
+    def test_unresolved_comparison_applies_review_artifacts_but_blocks_final_note(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root)
+            audio_path = root / "listening" / "lesson" / "attach" / "lesson.mp3"
+            audio_path.parent.mkdir(parents=True)
+            audio_path.write_bytes(b"audio")
+
+            def fake_process(stage_audio: Path, *_args, **_kwargs) -> str:
+                material_dir = MODULE.material_dir_for_audio(stage_audio)
+                note_path = material_dir / "lesson_待审核.md"
+                note_path.write_text("# must not be applied\n", encoding="utf-8")
+                artifact_dir = material_dir / "artifacts"
+                artifact_dir.mkdir(parents=True)
+                consensus_path = artifact_dir / "lesson.reviewed-transcript.json"
+                consensus_path.write_text(
+                    json.dumps({"schema_version": 1, "kind": "reviewed_transcript", "review_status": "needs_review"}),
+                    encoding="utf-8",
+                )
+                merge_request_path = artifact_dir / "lesson.llm-merge-request.json"
+                merge_request_path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "kind": "asr_llm_merge_request",
+                            "status": "merge_required",
+                            "disagreement_count": 2,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                return f"Created {note_path}; review {consensus_path}"
+
+            with mock.patch.object(MODULE, "process_one", side_effect=fake_process):
+                bundle = MODULE.prepare_local_listening_bundle(
+                    vault_root=root,
+                    audio_path=audio_path,
+                    note_override=None,
+                    locale="ja-JP",
+                    title=None,
+                    engine="faster-whisper",
+                    compare_engine="apple",
+                    faster_whisper_python=None,
+                    faster_whisper_model="small",
+                    faster_whisper_compute_type="int8",
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                    listening_mode="extensive",
+                    slice_manifest_override=None,
+                    slice_profile="auto",
+                    reviewed_transcript=None,
+                )
+            try:
+                self.assertTrue(bundle.review_required)
+                self.assertEqual(
+                    bundle.llm_merge_request_path,
+                    "listening/lesson/artifacts/lesson.llm-merge-request.json",
+                )
+                self.assertEqual(bundle.disagreement_count, 2)
+                payload = bundle.workflow_payload(overwrite_confirmed=False)
+                self.assertEqual(payload["note_path"], "")
+                self.assertTrue(all(MODULE.is_review_artifact_path(str(item["path"])) for item in payload["files"]))
+                _preview, applied = MODULE.apply_prepared_bundle(bundle, apply=True, overwrite_confirmed=False)
+                assert applied is not None
+                self.assertTrue(applied["accepted"], applied)
+                self.assertTrue(
+                    (root / "listening/lesson/artifacts/lesson.reviewed-transcript.json").is_file()
+                )
+                self.assertTrue(
+                    (root / "listening/lesson/artifacts/lesson.llm-merge-request.json").is_file()
+                )
+                self.assertFalse((root / "listening/lesson/lesson_待审核.md").exists())
+            finally:
+                bundle.cleanup()
+
+    def test_provider_neutral_two_pass_merge_survives_preview_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root)
+            audio_path = root / "listening" / "lesson" / "attach" / "lesson.mp3"
+            audio_path.parent.mkdir(parents=True)
+            audio_path.write_bytes(b"audio")
+
+            def fake_first_pass(stage_audio: Path, *_args, **_kwargs) -> str:
+                material_dir = MODULE.material_dir_for_audio(stage_audio)
+                note_path = material_dir / "lesson_待合并.md"
+                note_path.write_text("# preview only\n", encoding="utf-8")
+                artifact_dir = material_dir / "artifacts"
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                for name in (
+                    "lesson.faster-whisper.listenkit.json",
+                    "lesson.faster-whisper.listenkit.md",
+                    "lesson.faster-whisper.asr.json",
+                    "lesson.apple.asr.json",
+                ):
+                    (artifact_dir / name).write_text(f"fixture: {name}\n", encoding="utf-8")
+                primary = MODULE.candidate_from_payload(
+                    stage_audio,
+                    {
+                        "engine": "faster-whisper",
+                        "full_text": "三時に行きます。",
+                        "segments": [{"start": 0.0, "end": 1.0, "text": "三時に行きます。"}],
+                    },
+                    "faster-whisper",
+                )
+                secondary = MODULE.candidate_from_payload(
+                    stage_audio,
+                    {
+                        "engine": "apple",
+                        "full_text": "四時に行きます。",
+                        "segments": [{"start": 0.0, "end": 1.0, "text": "四時に行きます。"}],
+                    },
+                    "apple",
+                )
+                MODULE.write_asr_comparison_report(stage_audio, primary, secondary)
+                return f"Created {note_path}"
+
+            with mock.patch.object(MODULE, "process_one", side_effect=fake_first_pass):
+                first_bundle = MODULE.prepare_local_listening_bundle(
+                    vault_root=root,
+                    audio_path=audio_path,
+                    note_override=None,
+                    locale="ja-JP",
+                    title=None,
+                    engine="faster-whisper",
+                    compare_engine="apple",
+                    faster_whisper_python=None,
+                    faster_whisper_model="small",
+                    faster_whisper_compute_type="int8",
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                    listening_mode="extensive",
+                    slice_manifest_override=None,
+                    slice_profile="auto",
+                    reviewed_transcript=None,
+                )
+            handoff_path: Path | None = None
+            try:
+                handoff_path = MODULE.materialize_llm_merge_request_handoff(first_bundle)
+                assert handoff_path is not None
+                preview, applied = MODULE.apply_prepared_bundle(
+                    first_bundle,
+                    apply=False,
+                    overwrite_confirmed=False,
+                )
+                self.assertTrue(preview["accepted"], preview)
+                self.assertIsNone(applied)
+            finally:
+                first_bundle.cleanup()
+
+            assert handoff_path is not None
+            self.assertTrue(handoff_path.is_file())
+            for name in (
+                "lesson.faster-whisper.listenkit.json",
+                "lesson.faster-whisper.listenkit.md",
+                "lesson.faster-whisper.asr.json",
+                "lesson.apple.asr.json",
+                "lesson.asr-comparison.json",
+            ):
+                self.assertTrue((handoff_path.parent / name).is_file(), name)
+            self.assertFalse(
+                (root / "listening/lesson/artifacts/lesson.llm-merge-request.json").exists()
+            )
+            request = json.loads(handoff_path.read_text(encoding="utf-8"))
+            accepted = request["reviewed_transcript_template"]
+            accepted["review_status"] = "accepted"
+            accepted["reviewer"].update(
+                {
+                    "model": "gemini-fixture",
+                    "completed_at": "2026-07-13T00:00:00Z",
+                }
+            )
+            accepted["segments"][0].update(
+                {
+                    "selected_text": "三時に行きます。",
+                    "decision": "primary",
+                    "confidence": "medium",
+                    "rationale_zh": "上下文支持三点。",
+                    "needs_review": False,
+                }
+            )
+            reviewed_path = root / "gemini-consensus.json"
+            reviewed_path.write_text(json.dumps(accepted), encoding="utf-8")
+
+            with mock.patch.object(
+                MODULE,
+                "transcribe_with_heuristics",
+                side_effect=AssertionError("accepted consensus must not rerun ASR"),
+            ):
+                second_bundle = MODULE.prepare_local_listening_bundle(
+                    vault_root=root,
+                    audio_path=audio_path,
+                    note_override=None,
+                    locale="ja-JP",
+                    title=None,
+                    engine="faster-whisper",
+                    compare_engine="auto",
+                    faster_whisper_python=None,
+                    faster_whisper_model="small",
+                    faster_whisper_compute_type="int8",
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                    listening_mode="extensive",
+                    slice_manifest_override=None,
+                    slice_profile="auto",
+                    reviewed_transcript=reviewed_path,
+                    merge_request=handoff_path,
+                )
+            try:
+                self.assertEqual(second_bundle.merge_model, "gemini-fixture")
+                self.assertEqual(second_bundle.asr_validation_status, "merged")
+                self.assertEqual(second_bundle.disagreement_count, 1)
+                preview, applied = MODULE.apply_prepared_bundle(
+                    second_bundle,
+                    apply=True,
+                    overwrite_confirmed=False,
+                )
+                self.assertTrue(preview["accepted"], preview)
+                assert applied is not None
+                self.assertTrue(applied["accepted"], applied)
+                self.assertTrue(
+                    (root / "listening/lesson/artifacts/lesson.llm-merge-request.json").is_file()
+                )
+                for name in (
+                    "lesson.faster-whisper.listenkit.json",
+                    "lesson.faster-whisper.listenkit.md",
+                    "lesson.faster-whisper.asr.json",
+                    "lesson.apple.asr.json",
+                    "lesson.asr-comparison.json",
+                ):
+                    self.assertTrue((root / "listening/lesson/artifacts" / name).is_file(), name)
+                notes = list((root / "listening/lesson").glob("lesson_*.md"))
+                self.assertEqual(len(notes), 1)
+                self.assertIn("三時に行きます。", notes[0].read_text(encoding="utf-8"))
+            finally:
+                second_bundle.cleanup()
+                shutil.rmtree(handoff_path.parent, ignore_errors=True)
+
+    def test_all_listening_material_defaults_to_dual_asr_unless_opted_out(self) -> None:
+        extensive = MODULE.effective_compare_engine(
+            "auto",
+            single_asr=False,
+            listening_mode="extensive",
+            audio_path=Path("listening/ordinary-lesson.mp3"),
+            existing_note=None,
+        )
+        intensive = MODULE.effective_compare_engine(
+            "auto",
+            single_asr=False,
+            listening_mode="intensive",
+            audio_path=Path("listening/lesson.mp3"),
+            existing_note=None,
+        )
+        opted_out = MODULE.effective_compare_engine(
+            "auto",
+            single_asr=True,
+            listening_mode="intensive",
+            audio_path=Path("listening/lesson.mp3"),
+            existing_note=None,
+        )
+        explicit_secondary = MODULE.effective_compare_engine(
+            "apple",
+            single_asr=False,
+            listening_mode="extensive",
+            audio_path=Path("listening/ordinary-lesson.mp3"),
+            existing_note=None,
+        )
+
+        self.assertEqual(extensive, "auto")
+        self.assertEqual(intensive, "auto")
+        self.assertEqual(explicit_secondary, "apple")
+        self.assertIsNone(opted_out)
+
+    def test_matching_dual_asr_notification_reports_agreement_explicitly(self) -> None:
+        bundle = MODULE.PreparedListeningBundle(
+            vault_root=Path("/tmp/vault"),
+            note_path="listening/lesson.md",
+            files=[],
+            summary="prepared",
+            overwrite_required=False,
+            staging_root=Path("/tmp/staging"),
+            asr_validation_status="agreed",
+        )
+
+        status, notification = MODULE.listening_status_and_notification(bundle)
+
+        self.assertEqual(status, "complete")
+        self.assertIn("双 ASR 转写一致", notification)
+        self.assertIn("无需模型合并", notification)
+
+    def test_structural_normalization_does_not_apply_material_specific_corrections(self) -> None:
+        self.assertEqual(MODULE.normalize_structured_text("土曜の牛の日です。"), "土曜の牛の日です。")
 
     def test_unnumbered_dialogue_groups_continuous_four_turn_exchange(self) -> None:
         chunks = [
@@ -815,6 +1699,8 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertEqual(export_result.refs, ["attach/20_S01.m4a"])
         self.assertEqual(export_result.report_path, root / "artifacts" / "20.slice-export.json")
         self.assertTrue(report_exists)
+        self.assertEqual(export_result.report["source"], "attach/20.mp3")
+        self.assertEqual(export_result.report["slices"][0]["path"], "attach/20_S01.m4a")
         self.assertEqual(export_result.report["slice_profile"]["grouping"], "sentence")
         command = run_mock.call_args.args[0]
         self.assertIn("/tmp/export.py", command)
@@ -1081,7 +1967,9 @@ class TranscribeListeningTests(unittest.TestCase):
     def test_main_fails_when_offline_dictionary_runtime_is_unhealthy(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            audio_path = root / "audio.mp3"
+            create_lingotrace_vault(root)
+            audio_path = root / "listening" / "audio.mp3"
+            audio_path.parent.mkdir()
             audio_path.write_bytes(b"audio")
             stderr = StringIO()
             with mock.patch.object(
@@ -1090,7 +1978,11 @@ class TranscribeListeningTests(unittest.TestCase):
                 side_effect=MODULE.OfflineDictionaryError("Offline dictionary runtime validation failed"),
             ):
                 with mock.patch.dict(os.environ, {"JP_LISTENING_DICT_DIR": str(root / "dict")}, clear=False):
-                    with mock.patch.object(sys, "argv", ["transcribe-listening", str(audio_path), "--dry-run"]):
+                    with mock.patch.object(
+                        sys,
+                        "argv",
+                        ["transcribe-listening", str(audio_path), "--vault-root", str(root), "--dry-run"],
+                    ):
                         with mock.patch("sys.stderr", stderr):
                             exit_code = MODULE.main()
 
@@ -1293,26 +2185,121 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("--output-dir is required", stderr.getvalue())
 
-    def test_url_rejects_compare_engine_until_final_audio_cross_check_is_supported(self) -> None:
-        stderr = StringIO()
-        with mock.patch.object(
-            sys,
-            "argv",
-            [
-                "transcribe-listening",
-                "--url",
-                "https://example.com/a.mp4",
-                "--output-dir",
-                "/tmp/listening",
-                "--compare-engine",
-                "apple",
-            ],
-        ):
-            with mock.patch("sys.stderr", stderr):
-                exit_code = MODULE.main()
+    def test_main_preview_returns_stable_merge_request_after_staging_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "vault"
+            root.mkdir()
+            create_lingotrace_vault(root)
+            audio_path = root / "listening" / "lesson" / "attach" / "lesson.mp3"
+            audio_path.parent.mkdir(parents=True)
+            audio_path.write_bytes(b"audio")
+            staging_root = Path(tempfile.mkdtemp(prefix="lingotrace-main-preview-test-"))
+            stage_request = (
+                staging_root
+                / "vault"
+                / "listening"
+                / "lesson"
+                / "artifacts"
+                / "lesson.llm-merge-request.json"
+            )
+            stage_request.parent.mkdir(parents=True)
+            stage_request.write_text(
+                json.dumps({"kind": "asr_llm_merge_request", "disagreement_count": 1}),
+                encoding="utf-8",
+            )
+            bundle = MODULE.PreparedListeningBundle(
+                vault_root=root,
+                note_path="listening/lesson/lesson.md",
+                files=[
+                    {
+                        "path": "listening/lesson/artifacts/lesson.llm-merge-request.json",
+                        "source_path": str(stage_request),
+                    }
+                ],
+                summary="prepared",
+                overwrite_required=False,
+                staging_root=staging_root,
+                review_required=True,
+                llm_merge_request_path="listening/lesson/artifacts/lesson.llm-merge-request.json",
+                disagreement_count=1,
+                asr_validation_status="disagreement",
+            )
+            stdout = StringIO()
+            with mock.patch.object(MODULE, "load_offline_dictionary", return_value=MODULE.StaticAccentDictionary({})):
+                with mock.patch.object(MODULE, "prepare_local_listening_bundle", return_value=bundle):
+                    with mock.patch.object(
+                        MODULE,
+                        "apply_prepared_bundle",
+                        return_value=({"accepted": True}, None),
+                    ):
+                        with mock.patch.object(
+                            sys,
+                            "argv",
+                            ["transcribe-listening", str(audio_path), "--vault-root", str(root)],
+                        ):
+                            with mock.patch("sys.stdout", stdout):
+                                exit_code = MODULE.main()
 
-        self.assertEqual(exit_code, 1)
-        self.assertIn("--compare-engine is currently supported only for local audio files", stderr.getvalue())
+            output = json.loads(stdout.getvalue())
+            handoff_path = Path(output["llm_merge_request_path"])
+            try:
+                self.assertEqual(exit_code, 2)
+                self.assertTrue(handoff_path.is_absolute())
+                self.assertTrue(handoff_path.is_file())
+                self.assertEqual(handoff_path.stat().st_mode & 0o222, 0)
+                self.assertFalse(staging_root.exists())
+                self.assertIn("--merge-request", output["notification"])
+            finally:
+                shutil.rmtree(handoff_path.parent, ignore_errors=True)
+
+    def test_url_supports_compare_engine_through_preparation_pipeline(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root)
+            output_dir = root / "listening" / "url-item"
+            bundle = mock.Mock(
+                summary="prepared",
+                note_path="listening/url-item/note.md",
+                review_required=False,
+                llm_merge_request_path=None,
+                disagreement_count=2,
+                merge_model="gemini-test",
+                asr_validation_status="merged",
+            )
+            bundle.cleanup = mock.Mock()
+            stdout = StringIO()
+            with mock.patch.object(MODULE, "load_offline_dictionary", return_value=MODULE.StaticAccentDictionary({})):
+                with mock.patch.object(MODULE, "prepare_url_listening_bundle", return_value=bundle) as prepare_mock:
+                    with mock.patch.object(
+                        MODULE,
+                        "apply_prepared_bundle",
+                        return_value=({"accepted": True}, None),
+                    ):
+                        with mock.patch.object(
+                            sys,
+                            "argv",
+                            [
+                                "transcribe-listening",
+                                "--url",
+                                "https://example.com/a.mp4",
+                                "--output-dir",
+                                str(output_dir),
+                                "--vault-root",
+                                str(root),
+                                "--compare-engine",
+                                "apple",
+                            ],
+                        ):
+                            with mock.patch("sys.stdout", stdout):
+                                exit_code = MODULE.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(prepare_mock.call_args.kwargs["compare_engine"], "apple")
+        output = json.loads(stdout.getvalue())
+        self.assertEqual(output["status"], "complete")
+        self.assertEqual(output["disagreement_count"], 2)
+        self.assertEqual(output["merge_model"], "gemini-test")
+        self.assertIn("自动判断并合并", output["notification"])
 
     def test_url_input_generates_note_from_finalized_audio(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1330,13 +2317,17 @@ class TranscribeListeningTests(unittest.TestCase):
             }
 
             def fake_run(command, **kwargs):
+                payload = dict(expected_payload)
+                if "--engine" in command:
+                    payload["engine"] = command[command.index("--engine") + 1]
                 output_path = Path(command[command.index("--output") + 1])
                 output_path.write_text("# transcript\n", encoding="utf-8")
-                output_path.with_suffix(".json").write_text(json.dumps(expected_payload), encoding="utf-8")
-                audio_dir = output_path.parent / "audio"
-                audio_dir.mkdir()
-                audio_format = command[command.index("--format") + 1]
-                (audio_dir / f"{output_path.stem}.{audio_format}").write_bytes(b"audio")
+                output_path.with_suffix(".json").write_text(json.dumps(payload), encoding="utf-8")
+                if "--url" in command:
+                    audio_dir = output_path.parent / "audio"
+                    audio_dir.mkdir()
+                    audio_format = command[command.index("--format") + 1]
+                    (audio_dir / f"{output_path.stem}.{audio_format}").write_bytes(b"audio")
                 return mock.Mock(returncode=0, stdout=str(output_path), stderr="")
 
             with mock.patch.object(MODULE, "preflight_listenkit_generate_tooling"):
@@ -1348,11 +2339,16 @@ class TranscribeListeningTests(unittest.TestCase):
                         "ja-JP",
                         "数字の読み方",
                         False,
+                        compare_engine="apple",
                     )
 
             command = run_mock.call_args_list[0].args[0]
+            comparison_command = run_mock.call_args_list[1].args[0]
             self.assertIn("--url", command)
             self.assertIn("https://www.youtube.com/watch?v=abc123", command)
+            self.assertIn("--input", comparison_command)
+            self.assertIn("--engine", comparison_command)
+            self.assertIn("apple", comparison_command)
             final_audio = output_dir / "attach" / "youtube_abc123_4b91d82f.m4a"
             self.assertTrue(final_audio.exists())
             created_notes = list(output_dir.glob("youtube_abc123_4b91d82f_*.md"))
@@ -1365,6 +2361,11 @@ class TranscribeListeningTests(unittest.TestCase):
             self.assertIn("Source URL: https://www.youtube.com/watch?v=abc123", result)
             self.assertTrue((output_dir / "artifacts/youtube_abc123_4b91d82f.faster-whisper.listenkit.md").exists())
             self.assertTrue((output_dir / "artifacts/youtube_abc123_4b91d82f.faster-whisper.listenkit.json").exists())
+            comparison = json.loads(
+                (output_dir / "artifacts/youtube_abc123_4b91d82f.asr-comparison.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(comparison["primary"]["engine"], "faster-whisper")
+            self.assertEqual(comparison["secondary"]["engine"], "apple")
 
     def test_audio_in_attach_generates_note_in_material_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
