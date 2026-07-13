@@ -388,8 +388,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--locale", default="ja-JP")
     parser.add_argument("--title")
     parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper"], default="auto")
-    parser.add_argument("--compare-engine", choices=["auto", "apple", "faster-whisper"], default="auto")
-    parser.add_argument("--single-asr", action="store_true")
+    parser.add_argument(
+        "--compare-engine",
+        choices=["auto", "apple", "faster-whisper"],
+        default="auto",
+        help="Secondary ASR route; auto enables dual-ASR validation by default.",
+    )
+    parser.add_argument(
+        "--single-asr",
+        action="store_true",
+        help="Explicitly opt out of the default dual-ASR validation.",
+    )
     parser.add_argument("--reviewed-transcript")
     parser.add_argument("--format", choices=["mp3", "m4a", "wav", "flac"], default="m4a")
     parser.add_argument("--faster-whisper-python")
@@ -3360,16 +3369,6 @@ def _mapped_stage_path(stage_vault: Path, vault_root: Path, source: Path) -> Pat
     return stage_vault / source.resolve().relative_to(vault_root.resolve())
 
 
-def _existing_mode(note_path: Path | None) -> str | None:
-    if note_path is None or not note_path.is_file():
-        return None
-    try:
-        frontmatter, body = parse_frontmatter(note_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    return resolve_listening_mode(None, frontmatter, body)
-
-
 def effective_compare_engine(
     requested: str | None,
     *,
@@ -3378,16 +3377,12 @@ def effective_compare_engine(
     audio_path: Path,
     existing_note: Path | None,
 ) -> str | None:
+    """Keep legacy routing inputs while making dual ASR the stable default."""
     if single_asr:
         return None
     if requested and requested != "auto":
         return requested
-    high_risk = (
-        listening_mode == "intensive"
-        or _existing_mode(existing_note) == "intensive"
-        or is_short_choice_mode(audio_path)
-    )
-    return "auto" if high_risk else None
+    return "auto"
 
 
 def is_review_artifact_path(path: str) -> bool:

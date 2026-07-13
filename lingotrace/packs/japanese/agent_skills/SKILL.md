@@ -76,7 +76,7 @@ For requests such as "请把 23.mp3 做成精听稿", the agent should provide t
 
 1. Check that the audio or URL is available.
 2. Check the listening chain and slice tooling before intensive listening work.
-3. Generate or reuse the transcript and slice evidence.
+3. Generate or reuse the transcript and slice evidence with dual-ASR validation enabled by default for every listening note, including ordinary extensive listening. Do not pass `--single-asr` unless the user explicitly requests a single engine; a runtime fallback caused by an unavailable secondary engine must be reported.
 4. If the generator returns `status: llm_merge_required`, complete the ASR merge automatically in the same user task:
    - read the Vault-relative `llm_merge_request_path`; it contains both ASR candidates, neighboring context, risk categories, and `reviewed_transcript_template`;
    - use the current agent model's Japanese-language judgment, whether the caller is Codex, Gemini, or another compatible agent; do not call a provider-specific API from the listening script;

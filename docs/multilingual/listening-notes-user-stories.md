@@ -53,7 +53,7 @@ Labels:
 | `US-9` Clear runtime/resource failure | `Required` | `Covered` | `Unsupported` | Unsupported packs should fail clearly without invoking Japanese tooling. |
 | `US-10` Explicit unsupported declaration | `Required` | `N/A` | `Covered` | Applies to packs that do not implement listening notes. |
 | `US-11` Language-specific pronunciation cues | `Language-Specific` | `Covered` | `Planned` | Japanese pitch accent is reference behavior, not core. |
-| `US-12` Multi-ASR cross-check | `Optional` | `Covered` | `Unsupported` | Japanese emits a provider-neutral LLM merge request, validates the returned consensus, and reports the merge to the user. |
+| `US-12` Multi-ASR cross-check | `Optional` | `Covered` | `Unsupported` | Japanese defaults every listening script to dual ASR, emits a provider-neutral LLM merge request, validates the returned consensus, and reports the merge to the user. |
 | `US-13` Short-choice exam structure | `Optional` | `Covered` | `Unsupported` | Required only for packs that support exam-style listening notes. |
 | `US-14` Listening frontmatter and dashboard readiness | `Required` | `Covered` | `Unsupported` | Required for packs that render listening notes into the review dashboard. |
 | `US-15` Conservative dialogue rendering | `Optional` | `Covered` | `Unsupported` | Required only when dialogue listening is supported. |
@@ -344,13 +344,14 @@ Regression coverage:
 - `test_learning_package_renders_kana_accent_as_downstep_marker`
 - Manual review remains required for disputed Japanese pitch accent.
 
-### 12. Cross-Check High-Risk Transcripts With More Than One ASR Route
+### 12. Cross-Check Every Transcript With More Than One ASR Route
 
-As a learner, I want difficult recordings to be checked by more than one transcription route when practical, so the final script is more accurate and the agent spends less effort guessing from one unstable transcript.
+As a learner, I want every generated listening script to be checked by more than one transcription route by default, so ordinary-looking material does not silently bypass transcript validation.
 
 Acceptance criteria:
 
-- Multi-engine ASR comparison is optional by default and recommended for high-value intensive notes, unclear audio, dense dialogue, proper names, short-choice listening, or low-confidence transcript segments.
+- Multi-engine ASR comparison is enabled by default for every generated Japanese listening script, including ordinary extensive notes, intensive notes, local audio, and URL input.
+- Single-ASR generation is an explicit user opt-out through `--single-asr`, not an automatic shortcut for ordinary or apparently low-risk material.
 - The primary ASR output and secondary ASR output should be persisted as separate artifacts when both are used.
 - The workflow should align the two transcripts by timestamp, sentence, or segment id and produce a disagreement report or reviewed transcript artifact.
 - The final note should use reviewed consensus text, not a blind merge of two transcripts.
@@ -363,6 +364,7 @@ Acceptance criteria:
 Japanese reference:
 
 - The current Japanese chain already supports `faster-whisper` and Apple Speech routes through ListenKit.
+- The Japanese Agent Skill must preserve the default dual-ASR route and use `--single-asr` only when the user explicitly asks for it.
 - Some existing Shadowing artifacts keep both Apple and faster-whisper transcript files for comparison.
 - Japanese disagreement runs emit `artifacts/<audio_stem>.llm-merge-request.json` with a reviewed-transcript template that Codex, Gemini, or another compatible agent can complete without a provider-specific API inside the script.
 - The merge request and reviewed transcript use a lightweight artifact schema so the calling agent and deterministic runtime can exchange evidence without sharing provider-specific internals.
@@ -371,6 +373,7 @@ Japanese reference:
 Regression coverage:
 
 - `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`
+- `test_all_listening_material_defaults_to_dual_asr_unless_opted_out`
 - `test_llm_merge_request_contains_provider_neutral_review_template`
 - `test_japanese_agent_skill_auto_merges_asr_disagreements`
 - `test_llm_reviewed_consensus_skips_retranscription_and_finishes_note`
@@ -577,7 +580,7 @@ Expected agent behavior:
 | Runtime/resource failure clarity | Listening renderer tests and manual chain check |
 | Unsupported packs fail explicitly | Contributor guide and English pack behavior |
 | Language-specific pronunciation cues | `test_japanese_listening_guidance_records_accent_annotation_policy`, `test_learning_package_renders_kana_accent_as_downstep_marker`, plus manual pitch-accent review |
-| Multi-engine ASR cross-check | `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`, `test_llm_merge_request_contains_provider_neutral_review_template`, `test_llm_reviewed_consensus_skips_retranscription_and_finishes_note`, and `test_japanese_agent_skill_auto_merges_asr_disagreements` |
+| Multi-engine ASR cross-check | `test_all_listening_material_defaults_to_dual_asr_unless_opted_out`, `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`, `test_llm_merge_request_contains_provider_neutral_review_template`, `test_llm_reviewed_consensus_skips_retranscription_and_finishes_note`, and `test_japanese_agent_skill_auto_merges_asr_disagreements` |
 | Short-choice exam structure | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer short-choice tests |
 | Listening frontmatter and dashboard readiness | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer frontmatter tests |
 | Dialogue and numbered-dialogue rendering | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer dialogue tests |

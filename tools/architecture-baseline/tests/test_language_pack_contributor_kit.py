@@ -251,6 +251,8 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "rationale_zh",
             "same user task",
             "Do not stop at the first `llm_merge_required`",
+            "dual-ASR validation enabled by default for every listening note",
+            "Do not pass `--single-asr` unless the user explicitly requests",
         ):
             self.assertIn(token, skill)
         for token in (

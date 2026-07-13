@@ -1098,7 +1098,14 @@ class TranscribeListeningTests(unittest.TestCase):
             finally:
                 bundle.cleanup()
 
-    def test_high_risk_local_material_enables_dual_asr_unless_opted_out(self) -> None:
+    def test_all_listening_material_defaults_to_dual_asr_unless_opted_out(self) -> None:
+        extensive = MODULE.effective_compare_engine(
+            "auto",
+            single_asr=False,
+            listening_mode="extensive",
+            audio_path=Path("listening/ordinary-lesson.mp3"),
+            existing_note=None,
+        )
         intensive = MODULE.effective_compare_engine(
             "auto",
             single_asr=False,
@@ -1113,8 +1120,17 @@ class TranscribeListeningTests(unittest.TestCase):
             audio_path=Path("listening/lesson.mp3"),
             existing_note=None,
         )
+        explicit_secondary = MODULE.effective_compare_engine(
+            "apple",
+            single_asr=False,
+            listening_mode="extensive",
+            audio_path=Path("listening/ordinary-lesson.mp3"),
+            existing_note=None,
+        )
 
+        self.assertEqual(extensive, "auto")
         self.assertEqual(intensive, "auto")
+        self.assertEqual(explicit_secondary, "apple")
         self.assertIsNone(opted_out)
 
     def test_structural_normalization_does_not_apply_material_specific_corrections(self) -> None:
