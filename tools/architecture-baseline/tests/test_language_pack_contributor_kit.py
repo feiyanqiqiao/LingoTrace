@@ -156,6 +156,9 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "error cards",
             "kanji-difference",
             "daily checklist",
+            "active focus card reappears in a new source note",
+            "reset to `review_stage: day0`",
+            "`next_review` at the current extraction date",
         ):
             self.assertIn(token, review_materials)
 

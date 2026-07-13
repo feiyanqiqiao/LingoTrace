@@ -46,7 +46,7 @@ Labels:
 | `US-2` Route items to the correct card type            | `Required`          | `Covered` | `Partial` | Card families differ by language pack; pronunciation routing is optional when unsupported.    |
 | `US-3` Preserve source provenance                      | `Required`          | `Covered` | `Partial` | Provenance fields may use pack-owned names.                                                   |
 | `US-4` Initialize new active review cards              | `Required`          | `Covered` | `Covered` | Shared SRS initialization fields are expected for active review cards.                        |
-| `US-5` Reactivate known material                       | `Required`          | `Covered` | `Planned` | English should add explicit mastered/base reactivation tests before claiming parity.          |
+| `US-5` Reactivate known material                       | `Required`          | `Covered` | `Planned` | English should add explicit active/mastered/base reactivation tests before claiming parity.          |
 | `US-6` Keep base lexicon sink out of extraction        | `Required`          | `Covered` | `Partial` | The shared boundary is required; pack-specific base restore details need coverage.            |
 | `US-7` Preserve language-specific review cues          | `Language-Specific` | `Covered` | `Partial` | Japanese accent/kanji fields are not shared; English needs its own cue policy.                |
 | `US-8` Image-backed vocabulary extraction              | `Optional`          | `Covered` | `Planned` | Required only for packs that accept image-backed review extraction.                           |
@@ -143,7 +143,7 @@ Regression coverage:
 
 - `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body`
 - `test_review_materials_apply_creates_target_card`
-- `test_review_materials_item_updates_existing_focus_without_duplicate_or_body_loss`
+- `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss`
 
 ### 4. Initialize New Active Review Cards Predictably
 
@@ -176,18 +176,22 @@ As a learner, I want a mastered or base-lexicon item that reappears as a weaknes
 Acceptance criteria:
 
 - If a base-lexicon item appears in a new source context, create or restore an active focus card.
+- If an active focus card reappears in a new source note, treat the reappearance as a fresh learning signal instead of only appending provenance.
 - If a mastered focus card reappears as a weakness, switch it back to active review.
-- Reactivated cards reset to `review_stage: day0` and `next_review` at the current extraction date.
+- Reappearing active cards and reactivated mastered cards reset to `review_stage: day0` and `next_review` at the current extraction date.
+- Resetting to day0 also clears `last_reviewed` or otherwise makes the card visible in the same-day review queue according to the pack's dashboard policy.
 - The base lexicon keeps the long-term record and should not be deleted.
 
 Japanese reference:
 
 - Base-only match action is `restore_focus_card`.
+- Active focus reappearance should update the existing focus card, append the new source note, reset scheduling to `day0`, and preserve manual body content.
 - Mastered reappearance resets the focus card to `day0`.
 
 Regression coverage:
 
 - `test_lookup_cases_preserve_focus_first_and_routing_decisions`
+- `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss`
 - `test_review_materials_item_reactivates_mastered_focus_card`
 
 ### 6. Keep Base Lexicon Sink Out Of Daily Extraction
@@ -234,7 +238,7 @@ Japanese reference:
 Regression coverage:
 
 - `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body`
-- `test_review_materials_item_updates_existing_focus_without_duplicate_or_body_loss`
+- `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss`
 - `test_review_materials_item_preserves_vocab_review_cues`
 
 ### 8. Handle Image-Backed Vocabulary Conservatively
@@ -321,6 +325,7 @@ Regression coverage:
 | Focus-first duplicate search | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
 | Base-only match restores focus card | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
 | Mastered reappearance resets to day0 | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
+| Active focus card reappears in a new source note and resets to day0 | `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss` | Covered | Yes |
 | Grammar and error routing | `test_grammar_and_error_cards_do_not_route_to_vocab_layer` | Covered | Yes |
 | Pronunciation routing | `test_review_materials_item_routes_grammar_error_and_pronunciation_cards` | Covered for structured items | Yes, if the pack supports pronunciation cards |
 | Source provenance | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered | Yes |

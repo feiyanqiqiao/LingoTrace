@@ -678,18 +678,51 @@ def _mutation_for_existing_item(
     action_role: str,
 ) -> FileMutation | Finding:
     text = card_path.read_text(encoding="utf-8")
-    fields, body = _frontmatter_and_body(text)
+    fields, _ = _frontmatter_and_body(text)
     item_type = str(fields.get("item_type") or _infer_review_item_type(item))
+    updates: dict[str, str] = {}
     for key, value in _item_fields(item_type, item, title).items():
         if value and key not in {"status", "done_today", "review_stage", "next_review", "last_reviewed"}:
             fields[key] = value
-    fields["source_notes"] = _merged_source_notes(str(fields.get("source_notes", "")), item.get("source_note"))
+            updates[key] = _format_frontmatter_value(value)
+    existing_source_notes = str(fields.get("source_notes", ""))
+    new_source_note = item.get("source_note")
+    source_reappeared = (
+        action_role == "focus"
+        and isinstance(new_source_note, str)
+        and new_source_note.strip()
+        and new_source_note.strip() not in [part.strip() for part in existing_source_notes.split(",") if part.strip()]
+    )
+    fields["source_notes"] = _merged_source_notes(existing_source_notes, new_source_note)
+    updates["source_notes"] = str(fields["source_notes"])
     if fields.get("status") == "mastered":
         fields["status"] = "active"
         fields["done_today"] = "false"
         fields["review_stage"] = "day0"
         fields["next_review"] = review_date
         fields["last_reviewed"] = ""
+        updates.update(
+            {
+                "status": "active",
+                "done_today": "false",
+                "review_stage": "day0",
+                "next_review": review_date,
+                "last_reviewed": "",
+            }
+        )
+    elif fields.get("status") == "active" and source_reappeared:
+        fields["done_today"] = "false"
+        fields["review_stage"] = "day0"
+        fields["next_review"] = review_date
+        fields["last_reviewed"] = ""
+        updates.update(
+            {
+                "done_today": "false",
+                "review_stage": "day0",
+                "next_review": review_date,
+                "last_reviewed": "",
+            }
+        )
     validation_error = _review_material_validation_error(fields, card_path.relative_to(root).as_posix())
     if validation_error is not None:
         return validation_error
@@ -698,7 +731,7 @@ def _mutation_for_existing_item(
         action = "update_focus_card" if action == "update_review_card" else "reactivate_focus_card"
     return FileMutation(
         path=card_path.relative_to(root).as_posix(),
-        content=_render_markdown(fields, body),
+        content=_replace_frontmatter_fields(text, updates),
         action=action,
         reason="existing review material matched structured item",
     )
@@ -861,13 +894,30 @@ def _frontmatter_and_body(text: str) -> tuple[dict[str, str], str]:
     parts = text.split("---\n", 2)
     if len(parts) < 3:
         return {}, text
+    return _parse_frontmatter_fields(parts[1]), parts[2].lstrip("\n")
+
+
+def _parse_frontmatter_fields(frontmatter: str) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for line in parts[1].splitlines():
-        if not line or line.startswith(" ") or line.startswith("- ") or ":" not in line:
+    list_key: str | None = None
+    for line in frontmatter.splitlines():
+        if not line:
+            continue
+        stripped = line.strip()
+        if line.startswith(" ") or line.startswith("- "):
+            if list_key == "source_notes" and stripped.startswith("- "):
+                value = stripped[2:].strip().strip('"').strip("'")
+                fields["source_notes"] = _merged_source_notes(fields.get("source_notes", ""), value)
+            continue
+        list_key = None
+        if ":" not in line:
             continue
         key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip().strip('"')
-    return fields, parts[2].lstrip("\n")
+        key = key.strip()
+        fields[key] = value.strip().strip('"').strip("'")
+        if key == "source_notes" and not fields[key]:
+            list_key = key
+    return fields
 
 
 def _render_markdown(fields: dict[str, Any], body: str) -> str:
@@ -962,13 +1012,7 @@ def _frontmatter(path: Path) -> dict[str, str]:
     if len(parts) < 3:
         return {}
 
-    fields: dict[str, str] = {}
-    for line in parts[1].splitlines():
-        if not line or line.startswith(" ") or line.startswith("- ") or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip().strip('"')
-    return fields
+    return _parse_frontmatter_fields(parts[1])
 
 
 def _replace_frontmatter_fields(text: str, updates: dict[str, str]) -> str:
@@ -980,7 +1024,13 @@ def _replace_frontmatter_fields(text: str, updates: dict[str, str]) -> str:
     frontmatter = parts[1].splitlines()
     seen: set[str] = set()
     updated_lines: list[str] = []
+    skip_list_items = False
     for line in frontmatter:
+        if skip_list_items:
+            if line.startswith(" ") or line.startswith("- ") or not line:
+                continue
+            else:
+                skip_list_items = False
         if ":" not in line or line.startswith(" ") or line.startswith("- "):
             updated_lines.append(line)
             continue
@@ -989,6 +1039,7 @@ def _replace_frontmatter_fields(text: str, updates: dict[str, str]) -> str:
         if clean_key in updates:
             updated_lines.append(f"{clean_key}: {updates[clean_key]}")
             seen.add(clean_key)
+            skip_list_items = True
         else:
             updated_lines.append(line)
     for key, value in updates.items():
