@@ -180,6 +180,85 @@ class JapaneseWorkflowPreviewTests(unittest.TestCase):
                 self.assertEqual([expected_path], envelope["changed_files"])
                 self.assertTrue((root / expected_path).is_file())
 
+    def test_listening_bundle_previews_and_applies_markdown_json_and_binary_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "vault"
+            root.mkdir()
+            create_target_context(root)
+            staged_audio = Path(tmp) / "slice.m4a"
+            staged_audio.write_bytes(b"synthetic-audio")
+            payload = {
+                "note_path": "listening/lesson/lesson.md",
+                "files": [
+                    {
+                        "path": "listening/lesson/lesson.md",
+                        "content": "---\ntitle: Lesson\n---\n\n# Lesson\n",
+                    },
+                    {
+                        "path": "listening/lesson/artifacts/lesson.asr.json",
+                        "content": "{}\n",
+                    },
+                    {
+                        "path": "listening/lesson/attach/lesson_S01.m4a",
+                        "source_path": staged_audio,
+                    },
+                ],
+            }
+
+            preview = workflows.listening_notes(vault_root=root, input_artifact=payload, mode="preview")
+            applied = workflows.listening_notes(vault_root=root, input_artifact=payload, mode="apply")
+
+            self.assertTrue(preview.accepted, preview.to_dict())
+            self.assertEqual(preview.changed_files, [])
+            self.assertTrue(applied.accepted, applied.to_dict())
+            self.assertEqual(len(applied.changed_files), 3)
+            self.assertEqual(
+                (root / "listening/lesson/attach/lesson_S01.m4a").read_bytes(),
+                b"synthetic-audio",
+            )
+
+    def test_listening_bundle_rejects_paths_outside_role_and_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            outside = workflows.listening_notes(
+                vault_root=root,
+                input_artifact={"files": [{"path": "sources/not-listening.md", "content": "x"}]},
+            )
+            duplicate = workflows.listening_notes(
+                vault_root=root,
+                input_artifact={
+                    "files": [
+                        {"path": "listening/duplicate.md", "content": "one"},
+                        {"path": "listening/duplicate.md", "content": "two"},
+                    ]
+                },
+            )
+
+        self.assertEqual(outside.errors[0].code, "listening_artifact_outside_role")
+        self.assertEqual(duplicate.errors[0].code, "duplicate_listening_bundle_path")
+
+    def test_existing_listening_note_apply_requires_explicit_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            note_path = root / "listening/lesson.md"
+            write(note_path, "old")
+            payload = {
+                "note_path": "listening/lesson.md",
+                "files": [{"path": "listening/lesson.md", "content": "new"}],
+            }
+
+            rejected = workflows.listening_notes(vault_root=root, input_artifact=payload, mode="apply")
+            self.assertEqual(note_path.read_text(encoding="utf-8"), "old")
+            payload["overwrite_confirmed"] = True
+            accepted = workflows.listening_notes(vault_root=root, input_artifact=payload, mode="apply")
+
+            self.assertEqual(rejected.errors[0].code, "existing_listening_note_confirmation_required")
+            self.assertEqual(note_path.read_text(encoding="utf-8"), "new")
+            self.assertTrue(accepted.accepted, accepted.to_dict())
+
     def test_speaking_cards_reject_unreviewed_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

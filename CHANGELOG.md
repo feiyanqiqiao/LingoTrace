@@ -5,6 +5,17 @@
 
 ---
 
+## [20260713-134631]
+### 新增 (Added)
+- `tools/listening-transcribe-official/transcribe_listening.py`: 新增显式 Vault、LingoTrace 与 ListenKit 根目录参数，支持从任意工作目录统一准备本地音频和 URL 素材；新增带音频哈希、引擎、语言、完整时间戳的标准化 ASR 工件。
+- `tools/listening-transcribe-official/transcribe_listening.py`: 高风险精听默认使用 faster-whisper 主转写与 Apple 辅助转写，按时间重叠和文本相似度对齐，保存差异分类、比对报告和待审核共识；未解决差异阻止最终笔记写入，辅助引擎不可用时则明确记录单 ASR 降级限制。
+- `lingotrace.core.mutations` 与日语 `listening_notes` workflow：支持 Markdown、JSON、音频切片组成的多文件 bundle，经统一 preview/apply 写入保护进行原子提交和失败回滚。
+
+### 变更 (Changed)
+- 听力生成器不再直接写入已配置的 LingoTrace Vault；本地音频与 URL 均先在临时区生成，再校验 `listening_root` 路径边界、现有笔记覆盖确认和人工共识状态后提交。
+- 精听流程继续保留人工维护的常用句与自定义段落；reviewed manifest 强制非重叠，最终笔记的学习块、音频嵌入、切片报告与 `segment_count` 必须数量一致且对应真实非空音频文件。
+- 补充双 ASR 分段对齐、人工共识门禁、URL 双引擎、本地降级、二进制原子写入、覆盖确认、越界阻断和真实切片不变量的自动化测试。
+
 ## [20260703-164000]
 ### 变更 (Changed)
 - `docs/multilingual/`: 对历史阶段文档进行了结构重构。创建了 `docs/multilingual/history/` 目录并将已完成的 `phase-0`、`phase-1` 和 `phase-2` 完整移入归档。

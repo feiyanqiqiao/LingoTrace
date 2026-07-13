@@ -61,10 +61,43 @@ def listening_notes(
         return _missing_vault_root("listening_notes")
     if input_artifact is None:
         return _workflow_error("listening_notes-workflow", mode, "missing_input_artifact", "input_artifact is required.")
-    mutation = _artifact_mutation(input_artifact, action="write_listening_note", reason="prepared listening artifact")
-    if isinstance(mutation, Finding):
-        return _workflow_error("listening_notes-workflow", mode, mutation.code, mutation.message, mutation.path)
-    return _run_mutations(vault_root, "listening_notes", [mutation], mode)
+    root = Path(vault_root)
+    paths = _path_roles(root)
+    listening_root = paths.get("listening_root")
+    if not listening_root:
+        return _workflow_error(
+            "listening_notes-workflow",
+            mode,
+            "missing_path_role",
+            "Target Vault does not configure listening_root.",
+            "listening_root",
+        )
+    mutations = _listening_artifact_mutations(input_artifact)
+    if isinstance(mutations, Finding):
+        return _workflow_error("listening_notes-workflow", mode, mutations.code, mutations.message, mutations.path)
+    invalid_path = next(
+        (mutation.path for mutation in mutations if not _path_is_within_role(mutation.path, listening_root)),
+        None,
+    )
+    if invalid_path is not None:
+        return _workflow_error(
+            "listening_notes-workflow",
+            mode,
+            "listening_artifact_outside_role",
+            "Every listening artifact must stay under the configured listening_root.",
+            invalid_path,
+        )
+    note_path = input_artifact.get("note_path")
+    if mode == "apply" and isinstance(note_path, str) and note_path and (root / note_path).exists():
+        if input_artifact.get("overwrite_confirmed") is not True:
+            return _workflow_error(
+                "listening_notes-workflow",
+                mode,
+                "existing_listening_note_confirmation_required",
+                "Applying changes to an existing listening note requires overwrite_confirmed: true.",
+                note_path,
+            )
+    return _run_mutations(root, "listening_notes", mutations, mode)
 
 
 def source_notes(
@@ -396,6 +429,66 @@ def _artifact_mutation(payload: dict[str, Any], *, action: str, reason: str) -> 
         return Finding(code="invalid_artifact_body", message="Artifact body must be a non-empty string.", path=path)
     content = body if body.startswith("---\n") else f"---\ntitle: {title}\nstatus: active\n---\n\n{body}\n"
     return FileMutation(path=path, content=content, action=action, reason=reason)
+
+
+def _listening_artifact_mutations(payload: dict[str, Any]) -> list[FileMutation] | Finding:
+    files = payload.get("files")
+    if files is None:
+        mutation = _artifact_mutation(payload, action="write_listening_note", reason="prepared listening artifact")
+        return mutation if isinstance(mutation, Finding) else [mutation]
+    if not isinstance(files, list) or not files:
+        return Finding(
+            code="invalid_listening_bundle",
+            message="Listening bundle files must be a non-empty list.",
+            path="files",
+        )
+    mutations: list[FileMutation] = []
+    seen_paths: set[str] = set()
+    for index, item in enumerate(files):
+        if not isinstance(item, dict):
+            return Finding(
+                code="invalid_listening_bundle_file",
+                message="Each listening bundle file must be an object.",
+                path=f"files[{index}]",
+            )
+        path = item.get("path")
+        if not isinstance(path, str) or not path:
+            return Finding(
+                code="invalid_listening_bundle_path",
+                message="Each listening bundle file requires a Vault-relative path.",
+                path=f"files[{index}].path",
+            )
+        if path in seen_paths:
+            return Finding(
+                code="duplicate_listening_bundle_path",
+                message="Listening bundle paths must be unique.",
+                path=path,
+            )
+        seen_paths.add(path)
+        source_path = item.get("source_path")
+        content = item.get("content")
+        if source_path is not None and not isinstance(source_path, (str, Path)):
+            return Finding(
+                code="invalid_listening_bundle_source",
+                message="Listening bundle source_path must be a filesystem path.",
+                path=path,
+            )
+        mutations.append(
+            FileMutation(
+                path=path,
+                content=content if isinstance(content, (str, bytes)) else None,
+                source_path=source_path,
+                action=str(item.get("action") or "write_listening_artifact"),
+                reason=str(item.get("reason") or "prepared listening bundle"),
+            )
+        )
+    return mutations
+
+
+def _path_is_within_role(path: str, role_root: str) -> bool:
+    normalized_path = Path(path).as_posix().strip("/")
+    normalized_root = Path(role_root).as_posix().strip("/")
+    return normalized_path == normalized_root or normalized_path.startswith(f"{normalized_root}/")
 
 
 def _review_card_mutation(card: dict[str, Any]) -> FileMutation | Finding:

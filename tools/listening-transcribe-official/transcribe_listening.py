@@ -10,8 +10,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import date, datetime, timezone
+from difflib import SequenceMatcher
 from urllib.parse import parse_qs, urlparse
-from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -135,6 +136,44 @@ class SliceExportResult:
     refs: list[str]
     report_path: Path
     report: dict
+
+
+@dataclass
+class ASRComparisonResult:
+    candidate: TranscriptionCandidate
+    report: dict
+    report_path: Path | None
+    consensus_path: Path | None
+
+    @property
+    def unresolved_count(self) -> int:
+        return int(self.report.get("unresolved_count", 0))
+
+
+@dataclass
+class PreparedListeningBundle:
+    vault_root: Path
+    note_path: str
+    files: list[dict[str, object]]
+    summary: str
+    overwrite_required: bool
+    staging_root: Path
+    review_required: bool = False
+
+    def workflow_payload(self, *, overwrite_confirmed: bool = False) -> dict:
+        files = self.files
+        note_path = self.note_path
+        if self.review_required:
+            files = [item for item in files if is_review_artifact_path(str(item.get("path", "")))]
+            note_path = ""
+        return {
+            "note_path": note_path,
+            "files": files,
+            "overwrite_confirmed": overwrite_confirmed,
+        }
+
+    def cleanup(self) -> None:
+        shutil.rmtree(self.staging_root, ignore_errors=True)
 
 
 class OfflineDictionaryError(RuntimeError):
@@ -339,10 +378,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--url")
     parser.add_argument("--output-dir")
     parser.add_argument("--note-path")
+    parser.add_argument("--vault-root")
+    parser.add_argument("--lingotrace-root")
+    parser.add_argument("--listenkit-root")
     parser.add_argument("--locale", default="ja-JP")
     parser.add_argument("--title")
     parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper"], default="auto")
-    parser.add_argument("--compare-engine", choices=["apple", "faster-whisper"])
+    parser.add_argument("--compare-engine", choices=["auto", "apple", "faster-whisper"], default="auto")
+    parser.add_argument("--single-asr", action="store_true")
+    parser.add_argument("--reviewed-transcript")
     parser.add_argument("--format", choices=["mp3", "m4a", "wav", "flac"], default="m4a")
     parser.add_argument("--faster-whisper-python")
     parser.add_argument("--faster-whisper-model", default=DEFAULT_FASTER_WHISPER_MODEL)
@@ -351,15 +395,38 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--slice-manifest")
     parser.add_argument("--slice-profile", choices=sorted(SLICE_PROFILE_CHOICES), default="auto")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--confirm-overwrite", action="store_true")
     parser.add_argument("--scan-dir")
     return parser.parse_args()
+
+
+def lingotrace_root() -> Path:
+    override = os.environ.get("LINGOTRACE_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path(__file__).resolve().parents[2]
 
 
 def listenkit_root() -> Path:
     override = os.environ.get("LISTENKIT_ROOT")
     if override:
         return Path(override).expanduser()
-    return Path(__file__).resolve().parents[3] / "ListenKit"
+    return lingotrace_root().parent / "ListenKit"
+
+
+def configure_project_roots(*, lingotrace: str | None = None, listenkit: str | None = None) -> None:
+    if lingotrace:
+        root = Path(lingotrace).expanduser().resolve()
+        expected = root / "tools" / "listening-transcribe-official" / "transcribe_listening.py"
+        if not expected.is_file():
+            raise RuntimeError(f"LingoTrace root does not contain the listening generator: {root}")
+        os.environ["LINGOTRACE_ROOT"] = str(root)
+    if listenkit:
+        root = Path(listenkit).expanduser().resolve()
+        if not (root / "cli" / "generate-markdown.sh").is_file():
+            raise RuntimeError(f"ListenKit root does not contain cli/generate-markdown.sh: {root}")
+        os.environ["LISTENKIT_ROOT"] = str(root)
 
 
 def listenkit_generate_markdown_script_path() -> Path:
@@ -609,6 +676,77 @@ def material_dir_for_audio(audio_path: Path) -> Path:
     return audio_path.parent
 
 
+def configured_path_roles(vault_root: Path) -> dict[str, str]:
+    path = vault_root / ".lingotrace" / "paths.json"
+    if not path.is_file():
+        raise RuntimeError(f"LingoTrace Vault path configuration is missing: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"LingoTrace Vault path configuration is invalid JSON: {path}: {exc}") from exc
+    roles: dict[str, str] = {}
+    for item in payload.get("path_roles", []):
+        if isinstance(item, dict) and item.get("role") and item.get("relative_path"):
+            roles[str(item["role"])] = str(item["relative_path"]).strip("/")
+    if "listening_root" not in roles:
+        raise RuntimeError(f"LingoTrace Vault path configuration does not define listening_root: {path}")
+    return roles
+
+
+def discover_vault_root(start: Path) -> Path | None:
+    candidate = start.expanduser().resolve()
+    if candidate.is_file():
+        candidate = candidate.parent
+    for current in (candidate, *candidate.parents):
+        if (current / ".lingotrace" / "vault-context.json").is_file() and (
+            current / ".lingotrace" / "paths.json"
+        ).is_file():
+            return current
+    return None
+
+
+def resolve_vault_root(explicit: str | None, *hints: str | Path | None) -> Path:
+    if explicit:
+        root = Path(explicit).expanduser().resolve()
+        configured_path_roles(root)
+        return root
+    for hint in hints:
+        if hint is None:
+            continue
+        found = discover_vault_root(Path(hint))
+        if found is not None:
+            configured_path_roles(found)
+            return found
+    found = discover_vault_root(Path.cwd())
+    if found is not None:
+        configured_path_roles(found)
+        return found
+    raise RuntimeError(
+        "Unable to locate a LingoTrace Vault. Run from the Vault or pass --vault-root explicitly."
+    )
+
+
+def resolve_vault_relative_path(vault_root: Path, raw_path: str | Path) -> Path:
+    path = Path(raw_path).expanduser()
+    resolved = path.resolve() if path.is_absolute() else (vault_root / path).resolve()
+    try:
+        resolved.relative_to(vault_root.resolve())
+    except ValueError as exc:
+        raise RuntimeError(f"Listening path must stay inside the target Vault: {raw_path}") from exc
+    return resolved
+
+
+def validate_listening_target(vault_root: Path, target: Path) -> None:
+    listening_root = configured_path_roles(vault_root)["listening_root"]
+    configured_root = (vault_root / listening_root).resolve()
+    try:
+        target.resolve().relative_to(configured_root)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Listening input/output must stay under configured listening_root ({listening_root}): {target}"
+        ) from exc
+
+
 def audio_ref_for_note(audio_path: Path) -> str:
     if audio_path.parent.name == "attach":
         return f"attach/{audio_path.name}"
@@ -685,18 +823,6 @@ def clean_transcript_text(text: str) -> str:
     cleaned = re.sub(r"^(紹介|聴解)タスクシート質問\s*", "", cleaned)
     cleaned = re.sub(r"^\d+-\d+聞こう[。]?\s*", "", cleaned)
     cleaned = re.sub(r"^\d+番", "", cleaned)
-    cleaned = cleaned.replace("懲戒タスクシート", "聴解タスクシート")
-    cleaned = cleaned.replace("入り口", "入口")
-    cleaned = cleaned.replace("侵入止め", "進入止め")
-    cleaned = cleaned.replace("作られています", "造られています")
-    cleaned = cleaned.replace("小さい方", "小さいほう")
-    cleaned = cleaned.replace("大きい池より", "大きい池より")
-    cleaned = cleaned.replace("静かな佇まい", "静かなたたずまい")
-    cleaned = cleaned.replace("なんだか", "何だか")
-    cleaned = cleaned.replace("朝よく行きます", "朝、よく行きます")
-    cleaned = cleaned.replace("すご。ごしやすく", "過ごしやすく")
-    cleaned = cleaned.replace("土曜の丑の日", "土用の丑の日")
-    cleaned = cleaned.replace("土曜の牛の日", "土用の丑の日")
     cleaned = cleaned.replace("\n", "")
     cleaned = re.sub(r"\s+", "", cleaned)
     return cleaned.strip()
@@ -1049,6 +1175,52 @@ def split_sentences_from_text(text: str) -> list[str]:
     return [segment.strip() for segment in re.split(r"(?<=[。！？?])", text) if segment.strip()]
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def normalized_asr_artifact(candidate: TranscriptionCandidate, audio_path: Path) -> dict:
+    return {
+        "schema_version": 1,
+        "kind": "lingotrace_asr_artifact",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "audio": {
+            "name": audio_path.name,
+            "sha256": sha256_file(audio_path),
+            "size_bytes": audio_path.stat().st_size,
+        },
+        "engine": str(candidate.payload.get("engine", candidate.route_label)),
+        "route": candidate.route_label,
+        "locale": str(candidate.payload.get("locale", "ja-JP")),
+        "full_text": candidate.full_text,
+        "segments": [
+            {
+                "id": f"T{index:03d}",
+                "start": chunk.start,
+                "end": chunk.end,
+                "text": chunk.text,
+            }
+            for index, chunk in enumerate(candidate.segments, start=1)
+        ],
+    }
+
+
+def write_normalized_asr_artifact(audio_path: Path, candidate: TranscriptionCandidate) -> Path:
+    artifact_dir = material_dir_for_audio(audio_path) / "artifacts"
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    engine = slugify_stem(str(candidate.payload.get("engine", candidate.route_label)))
+    path = artifact_dir / f"{audio_path.stem}.{engine}.asr.json"
+    path.write_text(
+        json.dumps(normalized_asr_artifact(candidate, audio_path), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
 def choose_short_choice_script(generated_script: str, existing_script: str | None, audio_path: Path) -> str:
     if not existing_script:
         return generated_script
@@ -1122,31 +1294,45 @@ def build_asr_comparison_report(
     primary: TranscriptionCandidate,
     secondary: TranscriptionCandidate,
 ) -> dict:
-    primary_texts = primary.sentences or split_sentences_from_text(primary.full_text)
-    secondary_texts = secondary.sentences or split_sentences_from_text(secondary.full_text)
+    rows = align_asr_candidates(primary, secondary)
     disagreements: list[dict] = []
-    for index in range(max(len(primary_texts), len(secondary_texts))):
-        primary_text = primary_texts[index] if index < len(primary_texts) else ""
-        secondary_text = secondary_texts[index] if index < len(secondary_texts) else ""
+    consensus_segments: list[dict] = []
+    for index, row in enumerate(rows, start=1):
+        primary_text = row["primary_text"]
+        secondary_text = row["secondary_text"]
+        status = comparison_status(primary_text, secondary_text)
+        needs_review = status != "equal"
+        consensus_segments.append(
+            {
+                "segment_id": f"T{index:03d}",
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "primary_text": primary_text,
+                "secondary_text": secondary_text,
+                "selected_text": primary_text or secondary_text,
+                "decision": "agreement" if not needs_review else "pending_review",
+                "needs_review": needs_review,
+            }
+        )
         if clean_transcript_text(primary_text) == clean_transcript_text(secondary_text):
             continue
-        if not primary_text:
-            status = "missing_primary"
-        elif not secondary_text:
-            status = "missing_secondary"
-        else:
-            status = "different"
         disagreements.append(
             {
-                "index": index + 1,
+                "index": index,
+                "segment_id": f"T{index:03d}",
                 "status": status,
                 "primary_text": primary_text,
                 "secondary_text": secondary_text,
+                "start": row.get("start"),
+                "end": row.get("end"),
+                "categories": disagreement_categories(primary_text, secondary_text),
             }
         )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "kind": "asr_comparison",
+        "status": "complete",
+        "alignment": "timestamp_overlap_then_text_similarity",
         "primary": {
             "route": primary.route_label,
             "engine": str(primary.payload.get("engine", primary.route_label)),
@@ -1158,7 +1344,148 @@ def build_asr_comparison_report(
             "segment_count": len(secondary.segments),
         },
         "disagreement_count": len(disagreements),
+        "unresolved_count": len(disagreements),
         "disagreements": disagreements,
+        "consensus_segments": consensus_segments,
+    }
+
+
+def comparison_status(primary_text: str, secondary_text: str) -> str:
+    if not primary_text:
+        return "missing_primary"
+    if not secondary_text:
+        return "missing_secondary"
+    if clean_transcript_text(primary_text) == clean_transcript_text(secondary_text):
+        return "equal"
+    return "different"
+
+
+def _chunk_overlap(left: Chunk, right: Chunk) -> float:
+    if left.start is None or left.end is None or right.start is None or right.end is None:
+        return 0.0
+    return max(0.0, min(left.end, right.end) - max(left.start, right.start))
+
+
+def _text_similarity(left: str, right: str) -> float:
+    return SequenceMatcher(None, clean_transcript_text(left), clean_transcript_text(right)).ratio()
+
+
+def align_asr_candidates(primary: TranscriptionCandidate, secondary: TranscriptionCandidate) -> list[dict]:
+    primary_chunks = primary.segments or [Chunk(None, None, text) for text in primary.sentences]
+    secondary_chunks = secondary.segments or [Chunk(None, None, text) for text in secondary.sentences]
+    primary_edges: dict[int, set[int]] = {index: set() for index in range(len(primary_chunks))}
+    secondary_edges: dict[int, set[int]] = {index: set() for index in range(len(secondary_chunks))}
+    for primary_index, primary_chunk in enumerate(primary_chunks):
+        for secondary_index, secondary_chunk in enumerate(secondary_chunks):
+            if _chunk_overlap(primary_chunk, secondary_chunk) > 0:
+                primary_edges[primary_index].add(secondary_index)
+                secondary_edges[secondary_index].add(primary_index)
+
+    used_primary: set[int] = set()
+    used_secondary: set[int] = set()
+    rows: list[dict] = []
+    for seed in range(len(primary_chunks)):
+        if seed in used_primary or not primary_edges[seed]:
+            continue
+        component_primary: set[int] = set()
+        component_secondary: set[int] = set()
+        pending_primary = [seed]
+        pending_secondary: list[int] = []
+        while pending_primary or pending_secondary:
+            while pending_primary:
+                index = pending_primary.pop()
+                if index in component_primary:
+                    continue
+                component_primary.add(index)
+                pending_secondary.extend(primary_edges[index] - component_secondary)
+            while pending_secondary:
+                index = pending_secondary.pop()
+                if index in component_secondary:
+                    continue
+                component_secondary.add(index)
+                pending_primary.extend(secondary_edges[index] - component_primary)
+        used_primary.update(component_primary)
+        used_secondary.update(component_secondary)
+        members = [primary_chunks[index] for index in component_primary] + [
+            secondary_chunks[index] for index in component_secondary
+        ]
+        starts = [chunk.start for chunk in members if chunk.start is not None]
+        ends = [chunk.end for chunk in members if chunk.end is not None]
+        rows.append(
+            {
+                "start": min(starts) if starts else None,
+                "end": max(ends) if ends else None,
+                "primary_text": "".join(primary_chunks[index].text for index in sorted(component_primary)),
+                "secondary_text": "".join(secondary_chunks[index].text for index in sorted(component_secondary)),
+            }
+        )
+
+    unused_primary = set(range(len(primary_chunks))) - used_primary
+    unused_secondary = set(range(len(secondary_chunks))) - used_secondary
+    for primary_index in sorted(unused_primary):
+        primary_chunk = primary_chunks[primary_index]
+        best_index: int | None = None
+        best_score = -1.0
+        for index in unused_secondary:
+            secondary_chunk = secondary_chunks[index]
+            similarity = _text_similarity(primary_chunk.text, secondary_chunk.text)
+            if similarity > best_score:
+                best_score = similarity
+                best_index = index
+        if best_index is not None and best_score >= 0.35:
+            secondary_chunk = secondary_chunks[best_index]
+            unused_secondary.remove(best_index)
+        else:
+            secondary_chunk = Chunk(None, None, "")
+        starts = [value for value in (primary_chunk.start, secondary_chunk.start) if value is not None]
+        ends = [value for value in (primary_chunk.end, secondary_chunk.end) if value is not None]
+        rows.append(
+            {
+                "start": min(starts) if starts else None,
+                "end": max(ends) if ends else None,
+                "primary_text": primary_chunk.text,
+                "secondary_text": secondary_chunk.text,
+            }
+        )
+    for index in sorted(unused_secondary):
+        chunk = secondary_chunks[index]
+        rows.append(
+            {
+                "start": chunk.start,
+                "end": chunk.end,
+                "primary_text": "",
+                "secondary_text": chunk.text,
+            }
+        )
+    rows.sort(key=lambda row: (row["start"] is None, row["start"] or 0.0))
+    return rows
+
+
+def disagreement_categories(primary_text: str, secondary_text: str) -> list[str]:
+    categories: list[str] = []
+    combined = f"{primary_text}{secondary_text}"
+    if re.search(r"\d|[一二三四五六七八九十百千万]+", combined):
+        categories.append("number")
+    if re.search(r"(さん|氏|様|駅|市|県|国|町|社)", combined):
+        categories.append("proper_name_or_named_entity")
+    if re.search(r"(は|が|を|に|で|と|も|へ|の|ね|よ|か)", combined):
+        categories.append("particle_or_ending")
+    if not primary_text or not secondary_text:
+        categories.append("missing_text")
+    if not categories:
+        categories.append("word_or_homophone")
+    return categories
+
+
+def consensus_artifact(audio_path: Path, report: dict) -> dict:
+    return {
+        "schema_version": 1,
+        "kind": "reviewed_transcript",
+        "audio_sha256": sha256_file(audio_path),
+        "primary_engine": report.get("primary", {}).get("engine"),
+        "secondary_engine": report.get("secondary", {}).get("engine"),
+        "review_status": "accepted" if not report.get("unresolved_count") else "needs_review",
+        "segments": report.get("consensus_segments", []),
     }
 
 
@@ -1172,7 +1499,65 @@ def write_asr_comparison_report(
     report_path = artifact_dir / f"{audio_path.stem}.asr-comparison.json"
     report = build_asr_comparison_report(primary, secondary)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    consensus_path = artifact_dir / f"{audio_path.stem}.reviewed-transcript.json"
+    consensus_path.write_text(
+        json.dumps(consensus_artifact(audio_path, report), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return report_path
+
+
+def load_reviewed_transcript(path: Path, audio_path: Path) -> TranscriptionCandidate:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Reviewed transcript is invalid JSON: {path}: {exc}") from exc
+    if payload.get("schema_version") != 1 or payload.get("kind") != "reviewed_transcript":
+        raise RuntimeError("Reviewed transcript must use schema_version 1 and kind reviewed_transcript.")
+    if payload.get("review_status") != "accepted":
+        raise RuntimeError("Reviewed transcript must set review_status to accepted.")
+    if payload.get("audio_sha256") != sha256_file(audio_path):
+        raise RuntimeError("Reviewed transcript does not match the source audio hash.")
+    raw_segments = payload.get("segments")
+    if not isinstance(raw_segments, list) or not raw_segments:
+        raise RuntimeError("Reviewed transcript must contain at least one segment.")
+    segments: list[dict] = []
+    previous_end: float | None = None
+    for item in raw_segments:
+        if not isinstance(item, dict) or not str(item.get("selected_text", "")).strip():
+            raise RuntimeError("Every reviewed transcript segment needs selected_text.")
+        if item.get("needs_review") is True or item.get("decision") == "pending_review":
+            raise RuntimeError("Reviewed transcript still contains unresolved ASR disagreements.")
+        start = item.get("start")
+        end = item.get("end")
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, (int, float))
+            or not isinstance(end, (int, float))
+            or float(start) < 0
+            or float(end) <= float(start)
+        ):
+            raise RuntimeError("Every reviewed transcript segment needs a valid non-empty timestamp range.")
+        if previous_end is not None and float(start) < previous_end:
+            raise RuntimeError("Reviewed transcript segments must be ordered and non-overlapping.")
+        previous_end = float(end)
+        segments.append(
+            {
+                "start": float(start),
+                "end": float(end),
+                "text": str(item["selected_text"]).strip(),
+            }
+        )
+    candidate_payload = {
+        "schema_version": 1,
+        "engine": "reviewed-consensus",
+        "locale": "ja-JP",
+        "full_text": "".join(item["text"] for item in segments),
+        "segments": segments,
+        "timing_complete": all(item.get("start") is not None and item.get("end") is not None for item in segments),
+    }
+    return candidate_from_payload(audio_path, candidate_payload, "reviewed-consensus")
 
 
 def transcript_view_for_profile(
@@ -1237,48 +1622,111 @@ def transcribe_with_heuristics(
             artifact_dir,
             artifact_stem,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, OSError) as exc:
         raise RuntimeError(f"ListenKit transcript generation failed. Original error: {exc}") from exc
+    selected_candidate = base_candidate
+    selected_route = str(base_candidate.payload.get("engine", "base"))
 
-    if not is_short_choice_mode(audio_path):
-        if compare_engine and compare_engine != str(base_candidate.payload.get("engine", engine)):
-            secondary_candidate = build_candidate(
-                audio_path,
+    if is_short_choice_mode(audio_path):
+        slow_path = build_slow_copy(audio_path)
+        try:
+            slow_candidate = build_candidate(
+                slow_path,
                 locale,
-                f"compare-{compare_engine}",
-                compare_engine,
+                "slow",
+                engine,
                 faster_whisper_python,
                 faster_whisper_model,
                 faster_whisper_compute_type,
                 artifact_dir,
                 artifact_stem,
             )
-            if persist_artifacts:
-                write_asr_comparison_report(audio_path, base_candidate, secondary_candidate)
-        return base_candidate, str(base_candidate.payload.get("engine", "base"))
+        finally:
+            try:
+                slow_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if slow_candidate.score > base_candidate.score:
+            selected_candidate = slow_candidate
+            selected_route = "slow"
 
-    slow_path = build_slow_copy(audio_path)
+    if persist_artifacts:
+        write_normalized_asr_artifact(audio_path, selected_candidate)
+    compare_candidate_if_requested(
+        audio_path,
+        locale,
+        selected_candidate,
+        compare_engine,
+        faster_whisper_python,
+        faster_whisper_model,
+        faster_whisper_compute_type,
+        artifact_dir,
+        artifact_stem,
+        persist_artifacts,
+    )
+    return selected_candidate, selected_route
+
+
+def compare_candidate_if_requested(
+    audio_path: Path,
+    locale: str,
+    primary: TranscriptionCandidate,
+    compare_engine: str | None,
+    faster_whisper_python: str | None,
+    faster_whisper_model: str,
+    faster_whisper_compute_type: str,
+    artifact_dir: Path | None,
+    artifact_stem: str,
+    persist_artifacts: bool,
+) -> ASRComparisonResult | None:
+    primary_engine = str(primary.payload.get("engine", ""))
+    if compare_engine == "auto":
+        compare_engine = "faster-whisper" if primary_engine == "apple" else "apple"
+    if not compare_engine or compare_engine == primary_engine:
+        return None
     try:
-        slow_candidate = build_candidate(
-            slow_path,
+        secondary = build_candidate(
+            audio_path,
             locale,
-            "slow",
-            engine,
+            f"compare-{compare_engine}",
+            compare_engine,
             faster_whisper_python,
             faster_whisper_model,
             faster_whisper_compute_type,
             artifact_dir,
             artifact_stem,
         )
-    finally:
-        try:
-            slow_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+    except (RuntimeError, OSError) as exc:
+        report = {
+            "schema_version": 2,
+            "kind": "asr_comparison",
+            "status": "secondary_unavailable",
+            "primary": {
+                "route": primary.route_label,
+                "engine": str(primary.payload.get("engine", primary.route_label)),
+                "segment_count": len(primary.segments),
+            },
+            "secondary": {"engine": compare_engine, "error": str(exc)},
+            "disagreement_count": 0,
+            "unresolved_count": 0,
+            "disagreements": [],
+            "consensus_segments": [],
+        }
+        report_path = None
+        if persist_artifacts:
+            report_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.asr-comparison.json"
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return ASRComparisonResult(primary, report, report_path, None)
 
-    if slow_candidate.score > base_candidate.score:
-        return slow_candidate, "slow"
-    return base_candidate, str(base_candidate.payload.get("engine", "base"))
+    report = build_asr_comparison_report(primary, secondary)
+    report_path: Path | None = None
+    consensus_path: Path | None = None
+    if persist_artifacts:
+        write_normalized_asr_artifact(audio_path, secondary)
+        report_path = write_asr_comparison_report(audio_path, primary, secondary)
+        consensus_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
+    return ASRComparisonResult(primary, report, report_path, consensus_path)
 
 
 def infer_title(audio_stem: str, forced_title: str | None, sentences: list[str]) -> str:
@@ -1351,7 +1799,8 @@ def desired_note_path(audio_path: Path, title: str) -> Path:
 
 
 def should_rename_generated_note(note_path: Path) -> bool:
-    suffix = note_path.stem.removeprefix(f"{note_path.stem.split('_')[0]}_{note_path.stem.split('_')[1]}_")
+    parts = note_path.stem.split("_", 2)
+    suffix = parts[2] if len(parts) == 3 else note_path.stem
     return (
         note_path.name.endswith("_识别稿.md")
         or bool(re.match(r"^\d+-\d+聞こう$", suffix))
@@ -2168,11 +2617,9 @@ def parse_sections(body: str) -> list[tuple[str, str]]:
 
 
 def find_vault_root_from_path(path: Path) -> Path:
-    current = path.resolve().parent
-    while current != current.parent:
-        if (current / "学习系统").exists() and (current / "codex-skills").exists():
-            return current
-        current = current.parent
+    discovered = discover_vault_root(path)
+    if discovered is not None:
+        return discovered
     return path.resolve().parent
 
 
@@ -2196,6 +2643,17 @@ def resolve_listening_mode(forced_mode: str | None, frontmatter_lines: list[str]
 
 
 def load_vault_path_roles(vault_root: Path) -> dict[str, str]:
+    current_path = vault_root / ".lingotrace" / "paths.json"
+    if current_path.is_file():
+        try:
+            payload = json.loads(current_path.read_text(encoding="utf-8"))
+            return {
+                str(item["role"]): str(item["relative_path"])
+                for item in payload.get("path_roles", [])
+                if isinstance(item, dict) and item.get("role") and item.get("relative_path")
+            }
+        except (OSError, json.JSONDecodeError):
+            return {}
     for relative in (
         "系统配置/paths.json",
         "学习系统/系统/配置/paths.json",  # legacy fallback
@@ -2216,7 +2674,8 @@ def load_confirmed_accent_index(vault_root: Path) -> dict[str, str]:
     roots = [
         vault_root / roles.get("focus_vocab_root", "学习系统/词库/重点词汇"),
         vault_root / roles.get("base_vocab_root", "学习系统/词库/基础词汇"),
-        vault_root / "学习系统" / "发音",
+        vault_root / roles.get("pronunciation_accent_root", "学习系统/发音/アクセント"),
+        vault_root / roles.get("pronunciation_phoneme_root", "学习系统/发音/音素"),
     ]
     index: dict[str, str] = {}
     for root in roots:
@@ -2441,7 +2900,15 @@ def process_one(
     slice_manifest_override: str | None = None,
     slice_profile_request: str = "auto",
     compare_engine: str | None = None,
+    reviewed_transcript_override: str | None = None,
+    accent_vault_root: Path | None = None,
+    rename_generated_note: bool = True,
 ) -> str:
+    if discover_vault_root(audio_path) is not None:
+        raise RuntimeError(
+            "Direct listening generator writes to a LingoTrace Vault are disabled. "
+            "Use the CLI preparation workflow so writes pass through the core guard."
+        )
     preflight_source_audio(audio_path)
     if listening_mode == "intensive":
         preflight_intensive_slice_tooling()
@@ -2458,6 +2925,57 @@ def process_one(
         )
     else:
         candidate, route_label = candidate_route
+        if not dry_run:
+            write_normalized_asr_artifact(audio_path, candidate)
+        if compare_engine:
+            compare_candidate_if_requested(
+                audio_path,
+                locale,
+                candidate,
+                compare_engine,
+                faster_whisper_python,
+                faster_whisper_model,
+                faster_whisper_compute_type,
+                material_dir_for_audio(audio_path) / "artifacts" if not dry_run else None,
+                audio_path.stem,
+                not dry_run,
+            )
+
+    comparison_runtime_issue: str | None = None
+    if compare_engine and not dry_run:
+        comparison_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.asr-comparison.json"
+        if comparison_path.is_file():
+            comparison_payload = json.loads(comparison_path.read_text(encoding="utf-8"))
+            if comparison_payload.get("status") == "secondary_unavailable":
+                secondary = comparison_payload.get("secondary", {})
+                comparison_runtime_issue = (
+                    f"第二 ASR（{secondary.get('engine', 'unknown')}）不可用，本次降级为单 ASR；"
+                    f"限制与错误已记录在 artifacts/{comparison_path.name}。"
+                )
+
+    reviewed_path = Path(reviewed_transcript_override).expanduser() if reviewed_transcript_override else None
+    if reviewed_path is not None:
+        candidate = load_reviewed_transcript(reviewed_path, audio_path)
+        route_label = "reviewed-consensus"
+        if not dry_run:
+            canonical_reviewed_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
+            canonical_reviewed_path.parent.mkdir(parents=True, exist_ok=True)
+            if reviewed_path.resolve() != canonical_reviewed_path.resolve():
+                shutil.copy2(reviewed_path, canonical_reviewed_path)
+            write_normalized_asr_artifact(audio_path, candidate)
+    comparison_review_issue: str | None = None
+    if reviewed_path is None and compare_engine and not dry_run:
+        consensus_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
+        if consensus_path.is_file():
+            try:
+                candidate = load_reviewed_transcript(consensus_path, audio_path)
+                route_label = "reviewed-consensus"
+                write_normalized_asr_artifact(audio_path, candidate)
+            except RuntimeError as exc:
+                comparison_review_issue = (
+                    f"ASR comparison requires review before final note generation: {exc} "
+                    f"Review and rerun with --reviewed-transcript {consensus_path}."
+                )
     raw_chunks = raw_segments_to_chunks(candidate.payload.get("segments", []))
     manifest_profile = None
     active_manifest_path: Path | None = None
@@ -2488,8 +3006,9 @@ def process_one(
     target_note_path = desired_note_path(audio_path, title)
     existed = note_path.exists() if note_path is not None else False
     should_rename_note = (
-        note_path is not None
+        rename_generated_note
         and note_override is None
+        and note_path is not None
         and note_path.exists()
         and should_rename_generated_note(note_path)
         and note_path != target_note_path
@@ -2514,6 +3033,10 @@ def process_one(
         material_note += " 本次已自动采用慢速副本作为较优转写结果。"
     if source_url:
         material_note += f"\n\n来源 URL：<{source_url}>"
+    if comparison_review_issue:
+        material_note += f"\n\n转写交叉比对尚未完成审核：{comparison_review_issue}"
+    if comparison_runtime_issue:
+        material_note += f"\n\n转写交叉比对限制：{comparison_runtime_issue}"
 
     existing_body: str | None
     if read_note_path is not None and read_note_path.exists():
@@ -2565,7 +3088,7 @@ def process_one(
         material_note,
         short_choice_mode,
         slice_profile,
-        load_confirmed_accent_index(find_vault_root_from_path(audio_path)),
+        load_confirmed_accent_index(accent_vault_root or find_vault_root_from_path(audio_path)),
         offline_dictionary or load_offline_dictionary(required=False),
         audio_slice_refs,
         resolved_listening_mode,
@@ -2614,7 +3137,15 @@ def process_url(
     listening_mode: str | None = None,
     slice_manifest_override: str | None = None,
     slice_profile_request: str = "auto",
+    compare_engine: str | None = None,
+    reviewed_transcript_override: str | None = None,
+    accent_vault_root: Path | None = None,
 ) -> str:
+    if discover_vault_root(output_dir) is not None:
+        raise RuntimeError(
+            "Direct URL listening writes to a LingoTrace Vault are disabled. "
+            "Use the CLI preparation workflow so writes pass through the core guard."
+        )
     output_stem = infer_stem_from_url(url)
     env_overrides = {}
     if faster_whisper_python:
@@ -2649,10 +3180,287 @@ def process_url(
         listening_mode=listening_mode,
         slice_manifest_override=slice_manifest_override,
         slice_profile_request=slice_profile_request,
+        compare_engine=compare_engine,
+        reviewed_transcript_override=reviewed_transcript_override,
+        accent_vault_root=accent_vault_root,
     )
     if dry_run:
         return f"Source URL: {url}\nFinal audio: {final_audio_path}\n{result}"
     return f"Source URL: {url}\nFinal audio: {final_audio_path}\n{result}"
+
+
+def _tree_snapshot(root: Path) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
+    if not root.exists():
+        return snapshot
+    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+        snapshot[path.relative_to(root).as_posix()] = sha256_file(path)
+    return snapshot
+
+
+def _copy_preparation_file(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+
+
+def _mapped_stage_path(stage_vault: Path, vault_root: Path, source: Path) -> Path:
+    return stage_vault / source.resolve().relative_to(vault_root.resolve())
+
+
+def _existing_mode(note_path: Path | None) -> str | None:
+    if note_path is None or not note_path.is_file():
+        return None
+    try:
+        frontmatter, body = parse_frontmatter(note_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return resolve_listening_mode(None, frontmatter, body)
+
+
+def effective_compare_engine(
+    requested: str | None,
+    *,
+    single_asr: bool,
+    listening_mode: str | None,
+    audio_path: Path,
+    existing_note: Path | None,
+) -> str | None:
+    if single_asr:
+        return None
+    if requested and requested != "auto":
+        return requested
+    high_risk = (
+        listening_mode == "intensive"
+        or _existing_mode(existing_note) == "intensive"
+        or is_short_choice_mode(audio_path)
+    )
+    return "auto" if high_risk else None
+
+
+def is_review_artifact_path(path: str) -> bool:
+    return "/artifacts/" in f"/{path}" and (
+        path.endswith(".listenkit.json")
+        or path.endswith(".listenkit.md")
+        or path.endswith(".asr.json")
+        or path.endswith(".asr-comparison.json")
+        or path.endswith(".reviewed-transcript.json")
+        or path.endswith(".source.json")
+    )
+
+
+def _bundle_from_stage(
+    *,
+    vault_root: Path,
+    stage_vault: Path,
+    initial: dict[str, str],
+    summary: str,
+) -> PreparedListeningBundle:
+    final = _tree_snapshot(stage_vault)
+    changed = [path for path, digest in final.items() if initial.get(path) != digest]
+    if not changed:
+        raise RuntimeError("Listening preparation produced no changed artifacts.")
+    note_candidates = [
+        path
+        for path in changed
+        if path.endswith(".md") and "/artifacts/" not in f"/{path}" and "/attach/" not in f"/{path}"
+    ]
+    if len(note_candidates) != 1:
+        raise RuntimeError(f"Listening preparation must produce exactly one note; found {note_candidates}.")
+    note_path = note_candidates[0]
+    files: list[dict[str, object]] = []
+    for relative_path in changed:
+        target = vault_root / relative_path
+        files.append(
+            {
+                "path": relative_path,
+                "source_path": str(stage_vault / relative_path),
+                "action": "update_listening_note" if relative_path == note_path and target.exists() else (
+                    "create_listening_note" if relative_path == note_path else "write_listening_artifact"
+                ),
+                "reason": "prepared listening note" if relative_path == note_path else "prepared listening provenance or media artifact",
+            }
+        )
+    review_required = False
+    consensus_files = [stage_vault / path for path in changed if path.endswith(".reviewed-transcript.json")]
+    for consensus_path in consensus_files:
+        payload = json.loads(consensus_path.read_text(encoding="utf-8"))
+        if payload.get("review_status") != "accepted":
+            review_required = True
+            break
+    return PreparedListeningBundle(
+        vault_root=vault_root,
+        note_path=note_path,
+        files=files,
+        summary=summary,
+        overwrite_required=(vault_root / note_path).exists(),
+        staging_root=stage_vault.parent,
+        review_required=review_required,
+    )
+
+
+def prepare_local_listening_bundle(
+    *,
+    vault_root: Path,
+    audio_path: Path,
+    note_override: Path | None,
+    locale: str,
+    title: str | None,
+    engine: str,
+    compare_engine: str | None,
+    faster_whisper_python: str | None,
+    faster_whisper_model: str,
+    faster_whisper_compute_type: str,
+    offline_dictionary: StaticAccentDictionary,
+    listening_mode: str | None,
+    slice_manifest_override: Path | None,
+    slice_profile: str,
+    reviewed_transcript: Path | None,
+) -> PreparedListeningBundle:
+    validate_listening_target(vault_root, audio_path)
+    material_dir = material_dir_for_audio(audio_path)
+    staging_root = Path(tempfile.mkdtemp(prefix="lingotrace-listening-prepare-"))
+    stage_vault = staging_root / "vault"
+    stage_audio = _mapped_stage_path(stage_vault, vault_root, audio_path)
+    _copy_preparation_file(audio_path, stage_audio)
+
+    existing_note = note_override or resolve_note_path(audio_path, None)
+    stage_note: Path | None = None
+    if existing_note is not None and existing_note.is_file():
+        validate_listening_target(vault_root, existing_note)
+        stage_note = _mapped_stage_path(stage_vault, vault_root, existing_note)
+        _copy_preparation_file(existing_note, stage_note)
+
+    default_manifest = slice_manifest_path(audio_path)
+    if default_manifest.is_file():
+        _copy_preparation_file(default_manifest, _mapped_stage_path(stage_vault, vault_root, default_manifest))
+
+    stage_manifest: Path | None = None
+    if slice_manifest_override is not None:
+        validate_listening_target(vault_root, slice_manifest_override)
+        stage_manifest = _mapped_stage_path(stage_vault, vault_root, slice_manifest_override)
+        _copy_preparation_file(slice_manifest_override, stage_manifest)
+
+    stage_reviewed: Path | None = None
+    if reviewed_transcript is not None:
+        validate_listening_target(vault_root, reviewed_transcript)
+        stage_reviewed = material_dir_for_audio(stage_audio) / "artifacts" / f"{audio_path.stem}.accepted-reviewed-transcript.json"
+        _copy_preparation_file(reviewed_transcript, stage_reviewed)
+
+    initial = _tree_snapshot(stage_vault)
+    try:
+        summary = process_one(
+            stage_audio,
+            str(stage_note) if stage_note is not None else None,
+            locale,
+            title,
+            False,
+            engine,
+            faster_whisper_python,
+            faster_whisper_model,
+            faster_whisper_compute_type,
+            offline_dictionary=offline_dictionary,
+            listening_mode=listening_mode,
+            slice_manifest_override=str(stage_manifest) if stage_manifest is not None else None,
+            slice_profile_request=slice_profile,
+            compare_engine=compare_engine,
+            reviewed_transcript_override=str(stage_reviewed) if stage_reviewed is not None else None,
+            accent_vault_root=vault_root,
+            rename_generated_note=False,
+        )
+        return _bundle_from_stage(
+            vault_root=vault_root,
+            stage_vault=stage_vault,
+            initial=initial,
+            summary=summary.replace(str(stage_vault), str(vault_root)),
+        )
+    except Exception:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        raise
+
+
+def prepare_url_listening_bundle(
+    *,
+    vault_root: Path,
+    url: str,
+    output_dir: Path,
+    note_override: Path | None,
+    locale: str,
+    title: str | None,
+    engine: str,
+    compare_engine: str | None,
+    faster_whisper_python: str | None,
+    audio_format: str,
+    offline_dictionary: StaticAccentDictionary,
+    listening_mode: str | None,
+    slice_manifest_override: Path | None,
+    slice_profile: str,
+    reviewed_transcript: Path | None,
+) -> PreparedListeningBundle:
+    validate_listening_target(vault_root, output_dir)
+    staging_root = Path(tempfile.mkdtemp(prefix="lingotrace-listening-url-prepare-"))
+    stage_vault = staging_root / "vault"
+    stage_output = _mapped_stage_path(stage_vault, vault_root, output_dir)
+    stage_output.mkdir(parents=True, exist_ok=True)
+    stage_note: Path | None = None
+    if note_override is not None and note_override.is_file():
+        stage_note = _mapped_stage_path(stage_vault, vault_root, note_override)
+        _copy_preparation_file(note_override, stage_note)
+    stage_manifest: Path | None = None
+    if slice_manifest_override is not None:
+        stage_manifest = _mapped_stage_path(stage_vault, vault_root, slice_manifest_override)
+        _copy_preparation_file(slice_manifest_override, stage_manifest)
+    stage_reviewed: Path | None = None
+    if reviewed_transcript is not None:
+        stage_reviewed = stage_output / "artifacts" / "accepted-reviewed-transcript.json"
+        _copy_preparation_file(reviewed_transcript, stage_reviewed)
+    initial = _tree_snapshot(stage_vault)
+    try:
+        summary = process_url(
+            url,
+            stage_output,
+            str(stage_note) if stage_note is not None else None,
+            locale,
+            title,
+            False,
+            engine,
+            faster_whisper_python,
+            audio_format,
+            offline_dictionary,
+            listening_mode,
+            str(stage_manifest) if stage_manifest is not None else None,
+            slice_profile,
+            compare_engine,
+            str(stage_reviewed) if stage_reviewed is not None else None,
+            vault_root,
+        )
+        return _bundle_from_stage(
+            vault_root=vault_root,
+            stage_vault=stage_vault,
+            initial=initial,
+            summary=summary.replace(str(stage_vault), str(vault_root)),
+        )
+    except Exception:
+        shutil.rmtree(staging_root, ignore_errors=True)
+        raise
+
+
+def apply_prepared_bundle(
+    bundle: PreparedListeningBundle,
+    *,
+    apply: bool,
+    overwrite_confirmed: bool,
+) -> tuple[dict, dict | None]:
+    root = lingotrace_root()
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from lingotrace.packs.japanese import workflows
+
+    payload = bundle.workflow_payload(overwrite_confirmed=overwrite_confirmed)
+    preview = workflows.listening_notes(vault_root=bundle.vault_root, input_artifact=payload, mode="preview").to_dict()
+    applied: dict | None = None
+    if apply:
+        applied = workflows.listening_notes(vault_root=bundle.vault_root, input_artifact=payload, mode="apply").to_dict()
+    return preview, applied
 
 
 def scan_audio_files(directory: Path) -> list[Path]:
@@ -2665,6 +3473,9 @@ def scan_audio_files(directory: Path) -> list[Path]:
 
 def main() -> int:
     args = parse_args()
+    if args.apply and args.dry_run:
+        print("Use either --apply or --dry-run, not both.", file=sys.stderr)
+        return 1
     source_count = sum(1 for value in [args.audio_path, args.url, args.scan_dir] if value)
     if source_count == 0:
         print("Provide one of <audio_path>, --url, or --scan-dir.", file=sys.stderr)
@@ -2680,54 +3491,93 @@ def main() -> int:
     if args.url and not args.output_dir:
         print("--output-dir is required when using --url.", file=sys.stderr)
         return 1
-    if args.url and args.compare_engine:
-        print("--compare-engine is currently supported only for local audio files.", file=sys.stderr)
-        return 1
 
     try:
+        configure_project_roots(lingotrace=args.lingotrace_root, listenkit=args.listenkit_root)
+        vault_root = resolve_vault_root(args.vault_root, args.audio_path, args.output_dir, args.note_path)
         offline_dictionary = load_offline_dictionary(required=True)
-    except OfflineDictionaryError as exc:
+    except (OfflineDictionaryError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
-
-    if args.url:
-        result = process_url(
-            args.url,
-            Path(args.output_dir),
-            args.note_path,
-            args.locale,
-            args.title,
-            args.dry_run,
-            args.engine,
-            args.faster_whisper_python,
-            args.format,
-            offline_dictionary,
-            args.listening_mode,
-            args.slice_manifest,
-            args.slice_profile,
+    bundle: PreparedListeningBundle | None = None
+    try:
+        note_path = resolve_vault_relative_path(vault_root, args.note_path) if args.note_path else None
+        manifest_path = resolve_vault_relative_path(vault_root, args.slice_manifest) if args.slice_manifest else None
+        reviewed_path = resolve_vault_relative_path(vault_root, args.reviewed_transcript) if args.reviewed_transcript else None
+        if args.url:
+            output_dir = resolve_vault_relative_path(vault_root, args.output_dir)
+            url_compare = None if args.single_asr else args.compare_engine
+            bundle = prepare_url_listening_bundle(
+                vault_root=vault_root,
+                url=args.url,
+                output_dir=output_dir,
+                note_override=note_path,
+                locale=args.locale,
+                title=args.title,
+                engine=args.engine,
+                compare_engine=url_compare,
+                faster_whisper_python=args.faster_whisper_python,
+                audio_format=args.format,
+                offline_dictionary=offline_dictionary,
+                listening_mode=args.listening_mode,
+                slice_manifest_override=manifest_path,
+                slice_profile=args.slice_profile,
+                reviewed_transcript=reviewed_path,
+            )
+        else:
+            audio_path = resolve_vault_relative_path(vault_root, args.audio_path)
+            validate_listening_target(vault_root, audio_path)
+            existing_note = note_path or resolve_note_path(audio_path, None)
+            compare_engine = effective_compare_engine(
+                args.compare_engine,
+                single_asr=args.single_asr,
+                listening_mode=args.listening_mode,
+                audio_path=audio_path,
+                existing_note=existing_note,
+            )
+            bundle = prepare_local_listening_bundle(
+                vault_root=vault_root,
+                audio_path=audio_path,
+                note_override=note_path,
+                locale=args.locale,
+                title=args.title,
+                engine=args.engine,
+                compare_engine=compare_engine,
+                faster_whisper_python=args.faster_whisper_python,
+                faster_whisper_model=args.faster_whisper_model,
+                faster_whisper_compute_type=args.faster_whisper_compute_type,
+                offline_dictionary=offline_dictionary,
+                listening_mode=args.listening_mode,
+                slice_manifest_override=manifest_path,
+                slice_profile=args.slice_profile,
+                reviewed_transcript=reviewed_path,
+            )
+        preview, applied = apply_prepared_bundle(
+            bundle,
+            apply=args.apply,
+            overwrite_confirmed=args.confirm_overwrite,
         )
-        print(result)
+        output = {
+            "summary": bundle.summary,
+            "note_path": bundle.note_path,
+            "review_required": bundle.review_required,
+            "preview": preview,
+            "apply": applied,
+        }
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        if not preview.get("accepted", False):
+            return 1
+        if applied is not None and not applied.get("accepted", False):
+            return 1
+        if bundle.review_required:
+            return 2
         return 0
-
-    if args.audio_path:
-        result = process_one(
-            Path(args.audio_path),
-            args.note_path,
-            args.locale,
-            args.title,
-            args.dry_run,
-            args.engine,
-            args.faster_whisper_python,
-            args.faster_whisper_model,
-            args.faster_whisper_compute_type,
-            offline_dictionary=offline_dictionary,
-            listening_mode=args.listening_mode,
-            slice_manifest_override=args.slice_manifest,
-            slice_profile_request=args.slice_profile,
-            compare_engine=args.compare_engine,
-        )
-        print(result)
-        return 0
+    except (OfflineDictionaryError, RuntimeError, OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        if bundle is not None:
+            bundle.cleanup()
 
 
 if __name__ == "__main__":
