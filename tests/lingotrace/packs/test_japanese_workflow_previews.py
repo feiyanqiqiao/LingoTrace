@@ -392,7 +392,7 @@ meaning_zh: 合成词
         self.assertIn("next_review: 2026-06-22", body)
         self.assertIn("source_notes: [[source-note]]", body)
 
-    def test_review_materials_item_updates_existing_focus_without_duplicate_or_body_loss(self) -> None:
+    def test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
@@ -436,8 +436,106 @@ source_notes: [[old-source]]
         self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
         self.assertEqual(["review/focus/vocab/合成語.md"], files)
         self.assertIn("source_notes: [[old-source]], [[new-source]]", body)
-        self.assertIn("review_stage: day3", body)
+        self.assertIn("status: active", body)
+        self.assertIn("done_today: false", body)
+        self.assertIn("review_stage: day0", body)
+        self.assertIn("next_review: 2026-06-22", body)
+        self.assertIn("last_reviewed: ", body)
         self.assertIn("这里不能丢。", body)
+
+    def test_review_materials_item_handles_source_note_list_without_rewriting_unknown_nested_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/合成語.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: true
+review_stage: day3
+next_review: 2026-06-25
+last_reviewed: 2026-06-21
+headword: 合成語
+meaning_zh: 合成词
+source_notes:
+  - "[[old-source]]"
+manual_metadata:
+  source: classroom
+  confidence: high
+---
+
+## 人工整理
+嵌套字段和正文都不能丢。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "meaning_zh": "合成词",
+                    "source_note": "[[new-source]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("source_notes: [[old-source]], [[new-source]]", body)
+        self.assertIn("review_stage: day0", body)
+        self.assertIn("manual_metadata:\n  source: classroom\n  confidence: high", body)
+        self.assertNotIn("manual_metadata: ['source: classroom', 'confidence: high']", body)
+        self.assertIn("嵌套字段和正文都不能丢。", body)
+
+    def test_review_materials_item_does_not_reset_active_focus_for_same_source_note(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/合成語.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: true
+review_stage: day3
+next_review: 2026-06-25
+last_reviewed: 2026-06-21
+headword: 合成語
+meaning_zh: 合成词
+source_notes:
+  - "[[same-source]]"
+---
+
+## 人工整理
+同一来源不应重置进度。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "合成語",
+                    "meaning_zh": "合成词",
+                    "source_note": "[[same-source]]",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
+            body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("source_notes: [[same-source]]", body)
+        self.assertIn("done_today: true", body)
+        self.assertIn("review_stage: day3", body)
+        self.assertIn("next_review: 2026-06-25", body)
+        self.assertIn("last_reviewed: 2026-06-21", body)
+        self.assertIn("同一来源不应重置进度。", body)
 
     def test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

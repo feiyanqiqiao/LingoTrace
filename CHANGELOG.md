@@ -48,6 +48,7 @@
 - `docs/lingotrace_multilingual_phase0_implementation_plan.md`: 将其移至 `docs/multilingual/history/phase-0/implementation-plan.md`，修复了脱离其专属阶段目录的问题。
 - `docs/runtime-snapshot-lingotrace-python314.txt`: 从文档根目录移至 `tools/architecture-baseline/` 目录下。
 - `tools/README.md` 与全项目其余 Markdown 文档均执行了全局相对路径链接修复。
+- `docs/multilingual/review-materials-user-stories.md` 与 `lingotrace.packs.japanese.workflows:review_materials`: 补充并实现“已存在 active focus 卡在新来源笔记中再次出现时，应作为新的学习信号重置为 `day0`”的规则，确保重新出现的词卡回到当天复习队列，同时保留人工正文和来源合并。
 
 ## [20260703-162500]
 ### 变更 (Changed)
