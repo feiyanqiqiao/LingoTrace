@@ -1198,6 +1198,15 @@ class TranscribeListeningTests(unittest.TestCase):
                 material_dir = MODULE.material_dir_for_audio(stage_audio)
                 note_path = material_dir / "lesson_待合并.md"
                 note_path.write_text("# preview only\n", encoding="utf-8")
+                artifact_dir = material_dir / "artifacts"
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                for name in (
+                    "lesson.faster-whisper.listenkit.json",
+                    "lesson.faster-whisper.listenkit.md",
+                    "lesson.faster-whisper.asr.json",
+                    "lesson.apple.asr.json",
+                ):
+                    (artifact_dir / name).write_text(f"fixture: {name}\n", encoding="utf-8")
                 primary = MODULE.candidate_from_payload(
                     stage_audio,
                     {
@@ -1253,6 +1262,14 @@ class TranscribeListeningTests(unittest.TestCase):
 
             assert handoff_path is not None
             self.assertTrue(handoff_path.is_file())
+            for name in (
+                "lesson.faster-whisper.listenkit.json",
+                "lesson.faster-whisper.listenkit.md",
+                "lesson.faster-whisper.asr.json",
+                "lesson.apple.asr.json",
+                "lesson.asr-comparison.json",
+            ):
+                self.assertTrue((handoff_path.parent / name).is_file(), name)
             self.assertFalse(
                 (root / "listening/lesson/artifacts/lesson.llm-merge-request.json").exists()
             )
@@ -1315,6 +1332,14 @@ class TranscribeListeningTests(unittest.TestCase):
                 self.assertTrue(
                     (root / "listening/lesson/artifacts/lesson.llm-merge-request.json").is_file()
                 )
+                for name in (
+                    "lesson.faster-whisper.listenkit.json",
+                    "lesson.faster-whisper.listenkit.md",
+                    "lesson.faster-whisper.asr.json",
+                    "lesson.apple.asr.json",
+                    "lesson.asr-comparison.json",
+                ):
+                    self.assertTrue((root / "listening/lesson/artifacts" / name).is_file(), name)
                 notes = list((root / "listening/lesson").glob("lesson_*.md"))
                 self.assertEqual(len(notes), 1)
                 self.assertIn("三時に行きます。", notes[0].read_text(encoding="utf-8"))
@@ -1674,6 +1699,8 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertEqual(export_result.refs, ["attach/20_S01.m4a"])
         self.assertEqual(export_result.report_path, root / "artifacts" / "20.slice-export.json")
         self.assertTrue(report_exists)
+        self.assertEqual(export_result.report["source"], "attach/20.mp3")
+        self.assertEqual(export_result.report["slices"][0]["path"], "attach/20_S01.m4a")
         self.assertEqual(export_result.report["slice_profile"]["grouping"], "sentence")
         command = run_mock.call_args.args[0]
         self.assertIn("/tmp/export.py", command)

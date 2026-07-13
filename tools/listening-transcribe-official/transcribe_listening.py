@@ -2703,12 +2703,15 @@ def export_learning_block_slices(
     slices = report.get("slices")
     if not isinstance(slices, list) or len(slices) != len(blocks):
         raise RuntimeError("ListenKit slice export report count does not match learning blocks.")
+    report["source"] = f"attach/{audio_path.name}"
     report["slice_profile"] = profile.to_manifest_dict()
     refs: list[str] = []
     for block, item in zip(blocks, slices):
         if item.get("id") != block.id or item.get("status") != "exported":
             raise RuntimeError(f"ListenKit slice export report is invalid for {block.id}.")
-        refs.append(f"attach/{Path(str(item.get('path', ''))).name}")
+        relative_path = f"attach/{Path(str(item.get('path', ''))).name}"
+        item["path"] = relative_path
+        refs.append(relative_path)
     report_path = slice_export_report_path(audio_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -3423,6 +3426,25 @@ def is_review_artifact_path(path: str) -> bool:
     )
 
 
+def llm_handoff_artifact_sources(merge_request_path: Path) -> list[Path]:
+    suffix = ".llm-merge-request.json"
+    if not merge_request_path.name.endswith(suffix):
+        return [merge_request_path] if merge_request_path.is_file() else []
+    stem = merge_request_path.name[: -len(suffix)]
+    return sorted(
+        path
+        for path in merge_request_path.parent.glob(f"{stem}.*")
+        if path.is_file() and is_review_artifact_path(f"artifacts/{path.name}")
+    )
+
+
+def restore_llm_handoff_artifacts(merge_request_path: Path, artifact_dir: Path) -> None:
+    for source in llm_handoff_artifact_sources(merge_request_path):
+        destination = artifact_dir / source.name
+        _copy_preparation_file(source, destination)
+        destination.chmod(0o600)
+
+
 def _bundle_from_stage(
     *,
     vault_root: Path,
@@ -3520,9 +3542,11 @@ def materialize_llm_merge_request_handoff(bundle: PreparedListeningBundle) -> Pa
     if not source.is_file():
         raise RuntimeError(f"Prepared LLM merge request is missing: {source}")
     handoff_root = Path(tempfile.mkdtemp(prefix="lingotrace-llm-merge-"))
+    for artifact_source in llm_handoff_artifact_sources(source):
+        destination = handoff_root / artifact_source.name
+        shutil.copy2(artifact_source, destination)
+        destination.chmod(0o400)
     destination = handoff_root / source.name
-    shutil.copy2(source, destination)
-    destination.chmod(0o400)
     bundle.llm_merge_request_path = str(destination)
     return destination
 
@@ -3572,6 +3596,7 @@ def prepare_local_listening_bundle(
 
     stage_reviewed: Path | None = None
     stage_merge_request: Path | None = None
+    source_merge_request: Path | None = None
     if reviewed_transcript is not None:
         stage_reviewed = material_dir_for_audio(stage_audio) / "artifacts" / f"{audio_path.stem}.accepted-reviewed-transcript.json"
         _copy_preparation_file(reviewed_transcript, stage_reviewed)
@@ -3586,6 +3611,11 @@ def prepare_local_listening_bundle(
             )
 
     initial = _tree_snapshot(stage_vault)
+    if source_merge_request is not None and source_merge_request.is_file():
+        restore_llm_handoff_artifacts(
+            source_merge_request,
+            material_dir_for_audio(stage_audio) / "artifacts",
+        )
     try:
         summary = process_one(
             stage_audio,
@@ -3652,6 +3682,7 @@ def prepare_url_listening_bundle(
         _copy_preparation_file(slice_manifest_override, stage_manifest)
     stage_reviewed: Path | None = None
     stage_merge_request: Path | None = None
+    source_merge_request: Path | None = None
     if reviewed_transcript is not None:
         stage_reviewed = stage_output / "artifacts" / "accepted-reviewed-transcript.json"
         _copy_preparation_file(reviewed_transcript, stage_reviewed)
@@ -3664,6 +3695,8 @@ def prepare_url_listening_bundle(
             stage_merge_request = stage_output / "artifacts" / "accepted-merge-request.json"
             _copy_preparation_file(source_merge_request, stage_merge_request)
     initial = _tree_snapshot(stage_vault)
+    if source_merge_request is not None and source_merge_request.is_file():
+        restore_llm_handoff_artifacts(source_merge_request, stage_output / "artifacts")
     try:
         summary = process_url(
             url,

@@ -8,11 +8,12 @@
 ## [20260713-144452]
 ### 修复 (Fixed)
 - preview/dry-run 检出双 ASR 差异时，将 LLM 合并请求复制到权限隔离的稳定临时路径，避免 staging 清理后 Agent 无法继续同任务合并；第二阶段通过 `--reviewed-transcript` 与 `--merge-request` 成对重跑。
+- 稳定 handoff 同步保留首轮原始 ListenKit、标准化 ASR 与差异报告，并在共识重跑时交由 core write guard 持久化；精听切片报告改用可迁移的 `attach/...` 相对路径，避免 staging 临时路径进入 Vault 工件。
 - LLM 共识必须绑定真实待处理请求，并校验音频哈希、请求 ID、片段身份、时间戳以及 `decision` 与 `selected_text` 的对应关系；不再允许凭格式正确的伪造 ID 绕过双 ASR。
 - 两路 ASR 完全一致时明确通知用户“无需模型合并”，第二引擎不可用时明确报告受控单 ASR 降级。
 
 ### 测试 (Tests)
-- 新增 preview 清理后的稳定请求可读性测试，以及 provider-neutral 的两阶段 Gemini/Codex 形态共识端到端 fixture，覆盖请求读取、模型裁决、跳过重复 ASR、 guarded rerun 和最终笔记写入。
+- 新增 preview 清理后的稳定请求及完整 ASR 工件可读性测试，以及 provider-neutral 的两阶段 Gemini/Codex 形态共识端到端 fixture，覆盖请求读取、模型裁决、跳过重复 ASR、guarded rerun、可迁移切片报告和最终笔记写入。
 
 ## [20260713-142905]
 ### 变更 (Changed)
