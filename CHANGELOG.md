@@ -5,6 +5,15 @@
 
 ---
 
+## [20260713-142300]
+### 新增 (Added)
+- 双 ASR 出现差异时生成 provider-neutral 的 `llm-merge-request.json`，包含两路候选、上下文、风险分类和可直接填写的共识模板；Codex、Gemini 等调用方模型可在同一任务内自动裁决并重跑听力流程，无需在脚本中绑定模型厂商 API。
+- LLM 共识新增音频哈希、合并请求 ID、片段 ID、时间戳、决定、置信度和理由校验；低置信度或被篡改的片段继续阻断最终笔记写入。
+
+### 变更 (Changed)
+- 听力 CLI 以结构化状态和通知报告待合并差异数、完成合并的模型及最终结果；Agent skill 明确不得把内部合并请求直接丢给用户，而应自动处理，仅在确有低置信度时请求确认。
+- 补充双 ASR 一致直通、模型合并请求、模型共识重跑跳过重复 ASR、身份校验、低置信度阻断以及 Codex/Gemini 中立调用契约测试。
+
 ## [20260713-134631]
 ### 新增 (Added)
 - `tools/listening-transcribe-official/transcribe_listening.py`: 新增显式 Vault、LingoTrace 与 ListenKit 根目录参数，支持从任意工作目录统一准备本地音频和 URL 素材；新增带音频哈希、引擎、语言、完整时间戳的标准化 ASR 工件。

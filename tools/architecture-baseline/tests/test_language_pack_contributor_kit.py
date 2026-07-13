@@ -12,6 +12,7 @@ CAPABILITY_GUIDANCE = REPO_ROOT / "docs/multilingual/language-pack-capability-gu
 CAPABILITY_GUIDANCE_ZH = REPO_ROOT / "docs/multilingual/language-pack-capability-guidance.zh.md"
 REVIEW_MATERIALS_GUIDANCE = REPO_ROOT / "docs/multilingual/review-materials-user-stories.md"
 LISTENING_GUIDANCE = REPO_ROOT / "docs/multilingual/listening-notes-user-stories.md"
+JAPANESE_AGENT_SKILL = REPO_ROOT / "lingotrace/packs/japanese/agent_skills/SKILL.md"
 README = REPO_ROOT / "README.md"
 PHASE1_CONTRIBUTOR_GUIDE = REPO_ROOT / "docs/multilingual/history/phase-1/contributor-guide.md"
 
@@ -232,6 +233,32 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "本地候选",
             "待确认",
             "Shadowing common sentences remain candidates",
+        ):
+            self.assertIn(token, listening)
+
+    def test_japanese_agent_skill_auto_merges_asr_disagreements(self) -> None:
+        skill = read_required(JAPANESE_AGENT_SKILL)
+        listening = read_required(LISTENING_GUIDANCE)
+
+        for token in (
+            "status: llm_merge_required",
+            "llm_merge_request_path",
+            "Codex",
+            "Gemini",
+            "agent-runtime",
+            "--reviewed-transcript",
+            "confidence",
+            "rationale_zh",
+            "same user task",
+            "Do not stop at the first `llm_merge_required`",
+        ):
+            self.assertIn(token, skill)
+        for token in (
+            "structured merge request",
+            "audio hash",
+            "merge-request identity",
+            "which model performed the merge",
+            "low-confidence decisions still block",
         ):
             self.assertIn(token, listening)
 

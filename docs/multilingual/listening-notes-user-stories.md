@@ -53,7 +53,7 @@ Labels:
 | `US-9` Clear runtime/resource failure | `Required` | `Covered` | `Unsupported` | Unsupported packs should fail clearly without invoking Japanese tooling. |
 | `US-10` Explicit unsupported declaration | `Required` | `N/A` | `Covered` | Applies to packs that do not implement listening notes. |
 | `US-11` Language-specific pronunciation cues | `Language-Specific` | `Covered` | `Planned` | Japanese pitch accent is reference behavior, not core. |
-| `US-12` Multi-ASR cross-check | `Optional` | `Partial` | `Unsupported` | Current evidence covers artifact reporting, not real ASR quality. |
+| `US-12` Multi-ASR cross-check | `Optional` | `Covered` | `Unsupported` | Japanese emits a provider-neutral LLM merge request, validates the returned consensus, and reports the merge to the user. |
 | `US-13` Short-choice exam structure | `Optional` | `Covered` | `Unsupported` | Required only for packs that support exam-style listening notes. |
 | `US-14` Listening frontmatter and dashboard readiness | `Required` | `Covered` | `Unsupported` | Required for packs that render listening notes into the review dashboard. |
 | `US-15` Conservative dialogue rendering | `Optional` | `Covered` | `Unsupported` | Required only when dialogue listening is supported. |
@@ -355,18 +355,25 @@ Acceptance criteria:
 - The workflow should align the two transcripts by timestamp, sentence, or segment id and produce a disagreement report or reviewed transcript artifact.
 - The final note should use reviewed consensus text, not a blind merge of two transcripts.
 - Disagreements around names, numbers, homophones, particles, endings, or slice boundaries should be surfaced for review.
+- When the caller is an LLM-capable agent, disagreement handling should continue automatically in the same task: the agent reads a structured merge request, judges each segment with context, produces a temporary consensus, and reruns the guarded workflow.
+- The deterministic runtime must validate audio hash, merge-request identity, segment ids, timestamps, confidence, and completion status before accepting an LLM consensus.
+- The agent must tell the learner how many differences were merged, which model performed the merge, and whether any uncertainty remains; low-confidence decisions still block the final note.
 - If the secondary ASR route requires GUI permission, network access, paid services, or unavailable language support, the workflow may proceed with a single engine and report the limitation.
 
 Japanese reference:
 
 - The current Japanese chain already supports `faster-whisper` and Apple Speech routes through ListenKit.
 - Some existing Shadowing artifacts keep both Apple and faster-whisper transcript files for comparison.
+- Japanese disagreement runs emit `artifacts/<audio_stem>.llm-merge-request.json` with a reviewed-transcript template that Codex, Gemini, or another compatible agent can complete without a provider-specific API inside the script.
+- The merge request and reviewed transcript use a lightweight artifact schema so the calling agent and deterministic runtime can exchange evidence without sharing provider-specific internals.
 - Cross-checking should reduce manual transcript correction, but it does not replace reviewed manifests for intensive slice boundaries.
 
 Regression coverage:
 
 - `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`
-- Current tests cover comparison artifact schema and disagreement reporting; real ASR quality still requires manual or fixture-backed review.
+- `test_llm_merge_request_contains_provider_neutral_review_template`
+- `test_japanese_agent_skill_auto_merges_asr_disagreements`
+- `test_llm_reviewed_consensus_skips_retranscription_and_finishes_note`
 
 ### 13. Preserve Short-Choice And Exam Listening Structure
 
@@ -551,7 +558,8 @@ Expected agent behavior:
 
 - Prefer dry-run or preview first.
 - Compare available ASR artifacts when practical.
-- Keep a reviewed transcript or disagreement report before final write.
+- When a structured LLM merge request is returned, resolve it automatically in the same task and rerun with the validated temporary consensus.
+- Tell the user what the model merged; ask only when important evidence remains low-confidence.
 - Preserve manual sections and ask before risky replacement.
 
 ## Coverage Matrix
@@ -569,7 +577,7 @@ Expected agent behavior:
 | Runtime/resource failure clarity | Listening renderer tests and manual chain check |
 | Unsupported packs fail explicitly | Contributor guide and English pack behavior |
 | Language-specific pronunciation cues | `test_japanese_listening_guidance_records_accent_annotation_policy`, `test_learning_package_renders_kana_accent_as_downstep_marker`, plus manual pitch-accent review |
-| Multi-engine ASR cross-check | `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`; real ASR quality remains manual-reviewed |
+| Multi-engine ASR cross-check | `test_compare_engine_persists_asr_disagreement_report_without_replacing_primary`, `test_llm_merge_request_contains_provider_neutral_review_template`, `test_llm_reviewed_consensus_skips_retranscription_and_finishes_note`, and `test_japanese_agent_skill_auto_merges_asr_disagreements` |
 | Short-choice exam structure | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer short-choice tests |
 | Listening frontmatter and dashboard readiness | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer frontmatter tests |
 | Dialogue and numbered-dialogue rendering | `test_listening_guidance_records_remaining_migrated_skill_rules` plus renderer dialogue tests |
@@ -581,7 +589,7 @@ Expected agent behavior:
 - The public contract tests use fixture files and do not prove real ASR quality.
 - Common-sentence naturalness still requires manual or model-assisted review.
 - Japanese pitch-accent annotation needs better automated checks for density, confidence, and script-vs-practice placement.
-- Multi-engine ASR comparison now has a lightweight artifact schema and regression test, but real-engine agreement quality still needs fixture-backed or manual review before it can become required.
+- LLM merge quality still needs a broader fixture set for names, numbers, homophones, particles, endings, and ambiguous low-confidence audio before multi-ASR can become required across language packs.
 - Topic-bearing filename quality and short-choice answer correctness still need human review for real learning material.
 - Batch scanning exists as a tool-level affordance but should not be treated as a default agent workflow until preview and write bounds are stricter.
 - Non-Japanese listening implementations need their own transcript engine, pronunciation policy, and slice validation before this guidance can become a candidate contract.

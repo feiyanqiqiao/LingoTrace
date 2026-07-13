@@ -144,6 +144,7 @@ class ASRComparisonResult:
     report: dict
     report_path: Path | None
     consensus_path: Path | None
+    merge_request_path: Path | None = None
 
     @property
     def unresolved_count(self) -> int:
@@ -159,6 +160,9 @@ class PreparedListeningBundle:
     overwrite_required: bool
     staging_root: Path
     review_required: bool = False
+    llm_merge_request_path: str | None = None
+    disagreement_count: int = 0
+    merge_model: str | None = None
 
     def workflow_payload(self, *, overwrite_confirmed: bool = False) -> dict:
         files = self.files
@@ -733,6 +737,18 @@ def resolve_vault_relative_path(vault_root: Path, raw_path: str | Path) -> Path:
         resolved.relative_to(vault_root.resolve())
     except ValueError as exc:
         raise RuntimeError(f"Listening path must stay inside the target Vault: {raw_path}") from exc
+    return resolved
+
+
+def resolve_readonly_input_path(vault_root: Path, raw_path: str | Path) -> Path:
+    path = Path(raw_path).expanduser()
+    if path.is_absolute():
+        resolved = path.resolve()
+    else:
+        vault_candidate = (vault_root / path).resolve()
+        resolved = vault_candidate if vault_candidate.exists() else path.resolve()
+    if not resolved.is_file():
+        raise RuntimeError(f"Read-only input artifact is missing: {resolved}")
     return resolved
 
 
@@ -1478,7 +1494,7 @@ def disagreement_categories(primary_text: str, secondary_text: str) -> list[str]
 
 
 def consensus_artifact(audio_path: Path, report: dict) -> dict:
-    return {
+    payload = {
         "schema_version": 1,
         "kind": "reviewed_transcript",
         "audio_sha256": sha256_file(audio_path),
@@ -1486,6 +1502,75 @@ def consensus_artifact(audio_path: Path, report: dict) -> dict:
         "secondary_engine": report.get("secondary", {}).get("engine"),
         "review_status": "accepted" if not report.get("unresolved_count") else "needs_review",
         "segments": report.get("consensus_segments", []),
+    }
+    if report.get("merge_request_id"):
+        payload["merge_request_id"] = report["merge_request_id"]
+    return payload
+
+
+def asr_merge_request_id(audio_path: Path, report: dict) -> str:
+    identity = {
+        "audio_sha256": sha256_file(audio_path),
+        "primary": report.get("primary"),
+        "secondary": report.get("secondary"),
+        "segments": report.get("consensus_segments"),
+    }
+    encoded = json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def llm_merge_request_artifact(audio_path: Path, report: dict) -> dict:
+    merge_request_id = asr_merge_request_id(audio_path, report)
+    report["merge_request_id"] = merge_request_id
+    disagreement_by_id = {
+        str(item.get("segment_id")): item for item in report.get("disagreements", []) if isinstance(item, dict)
+    }
+    template = consensus_artifact(audio_path, report)
+    template["reviewer"] = {
+        "kind": "llm",
+        "provider": "agent-runtime",
+        "model": "",
+        "completed_at": "",
+    }
+    template_segments: list[dict] = []
+    request_segments: list[dict] = []
+    for segment in report.get("consensus_segments", []):
+        segment_id = str(segment.get("segment_id", ""))
+        disagreement = disagreement_by_id.get(segment_id, {})
+        needs_merge = bool(segment.get("needs_review"))
+        template_segment = dict(segment)
+        template_segment["confidence"] = "" if needs_merge else "high"
+        template_segment["rationale_zh"] = "" if needs_merge else "两路 ASR 一致。"
+        template_segments.append(template_segment)
+        request_segments.append(
+            {
+                **segment,
+                "categories": list(disagreement.get("categories", [])),
+                "task": "resolve_disagreement" if needs_merge else "confirm_agreement",
+            }
+        )
+    template["segments"] = template_segments
+    return {
+        "schema_version": 1,
+        "kind": "asr_llm_merge_request",
+        "status": "merge_required",
+        "merge_request_id": merge_request_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "audio": {"name": audio_path.name, "sha256": sha256_file(audio_path)},
+        "primary": report.get("primary", {}),
+        "secondary": report.get("secondary", {}),
+        "disagreement_count": int(report.get("disagreement_count", 0)),
+        "instructions_zh": [
+            "结合前后片段和日语语义判断每处差异，不要机械拼接两路文本。",
+            "不得修改 segment_id、start、end、audio_sha256 或 merge_request_id。",
+            "decision 只能使用 agreement、primary、secondary 或 merged。",
+            "每个差异片段必须填写 confidence 和简短 rationale_zh。",
+            "数字、姓名、地名、同音词或助词无法可靠判断时，保留 needs_review=true 并知会用户。",
+        ],
+        "allowed_decisions": ["agreement", "primary", "secondary", "merged"],
+        "allowed_confidence": ["high", "medium", "low"],
+        "segments": request_segments,
+        "reviewed_transcript_template": template,
     }
 
 
@@ -1498,16 +1583,27 @@ def write_asr_comparison_report(
     artifact_dir.mkdir(parents=True, exist_ok=True)
     report_path = artifact_dir / f"{audio_path.stem}.asr-comparison.json"
     report = build_asr_comparison_report(primary, secondary)
+    merge_request = llm_merge_request_artifact(audio_path, report) if report.get("unresolved_count") else None
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     consensus_path = artifact_dir / f"{audio_path.stem}.reviewed-transcript.json"
     consensus_path.write_text(
         json.dumps(consensus_artifact(audio_path, report), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    if merge_request is not None:
+        merge_request_path = artifact_dir / f"{audio_path.stem}.llm-merge-request.json"
+        merge_request_path.write_text(
+            json.dumps(merge_request, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
     return report_path
 
 
-def load_reviewed_transcript(path: Path, audio_path: Path) -> TranscriptionCandidate:
+def load_reviewed_transcript(
+    path: Path,
+    audio_path: Path,
+    merge_request_path: Path | None = None,
+) -> TranscriptionCandidate:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -1521,13 +1617,59 @@ def load_reviewed_transcript(path: Path, audio_path: Path) -> TranscriptionCandi
     raw_segments = payload.get("segments")
     if not isinstance(raw_segments, list) or not raw_segments:
         raise RuntimeError("Reviewed transcript must contain at least one segment.")
+    reviewer = payload.get("reviewer")
+    llm_review = isinstance(reviewer, dict) and reviewer.get("kind") == "llm"
+    expected_segments: list[dict] | None = None
+    if llm_review:
+        if not str(reviewer.get("model", "")).strip() or not str(reviewer.get("completed_at", "")).strip():
+            raise RuntimeError("LLM-reviewed transcript must record reviewer model and completed_at.")
+        merge_request_id = str(payload.get("merge_request_id", ""))
+        if not re.fullmatch(r"[0-9a-f]{64}", merge_request_id):
+            raise RuntimeError("LLM-reviewed transcript must preserve a valid merge_request_id.")
+        if merge_request_path is not None and merge_request_path.is_file():
+            request = json.loads(merge_request_path.read_text(encoding="utf-8"))
+            if request.get("kind") != "asr_llm_merge_request":
+                raise RuntimeError("LLM merge request has an unsupported artifact kind.")
+            request_audio = request.get("audio", {})
+            if request_audio.get("sha256") != sha256_file(audio_path):
+                raise RuntimeError("LLM merge request does not match the source audio hash.")
+            if request.get("merge_request_id") != merge_request_id:
+                raise RuntimeError("LLM-reviewed transcript does not match the pending merge-request identity.")
+            request_segments = request.get("segments")
+            if not isinstance(request_segments, list) or len(request_segments) != len(raw_segments):
+                raise RuntimeError("LLM-reviewed transcript must preserve every merge-request segment.")
+            expected_segments = request_segments
     segments: list[dict] = []
     previous_end: float | None = None
-    for item in raw_segments:
+    llm_segment_ids: set[str] = set()
+    for index, item in enumerate(raw_segments):
         if not isinstance(item, dict) or not str(item.get("selected_text", "")).strip():
             raise RuntimeError("Every reviewed transcript segment needs selected_text.")
         if item.get("needs_review") is True or item.get("decision") == "pending_review":
             raise RuntimeError("Reviewed transcript still contains unresolved ASR disagreements.")
+        if llm_review:
+            segment_id = str(item.get("segment_id", ""))
+            if not re.fullmatch(r"T\d{3,}", segment_id) or segment_id in llm_segment_ids:
+                raise RuntimeError("Every LLM-reviewed segment must preserve a unique segment_id.")
+            llm_segment_ids.add(segment_id)
+            if expected_segments is not None:
+                expected = expected_segments[index]
+                if (
+                    not isinstance(expected, dict)
+                    or segment_id != str(expected.get("segment_id", ""))
+                    or item.get("start") != expected.get("start")
+                    or item.get("end") != expected.get("end")
+                ):
+                    raise RuntimeError("LLM-reviewed transcript changed merge-request segment identity or timestamps.")
+            decision = str(item.get("decision", ""))
+            confidence = str(item.get("confidence", ""))
+            rationale = str(item.get("rationale_zh", "")).strip()
+            if decision not in {"agreement", "primary", "secondary", "merged"}:
+                raise RuntimeError("Every LLM-reviewed segment needs a supported decision.")
+            if confidence not in {"high", "medium"}:
+                raise RuntimeError("Accepted LLM-reviewed segments require high or medium confidence.")
+            if not rationale:
+                raise RuntimeError("Every LLM-reviewed segment needs rationale_zh.")
         start = item.get("start")
         end = item.get("end")
         if (
@@ -1726,7 +1868,11 @@ def compare_candidate_if_requested(
         write_normalized_asr_artifact(audio_path, secondary)
         report_path = write_asr_comparison_report(audio_path, primary, secondary)
         consensus_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
-    return ASRComparisonResult(primary, report, report_path, consensus_path)
+        merge_candidate = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
+        merge_request_path = merge_candidate if merge_candidate.is_file() else None
+    else:
+        merge_request_path = None
+    return ASRComparisonResult(primary, report, report_path, consensus_path, merge_request_path)
 
 
 def infer_title(audio_stem: str, forced_title: str | None, sentences: list[str]) -> str:
@@ -2912,50 +3058,18 @@ def process_one(
     preflight_source_audio(audio_path)
     if listening_mode == "intensive":
         preflight_intensive_slice_tooling()
-    if candidate_route is None:
-        candidate, route_label = transcribe_with_heuristics(
-            audio_path,
-            locale,
-            engine,
-            faster_whisper_python,
-            faster_whisper_model,
-            faster_whisper_compute_type,
-            persist_artifacts=not dry_run,
-            compare_engine=compare_engine,
-        )
-    else:
-        candidate, route_label = candidate_route
-        if not dry_run:
-            write_normalized_asr_artifact(audio_path, candidate)
-        if compare_engine:
-            compare_candidate_if_requested(
-                audio_path,
-                locale,
-                candidate,
-                compare_engine,
-                faster_whisper_python,
-                faster_whisper_model,
-                faster_whisper_compute_type,
-                material_dir_for_audio(audio_path) / "artifacts" if not dry_run else None,
-                audio_path.stem,
-                not dry_run,
-            )
-
-    comparison_runtime_issue: str | None = None
-    if compare_engine and not dry_run:
-        comparison_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.asr-comparison.json"
-        if comparison_path.is_file():
-            comparison_payload = json.loads(comparison_path.read_text(encoding="utf-8"))
-            if comparison_payload.get("status") == "secondary_unavailable":
-                secondary = comparison_payload.get("secondary", {})
-                comparison_runtime_issue = (
-                    f"第二 ASR（{secondary.get('engine', 'unknown')}）不可用，本次降级为单 ASR；"
-                    f"限制与错误已记录在 artifacts/{comparison_path.name}。"
-                )
-
     reviewed_path = Path(reviewed_transcript_override).expanduser() if reviewed_transcript_override else None
+    comparison_runtime_issue: str | None = None
+    comparison_review_issue: str | None = None
     if reviewed_path is not None:
-        candidate = load_reviewed_transcript(reviewed_path, audio_path)
+        pending_merge_request = (
+            material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
+        )
+        candidate = load_reviewed_transcript(
+            reviewed_path,
+            audio_path,
+            pending_merge_request if pending_merge_request.is_file() else None,
+        )
         route_label = "reviewed-consensus"
         if not dry_run:
             canonical_reviewed_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
@@ -2963,19 +3077,58 @@ def process_one(
             if reviewed_path.resolve() != canonical_reviewed_path.resolve():
                 shutil.copy2(reviewed_path, canonical_reviewed_path)
             write_normalized_asr_artifact(audio_path, candidate)
-    comparison_review_issue: str | None = None
-    if reviewed_path is None and compare_engine and not dry_run:
-        consensus_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
-        if consensus_path.is_file():
-            try:
-                candidate = load_reviewed_transcript(consensus_path, audio_path)
-                route_label = "reviewed-consensus"
+    else:
+        if candidate_route is None:
+            candidate, route_label = transcribe_with_heuristics(
+                audio_path,
+                locale,
+                engine,
+                faster_whisper_python,
+                faster_whisper_model,
+                faster_whisper_compute_type,
+                persist_artifacts=not dry_run,
+                compare_engine=compare_engine,
+            )
+        else:
+            candidate, route_label = candidate_route
+            if not dry_run:
                 write_normalized_asr_artifact(audio_path, candidate)
-            except RuntimeError as exc:
-                comparison_review_issue = (
-                    f"ASR comparison requires review before final note generation: {exc} "
-                    f"Review and rerun with --reviewed-transcript {consensus_path}."
+            if compare_engine:
+                compare_candidate_if_requested(
+                    audio_path,
+                    locale,
+                    candidate,
+                    compare_engine,
+                    faster_whisper_python,
+                    faster_whisper_model,
+                    faster_whisper_compute_type,
+                    material_dir_for_audio(audio_path) / "artifacts" if not dry_run else None,
+                    audio_path.stem,
+                    not dry_run,
                 )
+        if compare_engine and not dry_run:
+            comparison_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.asr-comparison.json"
+            if comparison_path.is_file():
+                comparison_payload = json.loads(comparison_path.read_text(encoding="utf-8"))
+                if comparison_payload.get("status") == "secondary_unavailable":
+                    secondary = comparison_payload.get("secondary", {})
+                    comparison_runtime_issue = (
+                        f"第二 ASR（{secondary.get('engine', 'unknown')}）不可用，本次降级为单 ASR；"
+                        f"限制与错误已记录在 artifacts/{comparison_path.name}。"
+                    )
+            consensus_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
+            if consensus_path.is_file():
+                try:
+                    candidate = load_reviewed_transcript(consensus_path, audio_path)
+                    route_label = "reviewed-consensus"
+                    write_normalized_asr_artifact(audio_path, candidate)
+                except RuntimeError as exc:
+                    merge_request_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
+                    comparison_review_issue = (
+                        f"ASR comparison requires LLM merge before final note generation: {exc} "
+                        f"Use {merge_request_path} to create a temporary reviewed transcript and rerun with "
+                        "--reviewed-transcript."
+                    )
     raw_chunks = raw_segments_to_chunks(candidate.payload.get("segments", []))
     manifest_profile = None
     active_manifest_path: Path | None = None
@@ -3243,6 +3396,7 @@ def is_review_artifact_path(path: str) -> bool:
         or path.endswith(".listenkit.md")
         or path.endswith(".asr.json")
         or path.endswith(".asr-comparison.json")
+        or path.endswith(".llm-merge-request.json")
         or path.endswith(".reviewed-transcript.json")
         or path.endswith(".source.json")
     )
@@ -3281,12 +3435,30 @@ def _bundle_from_stage(
             }
         )
     review_required = False
+    merge_model: str | None = None
     consensus_files = [stage_vault / path for path in changed if path.endswith(".reviewed-transcript.json")]
     for consensus_path in consensus_files:
         payload = json.loads(consensus_path.read_text(encoding="utf-8"))
         if payload.get("review_status") != "accepted":
             review_required = True
             break
+        reviewer = payload.get("reviewer")
+        if isinstance(reviewer, dict) and reviewer.get("kind") == "llm":
+            merge_model = str(reviewer.get("model") or "agent-runtime")
+    merge_request_paths = [path for path in changed if path.endswith(".llm-merge-request.json")]
+    llm_merge_request_path = merge_request_paths[0] if merge_request_paths else None
+    disagreement_count = 0
+    if llm_merge_request_path is not None:
+        merge_request = json.loads((stage_vault / llm_merge_request_path).read_text(encoding="utf-8"))
+        disagreement_count = int(merge_request.get("disagreement_count", 0))
+    elif merge_model is not None:
+        for consensus_path in consensus_files:
+            payload = json.loads(consensus_path.read_text(encoding="utf-8"))
+            disagreement_count += sum(
+                1
+                for segment in payload.get("segments", [])
+                if isinstance(segment, dict) and segment.get("decision") != "agreement"
+            )
     return PreparedListeningBundle(
         vault_root=vault_root,
         note_path=note_path,
@@ -3295,6 +3467,9 @@ def _bundle_from_stage(
         overwrite_required=(vault_root / note_path).exists(),
         staging_root=stage_vault.parent,
         review_required=review_required,
+        llm_merge_request_path=llm_merge_request_path,
+        disagreement_count=disagreement_count,
+        merge_model=merge_model,
     )
 
 
@@ -3342,9 +3517,14 @@ def prepare_local_listening_bundle(
 
     stage_reviewed: Path | None = None
     if reviewed_transcript is not None:
-        validate_listening_target(vault_root, reviewed_transcript)
         stage_reviewed = material_dir_for_audio(stage_audio) / "artifacts" / f"{audio_path.stem}.accepted-reviewed-transcript.json"
         _copy_preparation_file(reviewed_transcript, stage_reviewed)
+        merge_request = material_dir / "artifacts" / f"{audio_path.stem}.llm-merge-request.json"
+        if merge_request.is_file():
+            _copy_preparation_file(
+                merge_request,
+                material_dir_for_audio(stage_audio) / "artifacts" / merge_request.name,
+            )
 
     initial = _tree_snapshot(stage_vault)
     try:
@@ -3413,6 +3593,10 @@ def prepare_url_listening_bundle(
     if reviewed_transcript is not None:
         stage_reviewed = stage_output / "artifacts" / "accepted-reviewed-transcript.json"
         _copy_preparation_file(reviewed_transcript, stage_reviewed)
+        existing_artifact_dir = output_dir / "artifacts"
+        if existing_artifact_dir.is_dir():
+            for merge_request in existing_artifact_dir.glob("*.llm-merge-request.json"):
+                _copy_preparation_file(merge_request, stage_output / "artifacts" / merge_request.name)
     initial = _tree_snapshot(stage_vault)
     try:
         summary = process_url(
@@ -3503,7 +3687,7 @@ def main() -> int:
     try:
         note_path = resolve_vault_relative_path(vault_root, args.note_path) if args.note_path else None
         manifest_path = resolve_vault_relative_path(vault_root, args.slice_manifest) if args.slice_manifest else None
-        reviewed_path = resolve_vault_relative_path(vault_root, args.reviewed_transcript) if args.reviewed_transcript else None
+        reviewed_path = resolve_readonly_input_path(vault_root, args.reviewed_transcript) if args.reviewed_transcript else None
         if args.url:
             output_dir = resolve_vault_relative_path(vault_root, args.output_dir)
             url_compare = None if args.single_asr else args.compare_engine
@@ -3557,10 +3741,27 @@ def main() -> int:
             apply=args.apply,
             overwrite_confirmed=args.confirm_overwrite,
         )
+        if bundle.review_required:
+            status = "llm_merge_required"
+            notification = (
+                f"双 ASR 检出 {bundle.disagreement_count} 处差异。调用方大模型应读取合并请求、"
+                "自动生成临时共识文件并以 --reviewed-transcript 重跑；最终笔记尚未写入。"
+            )
+        elif bundle.merge_model:
+            status = "complete"
+            notification = f"双 ASR 差异已由 {bundle.merge_model} 自动判断并合并，最终笔记使用已校验共识。"
+        else:
+            status = "complete"
+            notification = "听力笔记已通过转写与写入校验。"
         output = {
+            "status": status,
             "summary": bundle.summary,
             "note_path": bundle.note_path,
             "review_required": bundle.review_required,
+            "llm_merge_request_path": bundle.llm_merge_request_path,
+            "disagreement_count": bundle.disagreement_count,
+            "merge_model": bundle.merge_model,
+            "notification": notification,
             "preview": preview,
             "apply": applied,
         }
