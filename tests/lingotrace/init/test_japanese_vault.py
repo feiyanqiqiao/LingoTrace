@@ -28,6 +28,8 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
         self.assertEqual("create_directory", planned_by_path["review/focus/vocab"]["action"])
         self.assertEqual("create_directory", planned_by_path["review/pronunciation/accent"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/focus-vocab-card.md"]["action"])
+        self.assertEqual("copy_pack_artifact", planned_by_path["templates/grammar-card.md"]["action"])
+        self.assertEqual("copy_pack_artifact", planned_by_path["templates/error-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["views/total-training.base"]["action"])
 
         for entry in envelope["planned_writes"]:

@@ -106,14 +106,26 @@ When the learning point is clear, convert the user request, source note, classro
 
 Use the review item route for:
 
-- vocabulary with `headword`, optional `reading`, `accent_display`, `meaning_zh`, and `collocations`;
-- grammar with `pattern`, `meaning_zh`, and `formation`;
-- concrete errors with `correct_form`, `wrong_form`, and `reason`;
+- vocabulary with `headword`, `reading`, `meaning_zh`, and optional accent, part-of-speech, collocation, example, and confusion fields;
+- grammar with `pattern`, `meaning_zh`, list-valued `formation`, and optional register, usage-scene, structured usage-branch, example, and contrast fields;
+- concrete errors with `correct_form`, `wrong_form`, `reason`, `avoidance`, optional exact focus substrings, and related review items;
 - pronunciation issues with `target_text`, `pronunciation_kind`, and `issue_tags`.
 
 Cards should remain concise enough for review. Long explanations belong in source notes or reference notes, not in the review prompt.
 
-If an image-backed item is not clearly readable, or if the card type, headword, grammar pattern, correct answer, or target root is uncertain, stop and ask before writing. Merges, moves, overwrites, and broad rewrites still require user confirmation.
+Structured items render deterministic vocabulary, grammar, and error-card bodies. Do not reduce semantic content to frontmatter-only fields or empty headings. Missing optional sections are omitted; uncertain core meaning, formation, or correction blocks creation.
+
+Treat links as a write-time correctness contract:
+
+- accept a source as either a Vault-relative note path or a wikilink, then resolve it inside `source_notes_root` or `daily_notes_root` before writing;
+- block missing, ambiguous, malformed, out-of-role, or self-referential source links;
+- resolve vocabulary, grammar, and error-card relations only inside their allowed review roles;
+- render a canonical Vault-relative extensionless wikilink only when exactly one target exists;
+- keep a missing or ambiguous optional relation as plain text under `## 待补卡`, return it in `unresolved_related_items`, and never create a dangling wikilink.
+
+Applying any mutation to an existing review card requires `existing_update_confirmed=True`. The structured `item` path may update provenance and lifecycle metadata after confirmation, but it must not replace manually curated semantic frontmatter or body content. Use an explicitly confirmed full `card` payload when the user asks to reformat an existing card.
+
+If an image-backed item is not clearly readable, or if the card type, headword, grammar pattern, correct answer, or target root is uncertain, stop and ask before writing. Merges, moves, overwrites, and broad rewrites still require user confirmation. Existing-card updates also require explicit confirmation.
 
 ## Speaking Cards
 

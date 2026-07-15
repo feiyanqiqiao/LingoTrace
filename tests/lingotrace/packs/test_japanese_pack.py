@@ -8,6 +8,7 @@ from pathlib import Path
 
 from lingotrace.core.capabilities import PHASE0_CAPABILITY_IDS
 from lingotrace.core.manifests import load_language_pack_manifest
+from lingotrace.packs.japanese import workflows
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -140,7 +141,7 @@ class JapanesePackTests(unittest.TestCase):
 
         templates = manifest["templates"]
         self.assertEqual(
-            {"focus_vocab_card", "speaking_card", "daily_checklist"},
+            {"focus_vocab_card", "grammar_card", "error_card", "speaking_card", "daily_checklist"},
             {record["id"] for record in templates},
         )
         for record in templates:
@@ -156,6 +157,33 @@ class JapanesePackTests(unittest.TestCase):
         for record in manifest["initialization_artifacts"]:
             self.assertEqual("recreate-from-pack", record["artifact_class"])
             self.assertTrue(record["path"].startswith(".lingotrace/"))
+
+    def test_review_card_templates_include_complete_active_review_metadata(self) -> None:
+        required = {
+            "track",
+            "item_type",
+            "status",
+            "priority",
+            "done_today",
+            "source_notes",
+            "first_seen",
+            "last_seen",
+            "seen_count",
+            "error_count",
+            "review_stage",
+            "next_review",
+            "last_reviewed",
+            "tags",
+        }
+        for filename in ("focus-vocab-card.md", "grammar-card.md", "error-card.md"):
+            text = (PACK_ROOT / "templates" / filename).read_text(encoding="utf-8")
+            fields, _ = workflows._frontmatter_and_body(text)
+            self.assertTrue(required.issubset(fields), filename)
+            self.assertEqual("active", fields["status"])
+            self.assertEqual("day0", fields["review_stage"])
+            self.assertIs(fields["done_today"], False)
+            self.assertIsInstance(fields["source_notes"], list)
+            self.assertIsInstance(fields["tags"], list)
 
     def test_total_training_dashboard_surfaces_type_specific_review_cues(self) -> None:
         template = read_total_training_base()
@@ -228,10 +256,23 @@ class JapanesePackTests(unittest.TestCase):
 
         review_report = validators.validate_review_materials(
             {
+                "track": "class_review",
                 "item_type": "vocab",
+                "status": "active",
+                "priority": "normal",
+                "done_today": False,
+                "headword": "合成語",
                 "reading": "ごうせいご",
                 "meaning_zh": "合成词",
-                "review_stage": 1,
+                "source_notes": [],
+                "first_seen": "2026-06-21",
+                "last_seen": "2026-06-21",
+                "seen_count": 1,
+                "error_count": 0,
+                "review_stage": "day0",
+                "next_review": "2026-06-21",
+                "last_reviewed": "",
+                "tags": ["jp/vocab", "jp/class_review"],
             }
         )
         rollover_report = validators.validate_review_rollover(
