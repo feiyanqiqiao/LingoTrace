@@ -53,6 +53,8 @@ Labels:
 | `US-9` Daily checklist separation                      | `Optional`          | `Covered` | `N/A`     | Required only for packs with daily checklist integration.                                     |
 | `US-10` Confirm before risky merge, move, or overwrite | `Required`          | `Covered` | `Partial` | Agent confirmation policy is shared; each pack needs local examples.                          |
 | `US-11` Core write guardrails                          | `Required`          | `Covered` | `Covered` | Core mutation and capability checks apply to all packs.                                       |
+| `US-12` Render stable, reviewable card bodies          | `Required`          | `Covered` | `Partial` | Japanese has deterministic vocabulary, grammar, and error renderers; English needs its own templates. |
+| `US-13` Prevent dangling or incorrect internal links   | `Required`          | `Covered` | `Planned` | Japanese resolves provenance and relations inside declared roles before writing.              |
 
 ## Ownership Boundary
 
@@ -318,6 +320,52 @@ Regression coverage:
 - `tests/lingotrace/core/test_mutations.py`
 - `tests/lingotrace/core/test_capabilities.py`
 
+### 12. Render Stable, Reviewable Card Bodies
+
+As a learner, I want structured review fields to produce a consistent card I can actually study from, so new cards do not look like metadata-only stubs.
+
+Acceptance criteria:
+
+- Vocabulary, grammar, and error items use language-pack-owned deterministic renderers.
+- Semantic fields appear in the readable body instead of only in frontmatter.
+- Optional sections are omitted when no reliable content exists; empty headings are not emitted.
+- New cards include complete active-review metadata and typed list fields.
+- Existing cards are not reformatted by structured-item updates; full reformatting requires explicit confirmation.
+
+Japanese reference:
+
+- Vocabulary follows the `溢れる` review shape.
+- Grammar follows the complete-but-optional `〜ようだ` structure.
+- Error cards follow the wrong/correct/reason/avoidance structure and use Obsidian highlights.
+
+Regression coverage:
+
+- `test_vocab_grammar_and_error_bodies_match_golden_fixtures`
+- `test_optional_sections_are_omitted_when_no_reliable_content_exists`
+- `test_existing_cards_require_confirmation_and_keep_manual_semantic_content`
+- `test_yaml_round_trip_preserves_special_text_and_typed_lists`
+
+### 13. Prevent Dangling Or Incorrect Internal Links
+
+As a learner, I want every generated internal link to resolve to the intended note, so review cards do not send me to a missing or similarly named card.
+
+Acceptance criteria:
+
+- Source input accepts a Vault-relative path or wikilink and resolves only inside declared source roles.
+- Missing, ambiguous, malformed, out-of-role, or self-referential source links block writing.
+- Optional review-card relations resolve only inside type-appropriate review roles.
+- Unique targets render canonical Vault-relative extensionless links with friendly labels.
+- Missing or ambiguous optional relations remain plain text, produce warnings, and are not written as wikilinks.
+- Generated filenames reject characters that change Obsidian link semantics.
+
+Regression coverage:
+
+- `test_source_links_must_resolve_uniquely_inside_source_roles`
+- `test_missing_or_ambiguous_optional_relations_remain_plain_text_and_are_reported`
+- `test_source_self_link_is_blocked_when_roles_overlap`
+- `test_reserved_filename_characters_and_non_unique_error_focus_are_blocked`
+- `test_vocab_grammar_and_error_bodies_match_golden_fixtures`
+
 ## Migration Test Matrix
 
 | Behavior | Reference Japanese coverage | Coverage status | Required for every language pack |
@@ -337,6 +385,9 @@ Regression coverage:
 | Daily checklist separation | `test_review_materials_item_does_not_touch_daily_checklist` | Covered for default extraction | If supported |
 | Risky merge or overwrite confirmation | `test_review_materials_item_blocks_duplicate_existing_matches`; `test_review_materials_item_blocks_target_path_collision`; `test_review_material_agent_skill_requires_confirmation_for_risky_writes` | Covered for structured items and agent contract | Yes |
 | Core write guard | Core mutation and capability tests | Covered | Yes |
+| Stable review-facing card bodies | Golden vocabulary, grammar, and error fixtures | Covered for Japanese | Yes |
+| Required provenance link resolution | Missing, ambiguous, malformed, out-of-role, and self-link tests | Covered for Japanese | Yes |
+| Optional relation fallback | Plain-text fallback, warning, and artifact tests | Covered for Japanese | Yes |
 
 ## Language-Pack Implementation Checklist
 
@@ -346,6 +397,8 @@ Before adding `review_materials` to a new language pack:
 - Define path roles for every card family the pack supports.
 - Define language-owned fields in `fields.json`; do not copy Japanese field names mechanically.
 - Define card templates for vocabulary, grammar, pronunciation, and error cards as applicable.
+- Define deterministic body renderers and optional-section behavior for structured items.
+- Define role-scoped source and relation link resolution, including ambiguity and fallback policy.
 - Add duplicate-search rules and target-card routing rules.
 - Decide which source-note and daily-checklist behaviors are supported.
 - Add pack-level tests mapped to every required row in the migration matrix.

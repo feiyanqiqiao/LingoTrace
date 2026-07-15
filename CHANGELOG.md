@@ -5,6 +5,18 @@
 
 ---
 
+## [20260715-152146]
+### 新增 (Added)
+- 日语 `review_materials` 新增结构化词汇卡、语法卡与错题卡渲染器，补齐统一复习元数据、安全 YAML 列表、按需章节和 Obsidian 错题重点标记；公共初始化新增语法卡与错题卡模板。
+- 新增 Vault 角色范围内的来源与关联卡链接解析：来源缺失、重名、越界、格式错误或自引用时阻断写入；缺失或重名的可选关联保留普通文本并通过 `unresolved_related_items` 报告，不再生成悬空 wikilink。
+
+### 变更 (Changed)
+- `review_materials` 新增 `existing_update_confirmed` 门禁；结构化 `item` 更新已有卡时只维护已确认的来源和复习生命周期，不覆盖人工语义字段或正文，完整重排继续通过显式确认的 `card` 载荷执行。
+- 新卡文件名拒绝会改变 Obsidian 链接语义的字符；公开 Agent skill、卡片格式与链接契约、review-material user story 同步更新。
+
+### 测试 (Tests)
+- 新增三类参考卡 golden fixtures，以及来源和关联链接唯一解析、缺失、重名、越界、自引用、YAML 注入、可选章节、已有卡确认和正文保护回归；全量 LingoTrace 测试覆盖初始化与复习结算兼容性。
+
 ## [20260713-144452]
 ### 修复 (Fixed)
 - preview/dry-run 检出双 ASR 差异时，将 LLM 合并请求复制到权限隔离的稳定临时路径，避免 staging 清理后 Agent 无法继续同任务合并；第二阶段通过 `--reviewed-transcript` 与 `--merge-request` 成对重跑。

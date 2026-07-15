@@ -234,6 +234,18 @@
       "artifact_class": "recreate-from-pack"
     },
     {
+      "id": "grammar_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/japanese/templates/grammar-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "error_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/japanese/templates/error-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
       "id": "speaking_card",
       "capability_id": "speaking_cards",
       "path": "lingotrace/packs/japanese/templates/speaking-card.md",

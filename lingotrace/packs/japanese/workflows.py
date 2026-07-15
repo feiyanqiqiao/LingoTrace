@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from lingotrace.core.mutations import FileMutation, run_file_mutations
@@ -49,6 +49,59 @@ STAGE_DAYS = {
     "day90": 90,
     "day180": 180,
 }
+
+SOURCE_LINK_ROLES = ("source_notes_root", "daily_notes_root")
+RELATED_LINK_ROLES = {
+    "vocab": ("focus_vocab_root", "base_vocab_root"),
+    "grammar": ("grammar_root",),
+    "error": REVIEW_MATERIAL_ROLES,
+    "pronunciation": ("pronunciation_accent_root", "pronunciation_phoneme_root"),
+}
+LIST_FIELDS = {
+    "source_notes",
+    "tags",
+    "formation",
+    "collocations",
+    "confusable_with",
+    "contrast_with",
+    "related_items",
+    "kanji_diff_pairs",
+    "issue_tags",
+    "usage_scenes",
+}
+DATE_FIELDS = {"first_seen", "last_seen", "next_review", "last_reviewed"}
+
+
+class ReviewMaterialPlan:
+    __slots__ = ("mutation", "warnings", "unresolved_related_items", "read_files")
+
+    def __init__(
+        self,
+        mutation: FileMutation,
+        warnings: tuple[Finding, ...] = (),
+        unresolved_related_items: tuple[str, ...] = (),
+        read_files: tuple[str, ...] = (),
+    ) -> None:
+        self.mutation = mutation
+        self.warnings = warnings
+        self.unresolved_related_items = unresolved_related_items
+        self.read_files = read_files
+
+
+class LinkResolution:
+    __slots__ = ("raw", "link", "finding", "read_files")
+
+    def __init__(
+        self,
+        raw: str,
+        link: str | None = None,
+        finding: Finding | None = None,
+        read_files: tuple[str, ...] = (),
+    ) -> None:
+        self.raw = raw
+        self.link = link
+        self.finding = finding
+        self.read_files = read_files
 
 
 def listening_notes(
@@ -122,6 +175,7 @@ def review_materials(
     card: dict[str, Any] | None = None,
     item: dict[str, Any] | None = None,
     extraction_date: str | None = None,
+    existing_update_confirmed: bool = False,
     mode: str = "preview",
 ) -> CommandReport:
     if vault_root is None:
@@ -139,17 +193,47 @@ def review_materials(
                 "ambiguous_review_material_input",
                 "Provide either card or item, not both.",
             )
-        mutation = _review_card_mutation(card)
-        if isinstance(mutation, Finding):
-            return _workflow_error("review_materials-workflow", mode, mutation.code, mutation.message, mutation.path)
-        return _run_mutations(root, "review_materials", [mutation], mode)
+        paths = _path_roles(root)
+        read_files.append(".lingotrace/paths.json")
+        plan = _review_card_plan(root, paths, card)
+        if isinstance(plan, Finding):
+            return _workflow_report("review_materials-workflow", mode, errors=[plan], read_files=read_files)
+        if mode == "apply" and (root / plan.mutation.path).exists() and not existing_update_confirmed:
+            return _workflow_report(
+                "review_materials-workflow",
+                mode,
+                errors=[
+                    Finding(
+                        code="existing_review_material_confirmation_required",
+                        message="Applying changes to an existing review card requires existing_update_confirmed: true.",
+                        path=plan.mutation.path,
+                    )
+                ],
+                read_files=[*read_files, *plan.read_files],
+                blocked_files=[plan.mutation.path],
+            )
+        return _run_review_material_plan(root, plan, mode, read_files)
     if item is not None:
         paths = _path_roles(root)
         read_files.append(".lingotrace/paths.json")
-        mutation = _review_item_mutation(root, paths, item, extraction_date=extraction_date)
-        if isinstance(mutation, Finding):
-            return _workflow_report("review_materials-workflow", mode, errors=[mutation], read_files=read_files)
-        return _run_mutations(root, "review_materials", [mutation], mode)
+        plan = _review_item_plan(root, paths, item, extraction_date=extraction_date)
+        if isinstance(plan, Finding):
+            return _workflow_report("review_materials-workflow", mode, errors=[plan], read_files=read_files)
+        if mode == "apply" and (root / plan.mutation.path).exists() and not existing_update_confirmed:
+            return _workflow_report(
+                "review_materials-workflow",
+                mode,
+                errors=[
+                    Finding(
+                        code="existing_review_material_confirmation_required",
+                        message="Applying changes to an existing review card requires existing_update_confirmed: true.",
+                        path=plan.mutation.path,
+                    )
+                ],
+                read_files=[*read_files, *plan.read_files],
+                blocked_files=[plan.mutation.path],
+            )
+        return _run_review_material_plan(root, plan, mode, read_files)
     if mode == "apply":
         return _workflow_error(
             "review_materials-workflow",
@@ -248,7 +332,7 @@ def review_rollover(
     mutations: list[FileMutation] = []
     for card_path, fields in _cards_for_roles(root, paths, ROLLOVER_ROLES):
         read_files.append(card_path.relative_to(root).as_posix())
-        if fields.get("status") != "active" or fields.get("done_today") != "true":
+        if fields.get("status") != "active" or not _truthy(fields.get("done_today")):
             continue
         validation = validate_review_rollover(fields)
         if not validation.accepted:
@@ -286,7 +370,7 @@ def review_rollover(
             next_stage, interval_days = STAGE_ADVANCEMENT[review_stage]
             next_review = "" if next_stage == "mastered" else (rollover_date + dt.timedelta(days=interval_days)).isoformat()
         updates = {
-            "done_today": "false",
+            "done_today": False,
             "review_stage": next_stage,
             "next_review": next_review,
             "last_reviewed": rollover_date.isoformat(),
@@ -419,6 +503,25 @@ def _run_mutations(
     return report
 
 
+def _run_review_material_plan(
+    root: Path,
+    plan: ReviewMaterialPlan,
+    mode: str,
+    read_files: list[str],
+) -> CommandReport:
+    report = _run_mutations(root, "review_materials", [plan.mutation], mode)
+    report.read_files = list(dict.fromkeys([*read_files, *plan.read_files, *report.read_files]))
+    report.warnings = list(plan.warnings)
+    if plan.unresolved_related_items:
+        report.artifacts["unresolved_related_items"] = json.dumps(
+            list(plan.unresolved_related_items),
+            ensure_ascii=False,
+        )
+        if report.planned_writes:
+            report.planned_writes[0]["unresolved_related_items"] = list(plan.unresolved_related_items)
+    return report
+
+
 def _artifact_mutation(payload: dict[str, Any], *, action: str, reason: str) -> FileMutation | Finding:
     path = payload.get("path")
     body = payload.get("body")
@@ -491,28 +594,78 @@ def _path_is_within_role(path: str, role_root: str) -> bool:
     return normalized_path == normalized_root or normalized_path.startswith(f"{normalized_root}/")
 
 
-def _review_card_mutation(card: dict[str, Any]) -> FileMutation | Finding:
+def _is_safe_role_root(role_root: str) -> bool:
+    candidate = PurePosixPath(role_root)
+    return bool(role_root) and not candidate.is_absolute() and ".." not in candidate.parts
+
+
+def _review_card_plan(
+    root: Path,
+    paths: dict[str, str],
+    card: dict[str, Any],
+) -> ReviewMaterialPlan | Finding:
     path = card.get("path")
     fields = card.get("fields")
     body = card.get("body")
     if not isinstance(path, str) or not path.endswith(".md"):
         return Finding(code="invalid_review_card_path", message="Review card path must be a Vault-relative Markdown path.", path="path")
+    if not any(paths.get(role) and _path_is_within_role(path, str(paths[role])) for role in REVIEW_MATERIAL_ROLES):
+        return Finding(
+            code="review_card_outside_role",
+            message="Review card path must stay inside a configured review-material role.",
+            path=path,
+        )
+    if not (root / path).exists() and _contains_link_reserved_character(Path(path).stem):
+        return Finding(
+            code="unsafe_review_item_title",
+            message="New review card filenames cannot contain #, |, [, ], or ^.",
+            path=path,
+        )
     if not isinstance(fields, dict):
         return Finding(code="invalid_review_card_fields", message="Review card fields must be an object.", path=path)
-    validation = validate_review_materials(fields)
+    normalized_fields = dict(fields)
+    source_resolution = _resolve_required_source_links(
+        root,
+        paths,
+        _input_values(normalized_fields.get("source_notes")),
+        target_path=path,
+    )
+    if isinstance(source_resolution, Finding):
+        return source_resolution
+    source_links, source_reads = source_resolution
+    normalized_fields["source_notes"] = source_links
+    item_type = str(normalized_fields.get("item_type") or "")
+    if item_type not in RELATED_LINK_ROLES:
+        return Finding(code="unsupported_review_item_type", message="Review material item_type is not supported.", path="item_type")
+    relations = _resolve_optional_relation_links(root, paths, item_type, normalized_fields, target_path=path)
+    for relation_field in ("confusable_with", "contrast_with", "related_items"):
+        normalized_fields.pop(relation_field, None)
+    normalized_fields.update(relations[0])
+    if not (root / path).exists() and normalized_fields.get("status") != "active":
+        return Finding(
+            code="invalid_new_review_status",
+            message="New review cards must start with status: active.",
+            path=path,
+        )
+    validation = validate_review_materials(normalized_fields)
     if not validation.accepted:
         return validation.errors[0]
-    content = _render_markdown(fields, str(body or ""))
-    return FileMutation(path=path, content=content, action="write_review_material", reason="accepted review material card")
+    content = _render_markdown(normalized_fields, str(body or ""))
+    return ReviewMaterialPlan(
+        mutation=FileMutation(path=path, content=content, action="write_review_material", reason="accepted review material card"),
+        warnings=tuple(relations[2]),
+        unresolved_related_items=tuple(relations[1]),
+        read_files=tuple(dict.fromkeys([*source_reads, *relations[3]])),
+    )
 
 
-def _review_item_mutation(
+def _review_item_plan(
     root: Path,
     paths: dict[str, str],
     item: dict[str, Any],
     *,
     extraction_date: str | None,
-) -> FileMutation | Finding:
+) -> ReviewMaterialPlan | Finding:
     if item.get("image_backed") is True and item.get("image_readable") is not True:
         return Finding(
             code="uncertain_image_backed_review_material",
@@ -538,62 +691,113 @@ def _review_item_mutation(
     target_root = paths.get(target_role)
     if not target_root:
         return Finding(code="missing_path_role", message=f"Target path role is not configured: {target_role}.", path=target_role)
+    if not _is_safe_role_root(target_root):
+        return Finding(code="invalid_path_role", message="Review material path roles must be safe Vault-relative paths.", path=target_role)
 
+    target_match: Path | None = None
     if item_type == "vocab":
         focus_root = paths.get("focus_vocab_root")
         base_root = paths.get("base_vocab_root")
         if not focus_root or not base_root:
             return Finding(code="missing_path_role", message="Vocabulary review requires focus and base path roles.", path="focus_vocab_root")
+        if not _is_safe_role_root(focus_root) or not _is_safe_role_root(base_root):
+            return Finding(code="invalid_path_role", message="Vocabulary path roles must be safe Vault-relative paths.", path="focus_vocab_root")
         focus_match = _single_review_match(root / focus_root, title)
         if isinstance(focus_match, Finding):
             return focus_match
         if focus_match is not None:
-            return _mutation_for_existing_item(root, focus_match, item, review_date, title, action_role="focus")
+            target_match = focus_match
+            target_role = "focus_vocab_root"
         base_match = _single_review_match(root / base_root, title)
         if isinstance(base_match, Finding):
             return base_match
-        if base_match is not None:
+        if target_match is None and base_match is not None:
+            target_path = _new_review_item_path(focus_root, item_type, title, review_date)
+            source_resolution = _resolve_item_source_links(root, paths, item, target_path=target_path)
+            if isinstance(source_resolution, Finding):
+                return source_resolution
+            source_links, source_reads = source_resolution
+            relations = _resolve_optional_relation_links(root, paths, item_type, item, target_path=target_path)
             base_fields = _frontmatter(base_match)
-            fields = _initialized_review_fields(item_type, title, item, review_date)
-            fields.update({key: value for key, value in base_fields.items() if key not in fields and value})
-            fields.update(_item_fields(item_type, item, title))
-            fields["source_notes"] = _merged_source_notes(str(base_fields.get("source_notes", "")), item.get("source_note"))
-            target_path = f"{focus_root}/{_safe_card_filename(title)}.md"
+            fields = _initialized_review_fields(item_type, title, item, review_date, source_links=source_links)
+            fields.update({key: value for key, value in base_fields.items() if key not in fields and value not in (None, "", [])})
+            fields.update(_item_fields(item_type, item, title, relation_links=relations[0]))
+            fields["source_notes"] = _merge_link_values(base_fields.get("source_notes"), source_links)
             collision_error = _path_collision_error(root, target_path, title)
             if collision_error is not None:
                 return collision_error
             validation_error = _review_material_validation_error(fields, target_path)
             if validation_error is not None:
                 return validation_error
-            content = _render_markdown(fields, _generated_review_body(item_type, fields))
-            return FileMutation(
-                path=target_path,
-                content=content,
-                action="restore_focus_card",
-                reason="base lexicon item reappears and returns to active focus review",
+            generated_body = _generated_review_body(item_type, fields, item, relations[1])
+            if isinstance(generated_body, Finding):
+                return generated_body
+            return ReviewMaterialPlan(
+                mutation=FileMutation(
+                    path=target_path,
+                    content=_render_markdown(fields, generated_body),
+                    action="restore_focus_card",
+                    reason="base lexicon item reappears and returns to active focus review",
+                ),
+                warnings=tuple(relations[2]),
+                unresolved_related_items=tuple(relations[1]),
+                read_files=tuple(dict.fromkeys([*source_reads, *relations[3], base_match.relative_to(root).as_posix()])),
             )
 
-    target_match = _single_review_match(root / target_root, title)
-    if isinstance(target_match, Finding):
-        return target_match
+    if target_match is None:
+        target_match = _single_review_match(root / target_root, title)
+        if isinstance(target_match, Finding):
+            return target_match
     if target_match is not None:
-        return _mutation_for_existing_item(root, target_match, item, review_date, title, action_role=target_role)
+        target_path = target_match.relative_to(root).as_posix()
+        source_resolution = _resolve_item_source_links(root, paths, item, target_path=target_path)
+        if isinstance(source_resolution, Finding):
+            return source_resolution
+        source_links, source_reads = source_resolution
+        mutation = _mutation_for_existing_item(
+            root,
+            target_match,
+            item,
+            review_date,
+            action_role=target_role,
+            source_links=source_links,
+        )
+        if isinstance(mutation, Finding):
+            return mutation
+        return ReviewMaterialPlan(
+            mutation=mutation,
+            read_files=tuple(dict.fromkeys([*source_reads, target_path])),
+        )
 
-    fields = _initialized_review_fields(item_type, title, item, review_date)
-    target_path = f"{target_root}/{_safe_card_filename(title)}.md"
+    target_path = _new_review_item_path(target_root, item_type, title, review_date)
+    source_resolution = _resolve_item_source_links(root, paths, item, target_path=target_path)
+    if isinstance(source_resolution, Finding):
+        return source_resolution
+    source_links, source_reads = source_resolution
+    relations = _resolve_optional_relation_links(root, paths, item_type, item, target_path=target_path)
+    fields = _initialized_review_fields(item_type, title, item, review_date, source_links=source_links)
+    fields.update(_item_fields(item_type, item, title, relation_links=relations[0]))
     collision_error = _path_collision_error(root, target_path, title)
     if collision_error is not None:
         return collision_error
     validation_error = _review_material_validation_error(fields, target_path)
     if validation_error is not None:
         return validation_error
-    content = _render_markdown(fields, _generated_review_body(item_type, fields))
+    generated_body = _generated_review_body(item_type, fields, item, relations[1])
+    if isinstance(generated_body, Finding):
+        return generated_body
+    content = _render_markdown(fields, generated_body)
     action = "create_focus_card" if item_type == "vocab" else f"create_{item_type}_card"
-    return FileMutation(
-        path=target_path,
-        content=content,
-        action=action,
-        reason="accepted structured review material item",
+    return ReviewMaterialPlan(
+        mutation=FileMutation(
+            path=target_path,
+            content=content,
+            action=action,
+            reason="accepted structured review material item",
+        ),
+        warnings=tuple(relations[2]),
+        unresolved_related_items=tuple(relations[1]),
+        read_files=tuple(dict.fromkeys([*source_reads, *relations[3]])),
     )
 
 
@@ -621,7 +825,14 @@ def _review_item_title(item_type: str, item: dict[str, Any]) -> str | Finding:
     value = item.get(key)
     if not isinstance(value, str) or not value.strip():
         return Finding(code="missing_review_item_title", message=f"Review material item requires {key}.", path=key)
-    return value.strip()
+    title = value.strip()
+    if _contains_link_reserved_character(title):
+        return Finding(
+            code="unsafe_review_item_title",
+            message="New review card filenames cannot contain #, |, [, ], or ^.",
+            path=key,
+        )
+    return title
 
 
 def _review_item_target_role(item_type: str, item: dict[str, Any]) -> str | Finding:
@@ -660,7 +871,7 @@ def _single_review_match(path_root: Path, title: str) -> Path | Finding | None:
     return matches[0] if matches else None
 
 
-def _review_match_key(fields: dict[str, str], card_path: Path) -> str:
+def _review_match_key(fields: dict[str, Any], card_path: Path) -> str:
     for key in ("headword", "pattern", "correct_form", "target_text"):
         value = fields.get(key)
         if value:
@@ -673,61 +884,65 @@ def _mutation_for_existing_item(
     card_path: Path,
     item: dict[str, Any],
     review_date: str,
-    title: str,
     *,
     action_role: str,
+    source_links: list[str],
 ) -> FileMutation | Finding:
     text = card_path.read_text(encoding="utf-8")
     fields, _ = _frontmatter_and_body(text)
     item_type = str(fields.get("item_type") or _infer_review_item_type(item))
-    updates: dict[str, str] = {}
-    for key, value in _item_fields(item_type, item, title).items():
-        if value and key not in {"status", "done_today", "review_stage", "next_review", "last_reviewed"}:
-            fields[key] = value
-            updates[key] = _format_frontmatter_value(value)
-    existing_source_notes = str(fields.get("source_notes", ""))
-    new_source_note = item.get("source_note")
+    updates: dict[str, Any] = {}
+    existing_sources = _input_values(fields.get("source_notes"))
+    merged_sources = _merge_link_values(existing_sources, source_links)
     source_reappeared = (
-        action_role == "focus"
-        and isinstance(new_source_note, str)
-        and new_source_note.strip()
-        and new_source_note.strip() not in [part.strip() for part in existing_source_notes.split(",") if part.strip()]
+        action_role == "focus_vocab_root"
+        and bool(source_links)
+        and any(_link_identity(link) not in {_link_identity(existing) for existing in existing_sources} for link in source_links)
     )
-    fields["source_notes"] = _merged_source_notes(existing_source_notes, new_source_note)
-    updates["source_notes"] = str(fields["source_notes"])
+    fields["source_notes"] = merged_sources
+    updates["source_notes"] = merged_sources
+    fields["last_seen"] = review_date
+    updates["last_seen"] = review_date
+    if source_reappeared or (item_type != "vocab" and source_links):
+        seen_count = _integer_value(fields.get("seen_count"), default=1) + 1
+        fields["seen_count"] = seen_count
+        updates["seen_count"] = seen_count
+    if item_type == "error" or item.get("weakness") is True:
+        error_count = _integer_value(fields.get("error_count"), default=0) + 1
+        fields["error_count"] = error_count
+        updates["error_count"] = error_count
+        fields["priority"] = "high"
+        updates["priority"] = "high"
     if fields.get("status") == "mastered":
         fields["status"] = "active"
-        fields["done_today"] = "false"
+        fields["done_today"] = False
         fields["review_stage"] = "day0"
         fields["next_review"] = review_date
         fields["last_reviewed"] = ""
         updates.update(
             {
                 "status": "active",
-                "done_today": "false",
+                "done_today": False,
                 "review_stage": "day0",
                 "next_review": review_date,
                 "last_reviewed": "",
             }
         )
     elif fields.get("status") == "active" and source_reappeared:
-        fields["done_today"] = "false"
+        fields["done_today"] = False
         fields["review_stage"] = "day0"
         fields["next_review"] = review_date
         fields["last_reviewed"] = ""
         updates.update(
             {
-                "done_today": "false",
+                "done_today": False,
                 "review_stage": "day0",
                 "next_review": review_date,
                 "last_reviewed": "",
             }
         )
-    validation_error = _review_material_validation_error(fields, card_path.relative_to(root).as_posix())
-    if validation_error is not None:
-        return validation_error
     action = "reactivate_review_card" if fields.get("review_stage") == "day0" and fields.get("next_review") == review_date else "update_review_card"
-    if action_role == "focus":
+    if action_role == "focus_vocab_root":
         action = "update_focus_card" if action == "update_review_card" else "reactivate_focus_card"
     return FileMutation(
         path=card_path.relative_to(root).as_posix(),
@@ -755,7 +970,7 @@ def _base_vocab_sink_mutation(
     root: Path,
     paths: dict[str, str],
     focus_path: Path,
-    focus_fields: dict[str, str],
+    focus_fields: dict[str, Any],
 ) -> FileMutation | Finding | None:
     base_root = paths.get("base_vocab_root")
     if not base_root:
@@ -770,10 +985,7 @@ def _base_vocab_sink_mutation(
         base_fields, base_body = _frontmatter_and_body(base_text)
         merged_fields = dict(base_fields)
         merged_fields.update(stable_fields)
-        merged_fields["source_notes"] = _merged_source_notes(
-            str(base_fields.get("source_notes", "")),
-            focus_fields.get("source_notes"),
-        )
+        merged_fields["source_notes"] = _merge_link_values(base_fields.get("source_notes"), focus_fields.get("source_notes"))
         return FileMutation(
             path=base_match.relative_to(root).as_posix(),
             content=_render_markdown(merged_fields, base_body),
@@ -785,19 +997,23 @@ def _base_vocab_sink_mutation(
     collision_error = _path_collision_error(root, target_path, title)
     if collision_error is not None:
         return collision_error
+    generated_body = _generated_review_body("vocab", stable_fields, stable_fields)
+    assert isinstance(generated_body, str)
     return FileMutation(
         path=target_path,
-        content=_render_markdown(stable_fields, _generated_review_body("vocab", stable_fields)),
+        content=_render_markdown(stable_fields, generated_body),
         action="sink_focus_vocab_to_base",
         reason="day180 focus vocabulary completed and creates a base lexicon record",
     )
 
 
-def _base_vocab_fields_from_focus(focus_fields: dict[str, str], title: str) -> dict[str, Any]:
+def _base_vocab_fields_from_focus(focus_fields: dict[str, Any], title: str) -> dict[str, Any]:
     fields: dict[str, Any] = {
         "track": "base_vocab",
         "item_type": "vocab",
         "status": "promoted",
+        "priority": focus_fields.get("priority", "normal"),
+        "done_today": False,
         "headword": title,
     }
     for key in (
@@ -810,6 +1026,12 @@ def _base_vocab_fields_from_focus(focus_fields: dict[str, str], title: str) -> d
         "kanji_diff",
         "kanji_diff_pairs",
         "source_notes",
+        "first_seen",
+        "last_seen",
+        "seen_count",
+        "error_count",
+        "last_reviewed",
+        "tags",
     ):
         value = focus_fields.get(key)
         if value not in (None, ""):
@@ -825,24 +1047,41 @@ def _review_material_validation_error(fields: dict[str, Any], path: str) -> Find
     return Finding(code=error.code, message=error.message, path=path)
 
 
-def _initialized_review_fields(item_type: str, title: str, item: dict[str, Any], review_date: str) -> dict[str, Any]:
+def _initialized_review_fields(
+    item_type: str,
+    title: str,
+    item: dict[str, Any],
+    review_date: str,
+    *,
+    source_links: list[str],
+) -> dict[str, Any]:
     track = "pronunciation" if item_type == "pronunciation" else "class_review"
     fields: dict[str, Any] = {
         "track": track,
         "item_type": item_type,
         "status": "active",
         "priority": str(item.get("priority") or "normal"),
-        "done_today": "false",
+        "done_today": False,
+        "first_seen": review_date,
+        "last_seen": review_date,
+        "seen_count": 1,
+        "error_count": 1 if item_type == "error" else 0,
         "review_stage": "day0",
         "next_review": review_date,
         "last_reviewed": "",
+        "source_notes": source_links,
+        "tags": _default_review_tags(item_type, item),
     }
-    fields.update(_item_fields(item_type, item, title))
-    fields["source_notes"] = _merged_source_notes("", item.get("source_note"))
     return fields
 
 
-def _item_fields(item_type: str, item: dict[str, Any], title: str) -> dict[str, Any]:
+def _item_fields(
+    item_type: str,
+    item: dict[str, Any],
+    title: str,
+    *,
+    relation_links: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
     fields: dict[str, Any] = {}
     key_by_type = {
         "vocab": "headword",
@@ -852,43 +1091,298 @@ def _item_fields(item_type: str, item: dict[str, Any], title: str) -> dict[str, 
     }
     fields[key_by_type[item_type]] = title
     allowed = {
-        "vocab": ("reading", "accent_display", "meaning_zh", "collocations", "confusable_with", "contrast_with", "kanji_diff", "kanji_diff_pairs"),
-        "grammar": ("meaning_zh", "formation", "usage", "examples", "contrast_with"),
-        "error": ("wrong_form", "reason", "meaning_zh", "source_sentence"),
+        "vocab": (
+            "reading",
+            "accent_display",
+            "meaning_zh",
+            "part_of_speech",
+            "collocations",
+            "kanji_diff",
+            "kanji_diff_pairs",
+        ),
+        "grammar": (
+            "meaning_zh",
+            "formation",
+            "core_nuance",
+            "register",
+            "usage_scenes",
+            "jlpt",
+            "confusion_notes",
+        ),
+        "error": ("wrong_form", "reason", "avoidance", "meaning_zh", "source_sentence"),
         "pronunciation": ("pronunciation_kind", "issue_tags", "meaning_zh"),
     }[item_type]
     for key in allowed:
         value = item.get(key)
         if value not in (None, ""):
-            fields[key] = value if isinstance(value, bool) else str(value)
+            if key in LIST_FIELDS:
+                fields[key] = _input_values(value)
+            else:
+                fields[key] = value
+    for key, value in (relation_links or {}).items():
+        fields[key] = value
     return fields
 
 
-def _merged_source_notes(existing: str, new_source: Any) -> str:
-    sources = [part.strip() for part in existing.split(",") if part.strip()]
-    if isinstance(new_source, str) and new_source.strip() and new_source.strip() not in sources:
-        sources.append(new_source.strip())
-    return ", ".join(sources)
-
-
-def _generated_review_body(item_type: str, fields: dict[str, Any]) -> str:
-    if item_type == "grammar":
-        return f"## {fields.get('pattern', '')}\n{fields.get('meaning_zh', '')}".rstrip()
-    if item_type == "error":
-        return f"## 正确\n{fields.get('correct_form', '')}\n\n## 错误\n{fields.get('wrong_form', '')}".rstrip()
+def _default_review_tags(item_type: str, item: dict[str, Any]) -> list[str]:
+    tags = [f"jp/{item_type}", "jp/class_review"]
     if item_type == "pronunciation":
-        return f"## {fields.get('target_text', '')}\n{fields.get('issue_tags', '')}".rstrip()
-    return f"## {fields.get('headword', '')}\n{fields.get('meaning_zh', '')}".rstrip()
+        tags = ["jp/pronunciation"]
+    if item.get("priority") == "high" or item.get("high_risk") is True:
+        tags.append("jp/high_risk")
+    if item.get("kanji_diff") is True:
+        tags.append("jp/kanji_diff")
+    return tags
+
+
+def _generated_review_body(
+    item_type: str,
+    fields: dict[str, Any],
+    item: dict[str, Any],
+    unresolved_related_items: list[str] | tuple[str, ...] = (),
+) -> str | Finding:
+    if item_type == "grammar":
+        return _render_grammar_body(fields, item, unresolved_related_items)
+    if item_type == "error":
+        return _render_error_body(fields, item, unresolved_related_items)
+    if item_type == "pronunciation":
+        issue_tags = "、".join(_input_values(fields.get("issue_tags")))
+        return f"## {fields.get('target_text', '')}\n\n- 练习重点：{issue_tags}".rstrip()
+    return _render_vocab_body(fields, item, unresolved_related_items)
+
+
+def _render_vocab_body(
+    fields: dict[str, Any],
+    item: dict[str, Any],
+    unresolved_related_items: list[str] | tuple[str, ...],
+) -> str:
+    sections: list[str] = []
+    quick: list[str] = []
+    if fields.get("meaning_zh"):
+        quick.append(f"- 中文：{fields['meaning_zh']}")
+    if fields.get("reading"):
+        quick.append(f"- 读音：{fields['reading']}")
+    collocations = _input_values(fields.get("collocations"))
+    if collocations:
+        quick.append(f"- 常用搭配：{'；'.join(collocations)}")
+    if quick:
+        sections.append("## 快速复习\n\n" + "\n".join(quick))
+
+    core: list[str] = []
+    accent = fields.get("accent_display")
+    if accent:
+        accent_label = item.get("accent_label")
+        core.append(f"- 重音：{accent_label} ({accent})" if accent_label else f"- 重音：{accent}")
+    if fields.get("part_of_speech"):
+        core.append(f"- 词性：{fields['part_of_speech']}")
+    if core:
+        sections.append("## 核心\n\n" + "\n".join(core))
+
+    examples = _example_entries(item.get("examples"))
+    if item.get("example_jp"):
+        examples.insert(0, (str(item["example_jp"]), str(item.get("example_zh") or "")))
+    if examples:
+        lines: list[str] = []
+        for japanese, chinese in examples:
+            lines.append(f"- {japanese}")
+            if chinese:
+                lines.append(f"  - 中文：{chinese}")
+        sections.append("## 例句\n\n" + "\n".join(lines))
+
+    confusion: list[str] = []
+    for link in _input_values(fields.get("confusable_with")) + _input_values(fields.get("contrast_with")):
+        confusion.append(f"- 对比：{link}")
+    for note in _input_values(item.get("confusion_notes")):
+        confusion.append(f"- {note}")
+    if confusion:
+        sections.append("## 易错 / 易混\n\n" + "\n".join(confusion))
+    if unresolved_related_items:
+        sections.append("## 待补卡\n\n" + "\n".join(f"- {value}" for value in unresolved_related_items))
+    source_section = _render_source_section(fields)
+    if source_section:
+        sections.append(source_section)
+    return "\n\n".join(sections)
+
+
+def _render_grammar_body(
+    fields: dict[str, Any],
+    item: dict[str, Any],
+    unresolved_related_items: list[str] | tuple[str, ...],
+) -> str | Finding:
+    pattern = str(fields.get("pattern") or "")
+    sections = [f"# {pattern}"]
+    formation = _input_values(fields.get("formation"))
+    quick: list[str] = []
+    if fields.get("meaning_zh"):
+        quick.append(f"- 中文：{fields['meaning_zh']}")
+    if formation:
+        quick.append(f"- 接续：{'；'.join(formation)}")
+    if fields.get("core_nuance"):
+        quick.append(f"- 核心语感：{fields['core_nuance']}")
+    if item.get("typical_example_jp"):
+        quick.append(f"- 典型例句：{item['typical_example_jp']}")
+    if quick:
+        sections.append("## 快速复习\n\n" + "\n".join(quick))
+
+    register_lines: list[str] = []
+    if fields.get("register"):
+        register_lines.append(f"- 语域：{fields['register']}")
+    usage_scenes = _input_values(fields.get("usage_scenes"))
+    if usage_scenes:
+        register_lines.append(f"- 常见场景：{'；'.join(usage_scenes)}")
+    if fields.get("jlpt"):
+        register_lines.append(f"- JLPT：{fields['jlpt']}")
+    if register_lines:
+        sections.append("## 语域与使用场景\n\n" + "\n".join(register_lines))
+
+    core_text = fields.get("core_nuance") or item.get("usage")
+    if core_text:
+        sections.append(f"## 核心\n\n{core_text}")
+
+    usage_sections = item.get("usage_sections")
+    if usage_sections is not None and not isinstance(usage_sections, list):
+        return Finding(
+            code="invalid_grammar_usage_sections",
+            message="usage_sections must be a list of structured grammar usage objects.",
+            path="usage_sections",
+        )
+    rendered_usage: list[str] = []
+    if usage_sections:
+        for index, usage in enumerate(usage_sections, start=1):
+            if not isinstance(usage, dict):
+                return Finding(
+                    code="invalid_grammar_usage_section",
+                    message="Every grammar usage section must be an object.",
+                    path=f"usage_sections[{index - 1}]",
+                )
+            title = str(usage.get("title") or f"用法 {index}")
+            lines = [f"### {index}. {title}"]
+            usage_formation = _input_values(usage.get("formation"))
+            if usage_formation:
+                lines.append(f"- 接续：{'；'.join(usage_formation)}")
+            if usage.get("nuance"):
+                lines.append(f"- 核心语感：{usage['nuance']}")
+            examples = _example_entries(usage.get("examples"))
+            if examples:
+                lines.append("- 例句：")
+                for japanese, chinese in examples:
+                    suffix = f"（{chinese}）" if chinese else ""
+                    lines.append(f"  - {japanese}{suffix}")
+            rendered_usage.append("\n".join(lines))
+    elif formation or item.get("examples"):
+        lines = ["### 1. 基本用法"]
+        if formation:
+            lines.append(f"- 接续：{'；'.join(formation)}")
+        if fields.get("core_nuance"):
+            lines.append(f"- 核心语感：{fields['core_nuance']}")
+        examples = _example_entries(item.get("examples"))
+        if examples:
+            lines.append("- 例句：")
+            for japanese, chinese in examples:
+                suffix = f"（{chinese}）" if chinese else ""
+                lines.append(f"  - {japanese}{suffix}")
+        rendered_usage.append("\n".join(lines))
+    if rendered_usage:
+        sections.append("## 接续、用法与例句\n\n" + "\n\n".join(rendered_usage))
+
+    confusion: list[str] = []
+    for link in _input_values(fields.get("contrast_with")):
+        confusion.append(f"- 对比：{link}")
+    for note in _input_values(fields.get("confusion_notes")):
+        confusion.append(f"- {note}")
+    if confusion:
+        sections.append("## 易错 / 易混\n\n" + "\n".join(confusion))
+    if unresolved_related_items:
+        sections.append("## 待补卡\n\n" + "\n".join(f"- {value}" for value in unresolved_related_items))
+    source_section = _render_source_section(fields)
+    sections.append(source_section or "## 来源\n\n- 用户直接录入；大模型整理")
+    return "\n\n".join(sections)
+
+
+def _render_error_body(
+    fields: dict[str, Any],
+    item: dict[str, Any],
+    unresolved_related_items: list[str] | tuple[str, ...],
+) -> str | Finding:
+    wrong = _highlight_focus(str(fields.get("wrong_form") or ""), item.get("wrong_focus"), "wrong_focus")
+    if isinstance(wrong, Finding):
+        return wrong
+    correct = _highlight_focus(str(fields.get("correct_form") or ""), item.get("correct_focus"), "correct_focus")
+    if isinstance(correct, Finding):
+        return correct
+    sections = [
+        f"## 错误句\n\n❌：{wrong}",
+        f"## 正确句\n\n⭕️：{correct}",
+        f"## 为什么错\n\n{fields.get('reason', '')}",
+        f"## 下次怎么避免\n\n{fields.get('avoidance', '')}",
+    ]
+    related = _input_values(fields.get("related_items"))
+    if related:
+        sections.append("## 关联复习\n\n" + "\n".join(f"- {link}" for link in related))
+    if unresolved_related_items:
+        sections.append("## 待补卡\n\n" + "\n".join(f"- {value}" for value in unresolved_related_items))
+    source_section = _render_source_section(fields)
+    if source_section:
+        sections.append(source_section)
+    return "\n\n".join(sections)
+
+
+def _highlight_focus(text: str, raw_focus: Any, field_name: str) -> str | Finding:
+    if raw_focus in (None, ""):
+        return text
+    focus = str(raw_focus)
+    if text.count(focus) != 1:
+        return Finding(
+            code="invalid_error_focus",
+            message=f"{field_name} must match exactly one substring in its sentence.",
+            path=field_name,
+        )
+    return text.replace(focus, f"=={focus}==", 1)
+
+
+def _render_source_section(fields: dict[str, Any]) -> str:
+    sources = _input_values(fields.get("source_notes"))
+    if not sources:
+        return ""
+    return "## 来源\n\n" + "\n".join(f"- {source}" for source in sources)
+
+
+def _example_entries(value: Any) -> list[tuple[str, str]]:
+    if value in (None, ""):
+        return []
+    values = value if isinstance(value, (list, tuple)) else [value]
+    examples: list[tuple[str, str]] = []
+    for entry in values:
+        if isinstance(entry, dict):
+            japanese = str(entry.get("jp") or entry.get("japanese") or "").strip()
+            chinese = str(entry.get("zh") or entry.get("chinese") or "").strip()
+        else:
+            japanese = str(entry).strip()
+            chinese = ""
+        if japanese:
+            examples.append((japanese, chinese))
+    return examples
+
+
+def _new_review_item_path(target_root: str, item_type: str, title: str, review_date: str) -> str:
+    filename = _safe_card_filename(title)
+    if item_type == "error":
+        filename = f"{review_date}_{filename}"
+    return f"{target_root}/{filename}.md"
+
+
+def _contains_link_reserved_character(value: str) -> bool:
+    return any(character in value for character in ("#", "|", "[", "]", "^"))
 
 
 def _safe_card_filename(title: str) -> str:
     cleaned = title.strip().replace(" / ", "-").replace("/", "-").replace("\\", "-")
-    for char in (":", "*", "?", '"', "<", ">", "|"):
+    for char in (":", "*", "?", '"', "<", ">"):
         cleaned = cleaned.replace(char, "-")
     return "-".join(cleaned.split()) or "review-material"
 
 
-def _frontmatter_and_body(text: str) -> tuple[dict[str, str], str]:
+def _frontmatter_and_body(text: str) -> tuple[dict[str, Any], str]:
     if not text.startswith("---\n"):
         return {}, text
     parts = text.split("---\n", 2)
@@ -897,33 +1391,36 @@ def _frontmatter_and_body(text: str) -> tuple[dict[str, str], str]:
     return _parse_frontmatter_fields(parts[1]), parts[2].lstrip("\n")
 
 
-def _parse_frontmatter_fields(frontmatter: str) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    list_key: str | None = None
-    for line in frontmatter.splitlines():
-        if not line:
+def _parse_frontmatter_fields(frontmatter: str) -> dict[str, Any]:
+    fields: dict[str, Any] = {}
+    lines = frontmatter.splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if not line or line.startswith(" ") or line.startswith("- ") or ":" not in line:
+            index += 1
             continue
-        stripped = line.strip()
-        if line.startswith(" ") or line.startswith("- "):
-            if list_key == "source_notes" and stripped.startswith("- "):
-                value = stripped[2:].strip().strip('"').strip("'")
-                fields["source_notes"] = _merged_source_notes(fields.get("source_notes", ""), value)
-            continue
-        list_key = None
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
+        key, raw_value = line.split(":", 1)
         key = key.strip()
-        fields[key] = value.strip().strip('"').strip("'")
-        if key == "source_notes" and not fields[key]:
-            list_key = key
+        raw_value = raw_value.strip()
+        if not raw_value and key in LIST_FIELDS:
+            values: list[str] = []
+            lookahead = index + 1
+            while lookahead < len(lines) and lines[lookahead].startswith("  - "):
+                values.append(str(_parse_yaml_scalar(lines[lookahead][4:].strip())))
+                lookahead += 1
+            fields[key] = values
+            index = lookahead
+            continue
+        fields[key] = _parse_yaml_scalar(raw_value)
+        index += 1
     return fields
 
 
 def _render_markdown(fields: dict[str, Any], body: str) -> str:
     lines = ["---"]
     for key, value in fields.items():
-        lines.append(f"{key}: {_format_frontmatter_value(value)}")
+        lines.extend(_frontmatter_lines(key, value))
     lines.append("---")
     lines.append("")
     lines.append(body.rstrip())
@@ -931,10 +1428,374 @@ def _render_markdown(fields: dict[str, Any], body: str) -> str:
     return "\n".join(lines)
 
 
-def _format_frontmatter_value(value: Any) -> str:
+def _frontmatter_lines(key: str, value: Any) -> list[str]:
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return [f"{key}: []"]
+        return [f"{key}:", *[f"  - {_format_frontmatter_value(item, key=key)}" for item in value]]
+    return [f"{key}: {_format_frontmatter_value(value, key=key)}"]
+
+
+def _format_frontmatter_value(value: Any, *, key: str | None = None) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
-    return str(value)
+    if isinstance(value, int):
+        return str(value)
+    text = str(value)
+    if key in DATE_FIELDS and _is_iso_date(text):
+        return text
+    if _is_safe_plain_yaml_text(text):
+        return text
+    return json.dumps(text, ensure_ascii=False)
+
+
+def _is_safe_plain_yaml_text(text: str) -> bool:
+    if not text or text != text.strip() or "\n" in text or "\r" in text:
+        return False
+    if text.lower() in {"true", "false", "null", "~", ".nan", ".inf", "-.inf"}:
+        return False
+    if text[0] in "-?:,[]{}#&*!|>'\"%@`":
+        return False
+    if any(character in text for character in ("[", "]", "{", "}", '"', "'")):
+        return False
+    if ": " in text or " #" in text:
+        return False
+    return True
+
+
+def _parse_yaml_scalar(raw_value: str) -> Any:
+    if raw_value == "[]":
+        return []
+    if raw_value in {"true", "false"}:
+        return raw_value == "true"
+    if raw_value.isdigit():
+        return int(raw_value)
+    if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] == '"':
+        try:
+            return json.loads(raw_value)
+        except json.JSONDecodeError:
+            return raw_value[1:-1]
+    if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] == "'":
+        return raw_value[1:-1].replace("''", "'")
+    if raw_value.startswith("[") and raw_value.endswith("]"):
+        return _input_values(raw_value)
+    return raw_value
+
+
+def _is_iso_date(value: str) -> bool:
+    try:
+        dt.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _input_values(value: Any) -> list[str]:
+    if value in (None, "", []):
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).strip()
+    if not text:
+        return []
+    if text.startswith("[") and text.endswith("]") and not text.startswith("[["):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = [part.strip().strip('"').strip("'") for part in text[1:-1].split(",")]
+        if isinstance(parsed, list):
+            return [str(item).strip() for item in parsed if str(item).strip()]
+    wikilinks: list[str] = []
+    remainder = text
+    while remainder.startswith("[[") and "]]" in remainder:
+        end = remainder.index("]]" ) + 2
+        wikilinks.append(remainder[:end])
+        remainder = remainder[end:].lstrip(" ,")
+    if wikilinks and not remainder:
+        return wikilinks
+    return [text]
+
+
+def _merge_values(existing: Any, additions: Any) -> list[str]:
+    merged = _input_values(existing)
+    for value in _input_values(additions):
+        if value not in merged:
+            merged.append(value)
+    return merged
+
+
+def _merge_link_values(existing: Any, additions: Any) -> list[str]:
+    merged = _input_values(existing)
+    identities = {_link_identity(value) for value in merged}
+    for value in _input_values(additions):
+        identity = _link_identity(value)
+        if identity not in identities:
+            merged.append(value)
+            identities.add(identity)
+    return merged
+
+
+def _link_identity(raw: str) -> str:
+    text = raw.strip()
+    if text.startswith("[[") and text.endswith("]]" ):
+        text = text[2:-2].split("|", 1)[0]
+    if text.endswith(".md"):
+        text = text[:-3]
+    return Path(text).name
+
+
+def _integer_value(value: Any, *, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _truthy(value: Any) -> bool:
+    return value is True or (isinstance(value, str) and value.lower() == "true")
+
+
+def _resolve_item_source_links(
+    root: Path,
+    paths: dict[str, str],
+    item: dict[str, Any],
+    *,
+    target_path: str,
+) -> tuple[list[str], list[str]] | Finding:
+    values = _input_values(item.get("source_notes"))
+    values = _merge_values(values, item.get("source_note"))
+    return _resolve_required_source_links(root, paths, values, target_path=target_path)
+
+
+def _resolve_required_source_links(
+    root: Path,
+    paths: dict[str, str],
+    values: list[str],
+    *,
+    target_path: str,
+) -> tuple[list[str], list[str]] | Finding:
+    links: list[str] = []
+    read_files: list[str] = []
+    for raw in values:
+        resolution = _resolve_vault_link(
+            root,
+            paths,
+            raw,
+            allowed_roles=SOURCE_LINK_ROLES,
+            target_path=target_path,
+            link_kind="source_note",
+        )
+        if resolution.finding is not None:
+            return resolution.finding
+        assert resolution.link is not None
+        if resolution.link not in links:
+            links.append(resolution.link)
+        read_files.extend(resolution.read_files)
+    return links, list(dict.fromkeys(read_files))
+
+
+def _resolve_optional_relation_links(
+    root: Path,
+    paths: dict[str, str],
+    item_type: str,
+    item: dict[str, Any],
+    *,
+    target_path: str,
+) -> tuple[dict[str, list[str]], list[str], list[Finding], list[str]]:
+    relation_fields = {
+        "vocab": ("confusable_with", "contrast_with"),
+        "grammar": ("contrast_with",),
+        "error": ("related_items",),
+        "pronunciation": ("related_items",),
+    }[item_type]
+    resolved_by_field: dict[str, list[str]] = {}
+    unresolved: list[str] = []
+    warnings: list[Finding] = []
+    read_files: list[str] = []
+    for field_name in relation_fields:
+        for raw in _input_values(item.get(field_name)):
+            resolution = _resolve_vault_link(
+                root,
+                paths,
+                raw,
+                allowed_roles=RELATED_LINK_ROLES[item_type],
+                target_path=target_path,
+                link_kind="related_item",
+            )
+            read_files.extend(resolution.read_files)
+            if resolution.finding is not None:
+                label = _link_display_text(raw)
+                if label not in unresolved:
+                    unresolved.append(label)
+                warnings.append(
+                    Finding(
+                        code="unresolved_related_item",
+                        message=resolution.finding.message,
+                        severity="warning",
+                        path=raw,
+                    )
+                )
+                continue
+            assert resolution.link is not None
+            resolved_by_field.setdefault(field_name, [])
+            if resolution.link not in resolved_by_field[field_name]:
+                resolved_by_field[field_name].append(resolution.link)
+    return resolved_by_field, unresolved, warnings, list(dict.fromkeys(read_files))
+
+
+def _resolve_vault_link(
+    root: Path,
+    paths: dict[str, str],
+    raw: str,
+    *,
+    allowed_roles: tuple[str, ...],
+    target_path: str,
+    link_kind: str,
+) -> LinkResolution:
+    parsed = _parse_link_input(raw, link_kind=link_kind)
+    if isinstance(parsed, Finding):
+        return LinkResolution(raw=raw, finding=parsed)
+    target, alias = parsed
+    configured_role_roots = [str(paths[role]) for role in allowed_roles if paths.get(role)]
+    if any(not _is_safe_role_root(role_root) for role_root in configured_role_roots):
+        return LinkResolution(
+            raw=raw,
+            finding=Finding(
+                code=f"invalid_{link_kind}_role",
+                message=f"The configured path role for this {link_kind.replace('_', ' ')} is not Vault-relative.",
+                path=raw,
+            ),
+        )
+    role_roots = [role_root.strip("/") for role_root in configured_role_roots]
+    if not role_roots:
+        return LinkResolution(
+            raw=raw,
+            finding=Finding(
+                code=f"missing_{link_kind}_role",
+                message=f"No configured path role can resolve this {link_kind.replace('_', ' ')}.",
+                path=raw,
+            ),
+        )
+
+    candidates: list[Path] = []
+    if "/" in target:
+        candidate_relative = f"{target}.md"
+        if not any(_path_is_within_role(candidate_relative, role_root) for role_root in role_roots):
+            return LinkResolution(
+                raw=raw,
+                finding=Finding(
+                    code=f"{link_kind}_outside_role",
+                    message=f"The {link_kind.replace('_', ' ')} must stay inside an allowed path role.",
+                    path=raw,
+                ),
+            )
+        candidate = root / candidate_relative
+        if candidate.is_file():
+            candidates.append(candidate)
+    else:
+        for role_root in role_roots:
+            path_root = root / role_root
+            if not path_root.exists():
+                continue
+            candidates.extend(path for path in path_root.rglob("*.md") if path.stem == target)
+
+    root_resolved = root.resolve()
+    resolved_candidates: list[Path] = []
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(root_resolved)
+        except ValueError:
+            return LinkResolution(
+                raw=raw,
+                finding=Finding(
+                    code=f"{link_kind}_outside_vault",
+                    message=f"The {link_kind.replace('_', ' ')} resolves outside the target Vault.",
+                    path=raw,
+                ),
+            )
+        resolved_candidates.append(resolved)
+    resolved_candidates = sorted(set(resolved_candidates))
+    if not resolved_candidates:
+        return LinkResolution(
+            raw=raw,
+            finding=Finding(
+                code=f"missing_{link_kind}_target",
+                message=f"The {link_kind.replace('_', ' ')} target does not exist in its allowed roles.",
+                path=raw,
+            ),
+        )
+    if len(resolved_candidates) > 1:
+        return LinkResolution(
+            raw=raw,
+            finding=Finding(
+                code=f"ambiguous_{link_kind}_target",
+                message=f"The {link_kind.replace('_', ' ')} target matches more than one note; no link was guessed.",
+                path=raw,
+            ),
+            read_files=tuple(path.relative_to(root_resolved).as_posix() for path in resolved_candidates),
+        )
+    resolved = resolved_candidates[0]
+    relative = resolved.relative_to(root_resolved).as_posix()
+    if relative == target_path:
+        return LinkResolution(
+            raw=raw,
+            finding=Finding(
+                code=f"self_referential_{link_kind}",
+                message=f"A review card cannot use itself as a {link_kind.replace('_', ' ')}.",
+                path=raw,
+            ),
+            read_files=(relative,),
+        )
+    link_target = relative[:-3] if relative.endswith(".md") else relative
+    display = alias or Path(link_target).name
+    return LinkResolution(
+        raw=raw,
+        link=f"[[{link_target}|{display}]]",
+        read_files=(relative,),
+    )
+
+
+def _parse_link_input(raw: str, *, link_kind: str) -> tuple[str, str] | Finding:
+    text = raw.strip()
+    if not text:
+        return Finding(code=f"invalid_{link_kind}_link", message="Link input cannot be blank.", path=raw)
+    if text.startswith("![["):
+        return Finding(code=f"invalid_{link_kind}_link", message="Embeds are not accepted as review-card links.", path=raw)
+    if text.startswith("[["):
+        if not text.endswith("]]" ) or text.count("[[") != 1 or text.count("]]" ) != 1:
+            return Finding(code=f"invalid_{link_kind}_link", message="Wikilink syntax is malformed.", path=raw)
+        inner = text[2:-2]
+        target, separator, alias = inner.partition("|")
+        if separator and "|" in alias:
+            return Finding(code=f"invalid_{link_kind}_link", message="Wikilink contains more than one alias separator.", path=raw)
+    else:
+        if "[[" in text or "]]" in text or "|" in text:
+            return Finding(code=f"invalid_{link_kind}_link", message="Link syntax is malformed.", path=raw)
+        target, alias = text, ""
+    target = target.strip()
+    alias = alias.strip()
+    if target.endswith(".md"):
+        target = target[:-3]
+    candidate = PurePosixPath(target)
+    if (
+        not target
+        or candidate.is_absolute()
+        or ".." in candidate.parts
+        or any(character in target for character in ("#", "^", "[", "]", "%"))
+    ):
+        return Finding(code=f"invalid_{link_kind}_link", message="Link target is not a safe Vault-relative note path.", path=raw)
+    if alias and any(character in alias for character in ("[", "]", "|")):
+        return Finding(code=f"invalid_{link_kind}_link", message="Link alias contains reserved wikilink characters.", path=raw)
+    return target.strip("/"), alias
+
+
+def _link_display_text(raw: str) -> str:
+    parsed = _parse_link_input(raw, link_kind="related_item")
+    if isinstance(parsed, Finding):
+        return raw.strip()
+    target, alias = parsed
+    return alias or Path(target).name
 
 
 def _target_context_errors(root: Path, capability_id: str) -> tuple[list[Finding], list[str]]:
@@ -986,8 +1847,8 @@ def _path_roles(root: Path) -> dict[str, str]:
     }
 
 
-def _cards_for_roles(root: Path, paths: dict[str, str], roles: tuple[str, ...]) -> list[tuple[Path, dict[str, str]]]:
-    cards: list[tuple[Path, dict[str, str]]] = []
+def _cards_for_roles(root: Path, paths: dict[str, str], roles: tuple[str, ...]) -> list[tuple[Path, dict[str, Any]]]:
+    cards: list[tuple[Path, dict[str, Any]]] = []
     seen: set[Path] = set()
     for role in roles:
         relative_root = paths.get(role)
@@ -1004,7 +1865,7 @@ def _cards_for_roles(root: Path, paths: dict[str, str], roles: tuple[str, ...]) 
     return cards
 
 
-def _frontmatter(path: Path) -> dict[str, str]:
+def _frontmatter(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8", errors="ignore")
     if not text.startswith("---\n"):
         return {}
@@ -1015,7 +1876,7 @@ def _frontmatter(path: Path) -> dict[str, str]:
     return _parse_frontmatter_fields(parts[1])
 
 
-def _replace_frontmatter_fields(text: str, updates: dict[str, str]) -> str:
+def _replace_frontmatter_fields(text: str, updates: dict[str, Any]) -> str:
     if not text.startswith("---\n"):
         return text
     parts = text.split("---\n", 2)
@@ -1037,12 +1898,12 @@ def _replace_frontmatter_fields(text: str, updates: dict[str, str]) -> str:
         key, _ = line.split(":", 1)
         clean_key = key.strip()
         if clean_key in updates:
-            updated_lines.append(f"{clean_key}: {updates[clean_key]}")
+            updated_lines.extend(_frontmatter_lines(clean_key, updates[clean_key]))
             seen.add(clean_key)
             skip_list_items = True
         else:
             updated_lines.append(line)
     for key, value in updates.items():
         if key not in seen:
-            updated_lines.append(f"{key}: {value}")
+            updated_lines.extend(_frontmatter_lines(key, value))
     return "---\n" + "\n".join(updated_lines) + "\n---\n" + parts[2]

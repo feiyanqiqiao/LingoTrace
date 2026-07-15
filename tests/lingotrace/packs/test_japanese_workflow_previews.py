@@ -57,6 +57,10 @@ def create_target_context(root: Path) -> None:
     )
 
 
+def write_source(root: Path, name: str) -> None:
+    write(root / f"sources/{name}.md", f"# {name}\n")
+
+
 def review_card(
     *,
     track: str = "class_review",
@@ -292,9 +296,18 @@ class JapaneseWorkflowPreviewTests(unittest.TestCase):
                         "track": "class_review",
                         "item_type": "vocab",
                         "status": "active",
-                        "done_today": "false",
+                        "priority": "normal",
+                        "done_today": False,
+                        "first_seen": "2026-06-21",
+                        "last_seen": "2026-06-21",
+                        "seen_count": 1,
+                        "error_count": 0,
                         "review_stage": "day1",
                         "next_review": "2026-06-22",
+                        "last_reviewed": "",
+                        "source_notes": [],
+                        "tags": ["jp/vocab", "jp/class_review"],
+                        "headword": "合成語",
                         "reading": "ごうせいご",
                         "meaning_zh": "合成词",
                     },
@@ -318,9 +331,18 @@ class JapaneseWorkflowPreviewTests(unittest.TestCase):
 track: class_review
 item_type: vocab
 status: active
+priority: normal
 done_today: false
+first_seen: 2026-06-21
+last_seen: 2026-06-21
+seen_count: 1
+error_count: 0
 review_stage: day1
 next_review: 2026-06-22
+last_reviewed:
+source_notes: []
+tags: ['jp/vocab', 'jp/class_review']
+headword: 合成語
 reading: ごうせいご
 meaning_zh: 合成词
 ---
@@ -353,6 +375,7 @@ meaning_zh: 合成词
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "source-note")
 
             preview = workflows.review_materials(
                 vault_root=root,
@@ -390,12 +413,16 @@ meaning_zh: 合成词
         self.assertIn("done_today: false", body)
         self.assertIn("review_stage: day0", body)
         self.assertIn("next_review: 2026-06-22", body)
-        self.assertIn("source_notes: [[source-note]]", body)
+        self.assertIn('  - "[[sources/source-note|source-note]]"', body)
+        self.assertIn("first_seen: 2026-06-22", body)
+        self.assertIn("seen_count: 1", body)
+        self.assertIn("## 快速复习", body)
 
     def test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "new-source")
             write(
                 root / "review/focus/vocab/合成語.md",
                 """---
@@ -426,6 +453,7 @@ source_notes: [[old-source]]
                     "source_note": "[[new-source]]",
                 },
                 extraction_date="2026-06-22",
+                existing_update_confirmed=True,
                 mode="apply",
             )
             files = sorted(path.relative_to(root).as_posix() for path in (root / "review/focus/vocab").glob("*.md"))
@@ -435,7 +463,8 @@ source_notes: [[old-source]]
         self.assertTrue(report.accepted, envelope)
         self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
         self.assertEqual(["review/focus/vocab/合成語.md"], files)
-        self.assertIn("source_notes: [[old-source]], [[new-source]]", body)
+        self.assertIn('  - "[[old-source]]"', body)
+        self.assertIn('  - "[[sources/new-source|new-source]]"', body)
         self.assertIn("status: active", body)
         self.assertIn("done_today: false", body)
         self.assertIn("review_stage: day0", body)
@@ -447,6 +476,7 @@ source_notes: [[old-source]]
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "new-source")
             write(
                 root / "review/focus/vocab/合成語.md",
                 """---
@@ -480,12 +510,14 @@ manual_metadata:
                     "source_note": "[[new-source]]",
                 },
                 extraction_date="2026-06-22",
+                existing_update_confirmed=True,
                 mode="apply",
             )
             body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertIn("source_notes: [[old-source]], [[new-source]]", body)
+        self.assertIn('  - "[[old-source]]"', body)
+        self.assertIn('  - "[[sources/new-source|new-source]]"', body)
         self.assertIn("review_stage: day0", body)
         self.assertIn("manual_metadata:\n  source: classroom\n  confidence: high", body)
         self.assertNotIn("manual_metadata: ['source: classroom', 'confidence: high']", body)
@@ -495,6 +527,7 @@ manual_metadata:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "same-source")
             write(
                 root / "review/focus/vocab/合成語.md",
                 """---
@@ -525,12 +558,13 @@ source_notes:
                     "source_note": "[[same-source]]",
                 },
                 extraction_date="2026-06-22",
+                existing_update_confirmed=True,
                 mode="apply",
             )
             body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertIn("source_notes: [[same-source]]", body)
+        self.assertIn('  - "[[same-source]]"', body)
         self.assertIn("done_today: true", body)
         self.assertIn("review_stage: day3", body)
         self.assertIn("next_review: 2026-06-25", body)
@@ -541,6 +575,7 @@ source_notes:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "new-source")
             write(
                 root / "review/base/vocab/合成語.md",
                 """---
@@ -576,7 +611,8 @@ base 内容。
         self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
         self.assertIn("status: active", focus_body)
         self.assertIn("review_stage: day0", focus_body)
-        self.assertIn("source_notes: [[base-source]], [[new-source]]", focus_body)
+        self.assertIn('  - "[[base-source]]"', focus_body)
+        self.assertIn('  - "[[sources/new-source|new-source]]"', focus_body)
         self.assertIn("status: promoted", base_body)
         self.assertIn("base 内容。", base_body)
 
@@ -584,6 +620,7 @@ base 内容。
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "new-source")
             write(
                 root / "review/focus/vocab/合成語.md",
                 """---
@@ -612,6 +649,7 @@ meaning_zh: 合成词
                     "source_note": "[[new-source]]",
                 },
                 extraction_date="2026-06-22",
+                existing_update_confirmed=True,
                 mode="apply",
             )
             body = (root / "review/focus/vocab/合成語.md").read_text(encoding="utf-8")
@@ -623,7 +661,7 @@ meaning_zh: 合成词
         self.assertIn("review_stage: day0", body)
         self.assertIn("next_review: 2026-06-22", body)
         self.assertIn("last_reviewed: ", body)
-        self.assertIn("[[new-source]]", body)
+        self.assertIn("[[sources/new-source|new-source]]", body)
         self.assertIn("再次出错时仍要保留。", body)
 
     def test_review_materials_item_routes_grammar_error_and_pronunciation_cards(self) -> None:
@@ -647,8 +685,9 @@ meaning_zh: 合成词
                         "correct_form": "店として知られている",
                         "wrong_form": "店に知られている",
                         "reason": "として marks role or identity.",
+                        "avoidance": "固定搭配按「Nとして」记忆。",
                     },
-                    "review/errors/店として知られている.md",
+                    "review/errors/2026-06-22_店として知られている.md",
                     "item_type: error",
                 ),
                 (
@@ -675,12 +714,13 @@ meaning_zh: 合成词
                 self.assertIn(expected_text, (root / expected_path).read_text(encoding="utf-8"))
 
             grammar = (root / "review/grammar/ことによって.md").read_text(encoding="utf-8")
-            error = (root / "review/errors/店として知られている.md").read_text(encoding="utf-8")
+            error = (root / "review/errors/2026-06-22_店として知られている.md").read_text(encoding="utf-8")
             self.assertIn("status: active", grammar)
             self.assertIn("done_today: false", grammar)
             self.assertIn("review_stage: day0", grammar)
             self.assertIn("next_review: 2026-06-22", grammar)
-            self.assertIn("formation: V辞書形 + ことによって", grammar)
+            self.assertIn("  - V辞書形 + ことによって", grammar)
+            self.assertIn("## 接续、用法与例句", grammar)
             self.assertIn("status: active", error)
             self.assertIn("done_today: false", error)
             self.assertIn("review_stage: day0", error)
@@ -712,6 +752,7 @@ meaning_zh: 合成词
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write_source(root, "image-source")
 
             report = workflows.review_materials(
                 vault_root=root,
@@ -732,7 +773,7 @@ meaning_zh: 合成词
         envelope = report.to_dict()
         self.assertTrue(report.accepted, envelope)
         self.assertEqual(["review/focus/vocab/看板.md"], envelope["changed_files"])
-        self.assertIn("source_notes: [[image-source]]", body)
+        self.assertIn('  - "[[sources/image-source|image-source]]"', body)
 
     def test_review_materials_item_preserves_vocab_review_cues(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -760,11 +801,13 @@ meaning_zh: 合成词
 
         self.assertTrue(report.accepted, report.to_dict())
         self.assertIn("accent_display: まぎらわしい⑤", body)
-        self.assertIn("collocations: 紛らわしい表現", body)
-        self.assertIn("confusable_with: [[間違えやすい]]", body)
-        self.assertIn("contrast_with: [[ややこしい]]", body)
+        self.assertIn("  - 紛らわしい表現", body)
+        self.assertNotIn("confusable_with:", body)
+        self.assertNotIn("contrast_with:", body)
         self.assertIn("kanji_diff: true", body)
-        self.assertIn("kanji_diff_pairs: 紛らわしい / 間違えやすい", body)
+        self.assertIn("  - 紛らわしい / 間違えやすい", body)
+        self.assertIn("## 待补卡", body)
+        self.assertEqual(2, len(report.warnings))
 
     def test_review_materials_item_blocks_missing_core_title(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1164,7 +1207,8 @@ seen_count: 2
         self.assertIn("status: promoted", base_body)
         self.assertIn("meaning_zh: 合成词", base_body)
         self.assertIn("accent_display: ごうせいご⓪", base_body)
-        self.assertIn("source_notes: [[base-source]], [[focus-source]]", base_body)
+        self.assertIn('  - "[[base-source]]"', base_body)
+        self.assertIn('  - "[[focus-source]]"', base_body)
         self.assertIn("seen_count: 2", base_body)
         self.assertIn("这段必须保留。", base_body)
 
@@ -1207,7 +1251,7 @@ source_notes: [[focus-source]]
         self.assertIn("headword: 合成語", base_body)
         self.assertIn("reading: ごうせいご", base_body)
         self.assertIn("meaning_zh: 合成词", base_body)
-        self.assertIn("source_notes: [[focus-source]]", base_body)
+        self.assertIn('  - "[[focus-source]]"', base_body)
 
     def test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
