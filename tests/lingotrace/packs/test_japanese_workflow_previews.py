@@ -1134,6 +1134,19 @@ meaning_zh: 合成词
                     },
                 },
             )
+            traversing_attachment = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "image_evidence": {
+                        "attachment": "../attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
             observed_mismatch = workflows.review_materials(
                 vault_root=root,
                 item={
@@ -1153,6 +1166,37 @@ meaning_zh: 合成词
                 item={
                     **base_item,
                     "source_note": "sources/outside-section",
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
+            write(root / "sources/ambiguous-embed.md", "## 単語\n\n![[lesson.png]]\n")
+            write_image(root / "other/lesson.png")
+            ambiguous_embed = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "source_note": "sources/ambiguous-embed",
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
+            write(root / "sources/unsafe-embed.md", "## 単語\n\n![[../attachments/lesson.png]]\n")
+            unsafe_embed = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "source_note": "sources/unsafe-embed",
                     "image_evidence": {
                         "attachment": "attachments/lesson.png",
                         "inspection_method": "visual",
@@ -1185,8 +1229,11 @@ meaning_zh: 合成词
         self.assertEqual("missing_image_inspection_evidence", boolean_only.errors[0].code)
         self.assertEqual("invalid_image_inspection_method", ocr_only.errors[0].code)
         self.assertEqual("missing_image_attachment", missing_attachment.errors[0].code)
+        self.assertEqual("invalid_image_attachment", traversing_attachment.errors[0].code)
         self.assertEqual("image_observed_text_mismatch", observed_mismatch.errors[0].code)
         self.assertEqual("image_attachment_not_in_source_vocab_section", outside_vocab_section.errors[0].code)
+        self.assertEqual("ambiguous_image_attachment_embed", ambiguous_embed.errors[0].code)
+        self.assertEqual("invalid_image_attachment_embed", unsafe_embed.errors[0].code)
         self.assertTrue(normalized_visible_form.accepted, normalized_visible_form.to_dict())
 
     def test_review_materials_item_does_not_repeat_vocab_already_written_in_source_text(self) -> None:
