@@ -156,9 +156,17 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "error cards",
             "kanji-difference",
             "daily checklist",
+            "Capability Input Modes",
+            "three mutually exclusive input modes",
+            "`item` updates preserve the existing readable body",
+            "existing dated daily note",
+            "managed checklist markers",
+            "pathless embed is accepted only when its filename resolves to exactly one Vault attachment",
             "active focus card reappears in a new source note",
+            "same canonical source note",
             "reset to `review_stage: day0`",
             "`next_review` at the current extraction date",
+            "No-input legacy discovery is preview-only",
         ):
             self.assertIn(token, review_materials)
 
