@@ -11,6 +11,9 @@ This document defines the public card-format and link-safety behavior implemente
 - Applying any mutation to an existing card requires `existing_update_confirmed=True`.
 - Confirmed structured-item updates preserve the existing semantic frontmatter and body. They may append verified provenance and update lifecycle metadata.
 - A full existing-card reformat must use an explicitly confirmed `card` payload. No bulk migration is implied.
+- Discovery previews continue to recognize readable legacy cards without requiring the complete new-card schema; strict metadata validation remains mandatory for every newly written or fully reformatted card.
+- Reappearing error cards and explicitly marked grammar or vocabulary weaknesses reset to `day0`, clear `done_today` and `last_reviewed`, and increment occurrence/error counters without replacing manual body content.
+- Full `card` payloads require a non-empty readable body and a safe bounded Vault-relative Markdown path.
 
 ## Rendered Card Shapes
 
@@ -53,7 +56,7 @@ Optional `wrong_focus` and `correct_focus` values must each match exactly one su
 - Booleans and counters remain typed YAML values.
 - Dates use `YYYY-MM-DD`.
 - Source notes, tags, formations, collocations, and card relations are YAML lists.
-- Text scalars and list entries are deterministically quoted when needed, including colons, brackets, quotes, line breaks, Japanese punctuation, and wikilinks.
+- Text scalars and list entries are deterministically quoted when needed, including colons, brackets, quotes, line breaks, Japanese punctuation, wikilinks, numeric-looking values, dates used as text, and YAML implicit words such as `yes` or `on`.
 - Existing unknown or nested frontmatter is preserved during confirmed lifecycle-only updates.
 
 ## Link Resolution Contract
@@ -77,4 +80,6 @@ Optional card relations use narrower roles:
 
 A unique relation is rendered as `[[vault/relative/path|friendly label]]`. A missing or ambiguous optional relation is omitted from frontmatter, kept as plain text under `## 待补卡`, and reported through warning findings plus the `unresolved_related_items` artifact. The workflow never guesses a target or emits a dangling relation wikilink.
 
-New generated filenames reject `#`, `|`, `[`, `]`, and `^` because those characters change Obsidian link semantics.
+Canonical links are compared by the complete Vault-relative target. Two notes with the same filename in different directories remain distinct. A pathless legacy link is considered equivalent to a canonical source only when it uniquely resolves inside the allowed source roles; ambiguous legacy links are preserved as manual text while the verified canonical source is appended.
+
+New generated filenames reject control characters plus `#`, `|`, `[`, `]`, and `^` because those characters break files or change Obsidian link semantics. Long generated names use a readable bounded prefix plus a deterministic digest, while the complete display text remains in semantic frontmatter and the card body. Caller-supplied full-card paths reject traversal and oversized filename components before the core write guard runs.

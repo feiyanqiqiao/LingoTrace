@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
+import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 from lingotrace.core.mutations import FileMutation, run_file_mutations
 from lingotrace.core.reports import CommandReport, Finding
-from lingotrace.packs.japanese.validators import validate_review_materials, validate_review_rollover
+from lingotrace.packs.japanese.validators import (
+    validate_existing_review_material,
+    validate_review_materials,
+    validate_review_rollover,
+)
 
 
 PACK_ROOT = Path(__file__).resolve().parent
@@ -49,6 +55,8 @@ STAGE_DAYS = {
     "day90": 90,
     "day180": 180,
 }
+MAX_GENERATED_FILENAME_BYTES = 180
+MAX_REVIEW_CARD_FILENAME_BYTES = 200
 
 SOURCE_LINK_ROLES = ("source_notes_root", "daily_notes_root")
 RELATED_LINK_ROLES = {
@@ -246,7 +254,7 @@ def review_materials(
     read_files.append(".lingotrace/paths.json")
     for card_path, fields in _cards_for_roles(root, paths, REVIEW_MATERIAL_ROLES):
         read_files.append(card_path.relative_to(root).as_posix())
-        validation = validate_review_materials(fields)
+        validation = validate_existing_review_material(fields)
         if not validation.accepted:
             continue
         return _preview_report(
@@ -609,6 +617,15 @@ def _review_card_plan(
     body = card.get("body")
     if not isinstance(path, str) or not path.endswith(".md"):
         return Finding(code="invalid_review_card_path", message="Review card path must be a Vault-relative Markdown path.", path="path")
+    path_candidate = PurePosixPath(path)
+    if path_candidate.is_absolute() or ".." in path_candidate.parts or "\\" in path or _contains_control_character(path):
+        return Finding(code="invalid_review_card_path", message="Review card path must be a safe Vault-relative Markdown path.", path=path)
+    if len(Path(path).name.encode("utf-8")) > MAX_REVIEW_CARD_FILENAME_BYTES:
+        return Finding(
+            code="review_card_filename_too_long",
+            message="Review card filenames must be short enough for guarded atomic writes.",
+            path=path,
+        )
     if not any(paths.get(role) and _path_is_within_role(path, str(paths[role])) for role in REVIEW_MATERIAL_ROLES):
         return Finding(
             code="review_card_outside_role",
@@ -623,6 +640,8 @@ def _review_card_plan(
         )
     if not isinstance(fields, dict):
         return Finding(code="invalid_review_card_fields", message="Review card fields must be an object.", path=path)
+    if not isinstance(body, str) or not body.strip():
+        return Finding(code="invalid_review_card_body", message="Review card body must contain readable review content.", path=path)
     normalized_fields = dict(fields)
     source_resolution = _resolve_required_source_links(
         root,
@@ -650,7 +669,8 @@ def _review_card_plan(
     validation = validate_review_materials(normalized_fields)
     if not validation.accepted:
         return validation.errors[0]
-    content = _render_markdown(normalized_fields, str(body or ""))
+    normalized_body = _body_with_unresolved_related_items(body, relations[1])
+    content = _render_markdown(normalized_fields, normalized_body)
     return ReviewMaterialPlan(
         mutation=FileMutation(path=path, content=content, action="write_review_material", reason="accepted review material card"),
         warnings=tuple(relations[2]),
@@ -722,7 +742,13 @@ def _review_item_plan(
             fields = _initialized_review_fields(item_type, title, item, review_date, source_links=source_links)
             fields.update({key: value for key, value in base_fields.items() if key not in fields and value not in (None, "", [])})
             fields.update(_item_fields(item_type, item, title, relation_links=relations[0]))
-            fields["source_notes"] = _merge_link_values(base_fields.get("source_notes"), source_links)
+            fields["source_notes"] = _merge_link_values(
+                base_fields.get("source_notes"),
+                source_links,
+                root=root,
+                paths=paths,
+                target_path=target_path,
+            )
             collision_error = _path_collision_error(root, target_path, title)
             if collision_error is not None:
                 return collision_error
@@ -756,6 +782,7 @@ def _review_item_plan(
         source_links, source_reads = source_resolution
         mutation = _mutation_for_existing_item(
             root,
+            paths,
             target_match,
             item,
             review_date,
@@ -826,10 +853,10 @@ def _review_item_title(item_type: str, item: dict[str, Any]) -> str | Finding:
     if not isinstance(value, str) or not value.strip():
         return Finding(code="missing_review_item_title", message=f"Review material item requires {key}.", path=key)
     title = value.strip()
-    if _contains_link_reserved_character(title):
+    if _contains_link_reserved_character(title) or _contains_control_character(title):
         return Finding(
             code="unsafe_review_item_title",
-            message="New review card filenames cannot contain #, |, [, ], or ^.",
+            message="New review card filenames cannot contain control characters or #, |, [, ], or ^.",
             path=key,
         )
     return title
@@ -881,6 +908,7 @@ def _review_match_key(fields: dict[str, Any], card_path: Path) -> str:
 
 def _mutation_for_existing_item(
     root: Path,
+    paths: dict[str, str],
     card_path: Path,
     item: dict[str, Any],
     review_date: str,
@@ -892,23 +920,44 @@ def _mutation_for_existing_item(
     fields, _ = _frontmatter_and_body(text)
     item_type = str(fields.get("item_type") or _infer_review_item_type(item))
     updates: dict[str, Any] = {}
+    target_path = card_path.relative_to(root).as_posix()
     existing_sources = _input_values(fields.get("source_notes"))
-    merged_sources = _merge_link_values(existing_sources, source_links)
+    merged_sources = _merge_link_values(
+        existing_sources,
+        source_links,
+        root=root,
+        paths=paths,
+        target_path=target_path,
+    )
+    source_is_new = bool(source_links) and any(
+        not any(
+            _links_refer_to_same_target(
+                link,
+                existing,
+                root=root,
+                paths=paths,
+                target_path=target_path,
+            )
+            for existing in existing_sources
+        )
+        for link in source_links
+    )
     source_reappeared = (
         action_role == "focus_vocab_root"
-        and bool(source_links)
-        and any(_link_identity(link) not in {_link_identity(existing) for existing in existing_sources} for link in source_links)
+        and source_is_new
     )
+    weakness_reappeared = item_type == "error" or item.get("weakness") is True
     fields["source_notes"] = merged_sources
     updates["source_notes"] = merged_sources
     fields["last_seen"] = review_date
     updates["last_seen"] = review_date
-    if source_reappeared or (item_type != "vocab" and source_links):
+    if source_is_new or weakness_reappeared:
         seen_count = _integer_value(fields.get("seen_count"), default=1) + 1
         fields["seen_count"] = seen_count
         updates["seen_count"] = seen_count
     if item_type == "error" or item.get("weakness") is True:
-        error_count = _integer_value(fields.get("error_count"), default=0) + 1
+        prior_error_default = 1 if item_type == "error" else 0
+        error_count = _integer_value(fields.get("error_count"), default=prior_error_default) + 1
         fields["error_count"] = error_count
         updates["error_count"] = error_count
         fields["priority"] = "high"
@@ -928,7 +977,7 @@ def _mutation_for_existing_item(
                 "last_reviewed": "",
             }
         )
-    elif fields.get("status") == "active" and source_reappeared:
+    elif fields.get("status") == "active" and (source_reappeared or weakness_reappeared):
         fields["done_today"] = False
         fields["review_stage"] = "day0"
         fields["next_review"] = review_date
@@ -1255,21 +1304,23 @@ def _render_grammar_body(
                     message="Every grammar usage section must be an object.",
                     path=f"usage_sections[{index - 1}]",
                 )
-            title = str(usage.get("title") or f"用法 {index}")
-            lines = [f"### {index}. {title}"]
+            detail_lines: list[str] = []
             usage_formation = _input_values(usage.get("formation"))
             if usage_formation:
-                lines.append(f"- 接续：{'；'.join(usage_formation)}")
+                detail_lines.append(f"- 接续：{'；'.join(usage_formation)}")
             if usage.get("nuance"):
-                lines.append(f"- 核心语感：{usage['nuance']}")
+                detail_lines.append(f"- 核心语感：{usage['nuance']}")
             examples = _example_entries(usage.get("examples"))
             if examples:
-                lines.append("- 例句：")
+                detail_lines.append("- 例句：")
                 for japanese, chinese in examples:
                     suffix = f"（{chinese}）" if chinese else ""
-                    lines.append(f"  - {japanese}{suffix}")
-            rendered_usage.append("\n".join(lines))
-    elif formation or item.get("examples"):
+                    detail_lines.append(f"  - {japanese}{suffix}")
+            if not detail_lines:
+                continue
+            title = str(usage.get("title") or f"用法 {index}")
+            rendered_usage.append("\n".join([f"### {index}. {title}", *detail_lines]))
+    if not rendered_usage and (formation or item.get("examples")):
         lines = ["### 1. 基本用法"]
         if formation:
             lines.append(f"- 接续：{'；'.join(formation)}")
@@ -1347,6 +1398,34 @@ def _render_source_section(fields: dict[str, Any]) -> str:
     return "## 来源\n\n" + "\n".join(f"- {source}" for source in sources)
 
 
+def _body_with_unresolved_related_items(body: str, unresolved_related_items: list[str] | tuple[str, ...]) -> str:
+    pending = list(dict.fromkeys(str(value).strip() for value in unresolved_related_items if str(value).strip()))
+    text = body.rstrip()
+    if not pending:
+        return text
+
+    lines = text.splitlines()
+    heading = "## 待补卡"
+    try:
+        start = lines.index(heading)
+    except ValueError:
+        section = heading + "\n\n" + "\n".join(f"- {value}" for value in pending)
+        return f"{text}\n\n{section}" if text else section
+
+    end = next((index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")), len(lines))
+    existing = {line[2:].strip() for line in lines[start + 1 : end] if line.startswith("- ")}
+    additions = [value for value in pending if value not in existing]
+    if not additions:
+        return text
+    insertion = end
+    while insertion > start + 1 and not lines[insertion - 1].strip():
+        insertion -= 1
+    inserted = ([""] if insertion == start + 1 else []) + [f"- {value}" for value in additions]
+    if end < len(lines):
+        inserted.append("")
+    return "\n".join([*lines[:insertion], *inserted, *lines[insertion:]]).rstrip()
+
+
 def _example_entries(value: Any) -> list[tuple[str, str]]:
     if value in (None, ""):
         return []
@@ -1375,11 +1454,25 @@ def _contains_link_reserved_character(value: str) -> bool:
     return any(character in value for character in ("#", "|", "[", "]", "^"))
 
 
+def _contains_control_character(value: str) -> bool:
+    return any(ord(character) < 32 or ord(character) == 127 for character in value)
+
+
 def _safe_card_filename(title: str) -> str:
     cleaned = title.strip().replace(" / ", "-").replace("/", "-").replace("\\", "-")
     for char in (":", "*", "?", '"', "<", ">"):
         cleaned = cleaned.replace(char, "-")
-    return "-".join(cleaned.split()) or "review-material"
+    filename = "-".join(cleaned.split()) or "review-material"
+    if len(filename.encode("utf-8")) <= MAX_GENERATED_FILENAME_BYTES:
+        return filename
+    digest = hashlib.sha256(filename.encode("utf-8")).hexdigest()[:10]
+    suffix = f"-{digest}"
+    prefix_budget = MAX_GENERATED_FILENAME_BYTES - len(suffix.encode("utf-8"))
+    prefix = filename
+    while prefix and len(prefix.encode("utf-8")) > prefix_budget:
+        prefix = prefix[:-1]
+    prefix = prefix.rstrip(" .-") or "review-material"
+    return f"{prefix}{suffix}"
 
 
 def _frontmatter_and_body(text: str) -> tuple[dict[str, Any], str]:
@@ -1452,7 +1545,7 @@ def _format_frontmatter_value(value: Any, *, key: str | None = None) -> str:
 def _is_safe_plain_yaml_text(text: str) -> bool:
     if not text or text != text.strip() or "\n" in text or "\r" in text:
         return False
-    if text.lower() in {"true", "false", "null", "~", ".nan", ".inf", "-.inf"}:
+    if _looks_like_yaml_implicit_scalar(text):
         return False
     if text[0] in "-?:,[]{}#&*!|>'\"%@`":
         return False
@@ -1461,6 +1554,35 @@ def _is_safe_plain_yaml_text(text: str) -> bool:
     if ": " in text or " #" in text:
         return False
     return True
+
+
+def _looks_like_yaml_implicit_scalar(text: str) -> bool:
+    lowered = text.casefold()
+    if lowered in {
+        "true",
+        "false",
+        "yes",
+        "no",
+        "on",
+        "off",
+        "y",
+        "n",
+        "null",
+        "~",
+        ".nan",
+        ".inf",
+        "+.inf",
+        "-.inf",
+    }:
+        return True
+    if re.fullmatch(
+        r"[+-]?(?:(?:0|[1-9][0-9_]*|0[0-9_]+)(?:\.[0-9_]*)?(?:[eE][+-]?[0-9_]+)?|"
+        r"\.[0-9_]+(?:[eE][+-]?[0-9_]+)?|0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|"
+        r"[0-9][0-9_]*(?::[0-5]?[0-9])+)",
+        text,
+    ):
+        return True
+    return re.match(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:$|[Tt ])", text) is not None
 
 
 def _parse_yaml_scalar(raw_value: str) -> Any:
@@ -1524,14 +1646,27 @@ def _merge_values(existing: Any, additions: Any) -> list[str]:
     return merged
 
 
-def _merge_link_values(existing: Any, additions: Any) -> list[str]:
+def _merge_link_values(
+    existing: Any,
+    additions: Any,
+    *,
+    root: Path | None = None,
+    paths: dict[str, str] | None = None,
+    target_path: str = "",
+) -> list[str]:
     merged = _input_values(existing)
-    identities = {_link_identity(value) for value in merged}
     for value in _input_values(additions):
-        identity = _link_identity(value)
-        if identity not in identities:
+        if not any(
+            _links_refer_to_same_target(
+                value,
+                current,
+                root=root,
+                paths=paths,
+                target_path=target_path,
+            )
+            for current in merged
+        ):
             merged.append(value)
-            identities.add(identity)
     return merged
 
 
@@ -1541,7 +1676,43 @@ def _link_identity(raw: str) -> str:
         text = text[2:-2].split("|", 1)[0]
     if text.endswith(".md"):
         text = text[:-3]
-    return Path(text).name
+    return PurePosixPath(text).as_posix().strip("/")
+
+
+def _links_refer_to_same_target(
+    left: str,
+    right: str,
+    *,
+    root: Path | None = None,
+    paths: dict[str, str] | None = None,
+    target_path: str = "",
+) -> bool:
+    left_target = _resolved_source_link_identity(root, paths, left, target_path=target_path)
+    right_target = _resolved_source_link_identity(root, paths, right, target_path=target_path)
+    return left_target == right_target
+
+
+def _resolved_source_link_identity(
+    root: Path | None,
+    paths: dict[str, str] | None,
+    raw: str,
+    *,
+    target_path: str,
+) -> str:
+    target = _link_identity(raw)
+    if root is None or paths is None or "/" in target:
+        return target
+    resolution = _resolve_vault_link(
+        root,
+        paths,
+        raw,
+        allowed_roles=SOURCE_LINK_ROLES,
+        target_path=target_path,
+        link_kind="source_note",
+    )
+    if resolution.finding is not None or resolution.link is None:
+        return target
+    return _link_identity(resolution.link)
 
 
 def _integer_value(value: Any, *, default: int) -> int:
@@ -1757,6 +1928,8 @@ def _resolve_vault_link(
 
 
 def _parse_link_input(raw: str, *, link_kind: str) -> tuple[str, str] | Finding:
+    if _contains_control_character(raw):
+        return Finding(code=f"invalid_{link_kind}_link", message="Link input cannot contain control characters.", path=raw)
     text = raw.strip()
     if not text:
         return Finding(code=f"invalid_{link_kind}_link", message="Link input cannot be blank.", path=raw)

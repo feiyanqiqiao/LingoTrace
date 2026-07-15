@@ -342,8 +342,11 @@ Regression coverage:
 
 - `test_vocab_grammar_and_error_bodies_match_golden_fixtures`
 - `test_optional_sections_are_omitted_when_no_reliable_content_exists`
+- `test_empty_grammar_usage_branches_fall_back_without_empty_headings`
 - `test_existing_cards_require_confirmation_and_keep_manual_semantic_content`
 - `test_yaml_round_trip_preserves_special_text_and_typed_lists`
+- `test_yaml_round_trip_preserves_numeric_and_implicit_scalar_text`
+- `test_review_materials_preview_keeps_legacy_cards_visible_without_migration`
 
 ### 13. Prevent Dangling Or Incorrect Internal Links
 
@@ -357,6 +360,10 @@ Acceptance criteria:
 - Unique targets render canonical Vault-relative extensionless links with friendly labels.
 - Missing or ambiguous optional relations remain plain text, produce warnings, and are not written as wikilinks.
 - Generated filenames reject characters that change Obsidian link semantics.
+- Canonical source identity uses the complete Vault-relative path; same-name notes in different directories remain distinct.
+- Pathless legacy links are matched only when unique and never used to guess across ambiguous same-name notes.
+- Long generated filenames remain filesystem-safe without truncating semantic display text, and full-card paths reject traversal or oversized components.
+- Full-card payloads keep unresolved relations as plain text and require a readable non-empty body.
 
 Regression coverage:
 
@@ -364,6 +371,11 @@ Regression coverage:
 - `test_missing_or_ambiguous_optional_relations_remain_plain_text_and_are_reported`
 - `test_source_self_link_is_blocked_when_roles_overlap`
 - `test_reserved_filename_characters_and_non_unique_error_focus_are_blocked`
+- `test_review_materials_item_keeps_distinct_same_basename_source_paths`
+- `test_review_materials_item_does_not_guess_ambiguous_legacy_source_links`
+- `test_long_error_sentence_uses_bounded_filename_without_losing_display_text`
+- `test_full_card_payload_rejects_traversal_empty_body_and_oversized_path`
+- `test_full_card_payload_keeps_unresolved_relations_as_plain_text`
 - `test_vocab_grammar_and_error_bodies_match_golden_fixtures`
 
 ## Migration Test Matrix
@@ -374,6 +386,7 @@ Regression coverage:
 | Base-only match restores focus card | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
 | Mastered reappearance resets to day0 | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
 | Active focus card reappears in a new source note and resets to day0 | `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss` | Covered | Yes |
+| Reappearing error and explicit grammar weakness reset to day0 | `test_review_materials_item_resets_reappearing_errors_and_grammar_weaknesses` | Covered for Japanese | Yes |
 | Grammar and error routing | `test_grammar_and_error_cards_do_not_route_to_vocab_layer` | Covered | Yes |
 | Pronunciation routing | `test_review_materials_item_routes_grammar_error_and_pronunciation_cards` | Covered for structured items | Yes, if the pack supports pronunciation cards |
 | Source provenance | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered | Yes |
@@ -388,6 +401,8 @@ Regression coverage:
 | Stable review-facing card bodies | Golden vocabulary, grammar, and error fixtures | Covered for Japanese | Yes |
 | Required provenance link resolution | Missing, ambiguous, malformed, out-of-role, and self-link tests | Covered for Japanese | Yes |
 | Optional relation fallback | Plain-text fallback, warning, and artifact tests | Covered for Japanese | Yes |
+| Legacy-card discovery without migration | `test_review_materials_preview_keeps_legacy_cards_visible_without_migration` | Covered for Japanese | Yes during schema transitions |
+| Canonical same-name source identity | Same-basename and ambiguous-legacy source tests | Covered for Japanese | Yes |
 
 ## Language-Pack Implementation Checklist
 
