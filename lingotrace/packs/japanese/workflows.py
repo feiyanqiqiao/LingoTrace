@@ -57,6 +57,11 @@ STAGE_DAYS = {
 }
 MAX_GENERATED_FILENAME_BYTES = 180
 MAX_REVIEW_CARD_FILENAME_BYTES = 200
+MAX_DAILY_CHECKLIST_ITEMS = 30
+MAX_DAILY_CHECKLIST_TEXT_LENGTH = 300
+DAILY_CHECKLIST_START = "<!-- lingotrace:daily-checklist:start -->"
+DAILY_CHECKLIST_END = "<!-- lingotrace:daily-checklist:end -->"
+SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 
 SOURCE_LINK_ROLES = ("source_notes_root", "daily_notes_root")
 RELATED_LINK_ROLES = {
@@ -182,6 +187,7 @@ def review_materials(
     *,
     card: dict[str, Any] | None = None,
     item: dict[str, Any] | None = None,
+    daily_checklist: dict[str, Any] | None = None,
     extraction_date: str | None = None,
     existing_update_confirmed: bool = False,
     mode: str = "preview",
@@ -193,14 +199,16 @@ def review_materials(
     if errors:
         return _workflow_report("review_materials-workflow", mode, errors=errors, read_files=read_files)
 
+    provided_inputs = sum(value is not None for value in (card, item, daily_checklist))
+    if provided_inputs > 1:
+        return _workflow_error(
+            "review_materials-workflow",
+            mode,
+            "ambiguous_review_material_input",
+            "Provide exactly one of card, item, or daily_checklist.",
+        )
+
     if card is not None:
-        if item is not None:
-            return _workflow_error(
-                "review_materials-workflow",
-                mode,
-                "ambiguous_review_material_input",
-                "Provide either card or item, not both.",
-            )
         paths = _path_roles(root)
         read_files.append(".lingotrace/paths.json")
         plan = _review_card_plan(root, paths, card)
@@ -214,6 +222,27 @@ def review_materials(
                     Finding(
                         code="existing_review_material_confirmation_required",
                         message="Applying changes to an existing review card requires existing_update_confirmed: true.",
+                        path=plan.mutation.path,
+                    )
+                ],
+                read_files=[*read_files, *plan.read_files],
+                blocked_files=[plan.mutation.path],
+            )
+        return _run_review_material_plan(root, plan, mode, read_files)
+    if daily_checklist is not None:
+        paths = _path_roles(root)
+        read_files.append(".lingotrace/paths.json")
+        plan = _daily_checklist_plan(root, paths, daily_checklist)
+        if isinstance(plan, Finding):
+            return _workflow_report("review_materials-workflow", mode, errors=[plan], read_files=read_files)
+        if mode == "apply" and not existing_update_confirmed:
+            return _workflow_report(
+                "review_materials-workflow",
+                mode,
+                errors=[
+                    Finding(
+                        code="daily_checklist_confirmation_required",
+                        message="Updating an existing daily study note requires existing_update_confirmed: true.",
                         path=plan.mutation.path,
                     )
                 ],
@@ -247,7 +276,7 @@ def review_materials(
             "review_materials-workflow",
             mode,
             "missing_review_material_input",
-            "review_materials apply mode requires a card payload.",
+            "review_materials apply mode requires a card, item, or daily_checklist payload.",
         )
 
     paths = _path_roles(root)
@@ -679,6 +708,175 @@ def _review_card_plan(
     )
 
 
+def _daily_checklist_plan(
+    root: Path,
+    paths: dict[str, str],
+    payload: dict[str, Any],
+) -> ReviewMaterialPlan | Finding:
+    path = payload.get("path")
+    if not isinstance(path, str) or not path.endswith(".md"):
+        return Finding(
+            code="invalid_daily_checklist_path",
+            message="Daily checklist updates require an exact Vault-relative Markdown path.",
+            path="path",
+        )
+    candidate = PurePosixPath(path)
+    daily_root = paths.get("daily_notes_root")
+    if (
+        candidate.is_absolute()
+        or ".." in candidate.parts
+        or "\\" in path
+        or _contains_control_character(path)
+        or not daily_root
+        or not _is_safe_role_root(daily_root)
+        or not _path_is_within_role(path, daily_root)
+    ):
+        return Finding(
+            code="daily_checklist_outside_role",
+            message="Daily checklist updates must stay inside the configured daily-notes role.",
+            path=path,
+        )
+    if not _is_dated_note_stem(Path(path).stem):
+        return Finding(
+            code="daily_checklist_requires_dated_note",
+            message="Daily checklist updates require a dated note named YYYY-MM-DD.md or YYYY.M.D.md.",
+            path=path,
+        )
+    target = root / path
+    if not target.is_file():
+        return Finding(
+            code="missing_daily_checklist_note",
+            message="Daily checklist updates require an existing dated note; no note was created implicitly.",
+            path=path,
+        )
+    resolved_target = target.resolve()
+    try:
+        resolved_target.relative_to(root.resolve())
+    except ValueError:
+        return Finding(
+            code="daily_checklist_outside_vault",
+            message="The dated note resolves outside the target Vault.",
+            path=path,
+        )
+
+    completed = _daily_checklist_items(payload.get("completed"), field="completed")
+    if isinstance(completed, Finding):
+        return completed
+    blockers = _daily_checklist_items(payload.get("blockers"), field="blockers")
+    if isinstance(blockers, Finding):
+        return blockers
+    reflection = _daily_checklist_reflection(payload.get("reflection"))
+    if isinstance(reflection, Finding):
+        return reflection
+    if not completed and not blockers and not reflection:
+        return Finding(
+            code="empty_daily_checklist",
+            message="A daily checklist update requires completed items, blockers, or a short reflection.",
+            path=path,
+        )
+
+    sections = ["## 每日学习清单"]
+    if completed:
+        sections.append("## 今日完成\n\n" + "\n".join(f"- {value}" for value in completed))
+    if blockers:
+        sections.append("## 今日卡点\n\n" + "\n".join(f"- {value}" for value in blockers))
+    if reflection:
+        sections.append(f"## 简短复盘\n\n{reflection}")
+    managed_block = f"{DAILY_CHECKLIST_START}\n" + "\n\n".join(sections) + f"\n{DAILY_CHECKLIST_END}"
+    original = target.read_text(encoding="utf-8")
+    if DAILY_CHECKLIST_START in original or DAILY_CHECKLIST_END in original:
+        if original.count(DAILY_CHECKLIST_START) != 1 or original.count(DAILY_CHECKLIST_END) != 1:
+            return Finding(
+                code="malformed_managed_daily_checklist",
+                message="The managed daily checklist markers are incomplete or duplicated.",
+                path=path,
+            )
+        start = original.index(DAILY_CHECKLIST_START)
+        end = original.index(DAILY_CHECKLIST_END, start) + len(DAILY_CHECKLIST_END)
+        content = original[:start].rstrip() + "\n\n" + managed_block + original[end:]
+    else:
+        managed_headings = ("## 每日学习清单", "## 今日完成", "## 今日卡点", "## 简短复盘")
+        if any(re.search(rf"(?m)^{re.escape(heading)}\s*$", original) for heading in managed_headings):
+            return Finding(
+                code="unmanaged_daily_checklist_exists",
+                message="An existing manual daily checklist was preserved; explicit migration is required before managed updates.",
+                path=path,
+            )
+        content = original.rstrip() + "\n\n" + managed_block + "\n"
+    return ReviewMaterialPlan(
+        mutation=FileMutation(
+            path=path,
+            content=content,
+            action="update_daily_study_checklist",
+            reason="explicit structured daily checklist update",
+        ),
+        read_files=(path,),
+    )
+
+
+def _daily_checklist_items(value: Any, *, field: str) -> list[str] | Finding:
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > MAX_DAILY_CHECKLIST_ITEMS:
+        return Finding(
+            code="invalid_daily_checklist_items",
+            message=f"{field} must be a list with at most {MAX_DAILY_CHECKLIST_ITEMS} short items.",
+            path=field,
+        )
+    result: list[str] = []
+    for index, raw in enumerate(value):
+        normalized = _daily_checklist_text(raw, path=f"{field}[{index}]")
+        if isinstance(normalized, Finding):
+            return normalized
+        result.append(normalized)
+    return result
+
+
+def _daily_checklist_reflection(value: Any) -> str | Finding:
+    if value is None:
+        return ""
+    return _daily_checklist_text(value, path="reflection")
+
+
+def _daily_checklist_text(value: Any, *, path: str) -> str | Finding:
+    if not isinstance(value, str):
+        return Finding(code="invalid_daily_checklist_text", message="Daily checklist text must be a string.", path=path)
+    normalized = value.strip()
+    if (
+        not normalized
+        or len(normalized) > MAX_DAILY_CHECKLIST_TEXT_LENGTH
+        or "\n" in normalized
+        or "\r" in normalized
+        or _contains_control_character(normalized)
+        or normalized.startswith("#")
+        or normalized == "---"
+        or "[[" in normalized
+        or "]]" in normalized
+        or DAILY_CHECKLIST_START in normalized
+        or DAILY_CHECKLIST_END in normalized
+    ):
+        return Finding(
+            code="invalid_daily_checklist_text",
+            message="Daily checklist entries must be short single-line plain text.",
+            path=path,
+        )
+    return normalized
+
+
+def _is_dated_note_stem(stem: str) -> bool:
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", stem):
+            dt.date.fromisoformat(stem)
+            return True
+        match = re.fullmatch(r"(\d{4})\.(\d{1,2})\.(\d{1,2})", stem)
+        if match:
+            dt.date(*(int(value) for value in match.groups()))
+            return True
+    except ValueError:
+        return False
+    return False
+
+
 def _review_item_plan(
     root: Path,
     paths: dict[str, str],
@@ -686,12 +884,6 @@ def _review_item_plan(
     *,
     extraction_date: str | None,
 ) -> ReviewMaterialPlan | Finding:
-    if item.get("image_backed") is True and item.get("image_readable") is not True:
-        return Finding(
-            code="uncertain_image_backed_review_material",
-            message="Image-backed review material must be clearly readable before creating a card.",
-            path=str(item.get("attachment") or "item"),
-        )
     review_date = extraction_date or dt.date.today().isoformat()
     try:
         dt.date.fromisoformat(review_date)
@@ -728,15 +920,21 @@ def _review_item_plan(
         if focus_match is not None:
             target_match = focus_match
             target_role = "focus_vocab_root"
-        base_match = _single_review_match(root / base_root, title)
-        if isinstance(base_match, Finding):
-            return base_match
-        if target_match is None and base_match is not None:
+        base_match: Path | None = None
+        if target_match is None:
+            base_match = _single_review_match(root / base_root, title)
+            if isinstance(base_match, Finding):
+                return base_match
+        if base_match is not None:
             target_path = _new_review_item_path(focus_root, item_type, title, review_date)
             source_resolution = _resolve_item_source_links(root, paths, item, target_path=target_path)
             if isinstance(source_resolution, Finding):
                 return source_resolution
             source_links, source_reads = source_resolution
+            image_reads = _validate_image_backed_item(root, item, item_type, title, source_reads)
+            if isinstance(image_reads, Finding):
+                return image_reads
+            source_reads = list(dict.fromkeys([*source_reads, *image_reads]))
             relations = _resolve_optional_relation_links(root, paths, item_type, item, target_path=target_path)
             base_fields = _frontmatter(base_match)
             fields = _initialized_review_fields(item_type, title, item, review_date, source_links=source_links)
@@ -780,6 +978,10 @@ def _review_item_plan(
         if isinstance(source_resolution, Finding):
             return source_resolution
         source_links, source_reads = source_resolution
+        image_reads = _validate_image_backed_item(root, item, item_type, title, source_reads)
+        if isinstance(image_reads, Finding):
+            return image_reads
+        source_reads = list(dict.fromkeys([*source_reads, *image_reads]))
         mutation = _mutation_for_existing_item(
             root,
             paths,
@@ -801,6 +1003,10 @@ def _review_item_plan(
     if isinstance(source_resolution, Finding):
         return source_resolution
     source_links, source_reads = source_resolution
+    image_reads = _validate_image_backed_item(root, item, item_type, title, source_reads)
+    if isinstance(image_reads, Finding):
+        return image_reads
+    source_reads = list(dict.fromkeys([*source_reads, *image_reads]))
     relations = _resolve_optional_relation_links(root, paths, item_type, item, target_path=target_path)
     fields = _initialized_review_fields(item_type, title, item, review_date, source_links=source_links)
     fields.update(_item_fields(item_type, item, title, relation_links=relations[0]))
@@ -1724,6 +1930,190 @@ def _integer_value(value: Any, *, default: int) -> int:
 
 def _truthy(value: Any) -> bool:
     return value is True or (isinstance(value, str) and value.lower() == "true")
+
+
+def _validate_image_backed_item(
+    root: Path,
+    item: dict[str, Any],
+    item_type: str,
+    title: str,
+    source_reads: list[str],
+) -> list[str] | Finding:
+    if item.get("image_backed") is not True:
+        return []
+    if item_type != "vocab":
+        return Finding(
+            code="invalid_image_backed_review_type",
+            message="Image-backed extraction is supported only for vocabulary items.",
+            path="item_type",
+        )
+    if item.get("image_readable") is False:
+        return Finding(
+            code="uncertain_image_backed_review_material",
+            message="Image-backed review material must be clearly readable before creating a card.",
+            path=str(item.get("attachment") or "image_evidence"),
+        )
+    evidence = item.get("image_evidence")
+    if not isinstance(evidence, dict):
+        return Finding(
+            code="missing_image_inspection_evidence",
+            message="Image-backed vocabulary requires structured evidence from a visual or manual attachment inspection.",
+            path="image_evidence",
+        )
+    if evidence.get("inspection_method") not in {"visual", "manual"}:
+        return Finding(
+            code="invalid_image_inspection_method",
+            message="Image inspection must be visual or manual; OCR-only evidence is not accepted.",
+            path="image_evidence.inspection_method",
+        )
+    if evidence.get("readability") != "clear":
+        return Finding(
+            code="uncertain_image_backed_review_material",
+            message="Only clearly readable image-backed vocabulary may enter duplicate search.",
+            path="image_evidence.readability",
+        )
+    observed_text = evidence.get("observed_text")
+    normalized_headword = evidence.get("normalized_headword")
+    if not isinstance(observed_text, str) or not observed_text.strip() or _contains_control_character(observed_text):
+        return Finding(
+            code="invalid_image_observed_text",
+            message="Image inspection evidence requires the non-empty text that was actually observed.",
+            path="image_evidence.observed_text",
+        )
+    if not isinstance(normalized_headword, str) or normalized_headword.strip() != title:
+        return Finding(
+            code="image_headword_mismatch",
+            message="The inspected image headword must normalize to the review item's exact headword.",
+            path="image_evidence.normalized_headword",
+        )
+    observed_text = observed_text.strip()
+    observed_form = evidence.get("observed_form")
+    observed_terms = [title]
+    if title not in observed_text:
+        if not isinstance(observed_form, str) or not observed_form.strip() or observed_form.strip() not in observed_text:
+            return Finding(
+                code="image_observed_text_mismatch",
+                message="The observed image text must contain the headword or an explicit observed form that normalizes to it.",
+                path="image_evidence.observed_text",
+            )
+        observed_terms.append(observed_form.strip())
+
+    attachment = evidence.get("attachment")
+    if not isinstance(attachment, str) or not attachment:
+        return Finding(
+            code="missing_image_attachment",
+            message="Image inspection evidence requires an exact Vault-relative attachment path.",
+            path="image_evidence.attachment",
+        )
+    attachment_path = PurePosixPath(attachment)
+    if (
+        attachment_path.is_absolute()
+        or ".." in attachment_path.parts
+        or "\\" in attachment
+        or _contains_control_character(attachment)
+        or attachment_path.suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES
+    ):
+        return Finding(
+            code="invalid_image_attachment",
+            message="Image evidence must use a safe Vault-relative path to a supported local image.",
+            path=attachment,
+        )
+    target = root / attachment
+    if not target.is_file():
+        return Finding(
+            code="missing_image_attachment",
+            message="The inspected local image attachment does not exist.",
+            path=attachment,
+        )
+    resolved_target = target.resolve()
+    root_resolved = root.resolve()
+    try:
+        resolved_target.relative_to(root_resolved)
+    except ValueError:
+        return Finding(
+            code="image_attachment_outside_vault",
+            message="The inspected image attachment resolves outside the target Vault.",
+            path=attachment,
+        )
+    attachment_relative = resolved_target.relative_to(root_resolved).as_posix()
+
+    source_note_paths = [root / path for path in source_reads if path.endswith(".md") and (root / path).is_file()]
+    if not source_note_paths:
+        return Finding(
+            code="missing_image_source_note",
+            message="Image-backed vocabulary requires a resolved source note containing the attachment.",
+            path="source_note",
+        )
+    embedded_sources: list[tuple[Path, str]] = []
+    for source_path in source_note_paths:
+        source_text = source_path.read_text(encoding="utf-8")
+        vocabulary_section = _markdown_vocabulary_section(source_text)
+        if vocabulary_section is None:
+            continue
+        embed_match = _section_embeds_attachment(root, vocabulary_section, attachment_relative)
+        if isinstance(embed_match, Finding):
+            return embed_match
+        if embed_match:
+            embedded_sources.append((source_path, vocabulary_section))
+    if not embedded_sources:
+        return Finding(
+            code="image_attachment_not_in_source_vocab_section",
+            message="The inspected attachment must be embedded inside the source note's vocabulary section.",
+            path=attachment_relative,
+        )
+    for source_path, vocabulary_section in embedded_sources:
+        explicit_text = _without_markdown_image_embeds(vocabulary_section)
+        if any(term in explicit_text for term in observed_terms):
+            return Finding(
+                code="image_item_already_present_in_source_text",
+                message="The vocabulary item already appears as text in the same source note and was not extracted again from the image.",
+                path=source_path.relative_to(root).as_posix(),
+            )
+    return [attachment_relative]
+
+
+def _markdown_vocabulary_section(text: str) -> str | None:
+    match = re.search(r"(?m)^##\s+単語\s*$", text)
+    if match is None:
+        return None
+    end = re.search(r"(?m)^#{1,2}\s+.+$", text[match.end() :])
+    end_index = match.end() + end.start() if end is not None else len(text)
+    return text[match.start() : end_index]
+
+
+def _section_embeds_attachment(root: Path, section: str, attachment_relative: str) -> bool | Finding:
+    targets = re.findall(r"!\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]", section)
+    targets.extend(re.findall(r"!\[[^\]]*\]\(([^\s)]+)(?:\s+[^)]*)?\)", section))
+    attachment_name = Path(attachment_relative).name
+    for raw_target in targets:
+        target = raw_target.strip()
+        candidate = PurePosixPath(target)
+        if candidate.is_absolute() or ".." in candidate.parts or "\\" in target or _contains_control_character(target):
+            return Finding(
+                code="invalid_image_attachment_embed",
+                message="Image embeds used as inspection evidence must be safe Vault-relative paths or unique filenames.",
+                path=raw_target,
+            )
+        if target.startswith("./"):
+            target = target[2:]
+        if target == attachment_relative:
+            return True
+        if "/" not in target and target == attachment_name:
+            matches = [path for path in root.rglob(attachment_name) if path.is_file()]
+            if len(matches) > 1:
+                return Finding(
+                    code="ambiguous_image_attachment_embed",
+                    message="A pathless image embed matches more than one Vault attachment; no target was guessed.",
+                    path=raw_target,
+                )
+            if len(matches) == 1 and matches[0].resolve() == (root / attachment_relative).resolve():
+                return True
+    return False
+
+
+def _without_markdown_image_embeds(text: str) -> str:
+    without_obsidian = re.sub(r"!\[\[[^\]]+\]\]", "", text)
+    return re.sub(r"!\[[^\]]*\]\([^)]+\)", "", without_obsidian)
 
 
 def _resolve_item_source_links(

@@ -111,6 +111,17 @@ Use the review item route for:
 - concrete errors with `correct_form`, `wrong_form`, `reason`, `avoidance`, optional exact focus substrings, and related review items;
 - pronunciation issues with `target_text`, `pronunciation_kind`, and `issue_tags`.
 
+For vocabulary extracted from an image, set `image_backed: true` and include structured `image_evidence` with:
+
+- `attachment`: the exact Vault-relative local image path;
+- `inspection_method`: `visual` or `manual` (`ocr` alone is not accepted);
+- `readability`: `clear` only after the attachment has actually been inspected;
+- `observed_text`: the text visible in the image;
+- `observed_form`: the exact visible token when it differs from the normalized dictionary form;
+- `normalized_headword`: the dictionary-form headword used by the review item.
+
+The resolved source note must embed that attachment inside `## 単語`. The workflow reads the source section itself and blocks image extraction when the same headword is already present as text. Do not use `image_readable: true` as a substitute for inspection evidence.
+
 Cards should remain concise enough for review. Long explanations belong in source notes or reference notes, not in the review prompt.
 
 Structured items render deterministic vocabulary, grammar, and error-card bodies. Do not reduce semantic content to frontmatter-only fields or empty headings. Missing optional sections are omitted; uncertain core meaning, formation, or correction blocks creation.
@@ -126,6 +137,8 @@ Treat links as a write-time correctness contract:
 Compare canonical links by their complete Vault-relative target, not by filename alone. A pathless legacy link may be treated as the same source only when it uniquely resolves to the verified canonical target; an ambiguous legacy link stays untouched and does not suppress the new verified source.
 
 Applying any mutation to an existing review card requires `existing_update_confirmed=True`. The structured `item` path may update provenance and lifecycle metadata after confirmation, but it must not replace manually curated semantic frontmatter or body content. Use an explicitly confirmed full `card` payload when the user asks to reformat an existing card.
+
+Daily checklist maintenance is an explicit, separate input. Use `daily_checklist={path, completed, blockers, reflection}` only when the user asks to update a specific existing dated note, preview first, and pass `existing_update_confirmed=True` only after confirmation. The workflow appends or replaces only its marked checklist block, accepts short single-line plain-text summaries, and never changes review-card SRS fields. If the dated note already contains an unmarked manual checklist, preserve it and ask before migrating it into the managed block.
 
 When an existing error card records the same misunderstanding again, or an existing grammar/vocabulary item is explicitly marked as a weakness, increment its occurrence/error counters, raise priority, clear `done_today`, and reset it to `day0` for same-day review. Full `card` payloads must use a safe bounded Vault-relative path and a non-empty readable body; unresolved optional relations are still kept as plain text under `## 待补卡`.
 
