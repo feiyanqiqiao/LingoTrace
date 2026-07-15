@@ -100,6 +100,7 @@ Japanese reference:
 Regression coverage:
 
 - `test_lookup_cases_preserve_focus_first_and_routing_decisions`
+- `test_review_materials_item_stops_after_focus_match_even_when_base_has_duplicate_history`
 
 ### 2. Route Different Review Items To The Correct Card Type
 
@@ -250,6 +251,8 @@ As a learner, I want vocabulary visible only in a source image to be extracted o
 Acceptance criteria:
 
 - Image-backed vocabulary may be extracted only after inspecting the local attachment.
+- Structured image input includes `image_evidence` with an exact Vault-relative attachment path, `inspection_method`, `readability`, the observed text, and the normalized headword; when normalization changes the visible form, `observed_form` records the exact token seen in the image.
+- `review_materials` verifies that the attachment exists in the target Vault and is embedded inside the resolved source note's `## 単語` section; a caller-supplied `image_readable: true` flag alone is not evidence.
 - Clearly readable items can enter the normal duplicate-search flow.
 - Items already present as text in the same source note should not be duplicated from the image.
 - Unclear, blurred, handwritten, or uncertain OCR should be reported for user confirmation instead of creating cards.
@@ -262,6 +265,8 @@ Regression coverage:
 
 - `test_review_materials_item_blocks_uncertain_image_backed_extraction`
 - `test_review_materials_item_accepts_clearly_readable_image_backed_extraction`
+- `test_review_materials_item_requires_real_image_inspection_evidence`
+- `test_review_materials_item_does_not_repeat_vocab_already_written_in_source_text`
 
 ### 9. Keep Daily Checklist Separate From Review Cards
 
@@ -270,9 +275,11 @@ As a learner, I want daily checklist updates to remain a lightweight execution l
 Acceptance criteria:
 
 - Daily checklist updates use the user's dated note only when explicitly requested.
+- Explicit updates use the separate `daily_checklist` input rather than being inferred from `item` or `card` extraction.
 - Checklist text should summarize completed work and blockers, not duplicate full card content.
 - Checklist updates must not change SRS state fields such as `done_today`, `review_stage`, or `next_review`.
 - Review-card extraction can report created/updated cards without writing the daily checklist by default.
+- Existing unmarked manual checklist sections are preserved and block managed replacement until the user explicitly migrates them.
 
 Japanese reference:
 
@@ -281,6 +288,8 @@ Japanese reference:
 Regression coverage:
 
 - `test_review_materials_item_does_not_touch_daily_checklist`
+- `test_review_materials_daily_checklist_requires_explicit_confirmed_structured_update`
+- `test_review_materials_daily_checklist_replaces_only_managed_block_and_rejects_unsafe_payloads`
 
 ### 10. Confirm Before Risky Merge, Move, Or Overwrite
 
@@ -382,7 +391,7 @@ Regression coverage:
 
 | Behavior | Reference Japanese coverage | Coverage status | Required for every language pack |
 | --- | --- | --- | --- |
-| Focus-first duplicate search | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
+| Focus-first duplicate search | `test_review_materials_item_stops_after_focus_match_even_when_base_has_duplicate_history` | Covered by the real workflow | Yes |
 | Base-only match restores focus card | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
 | Mastered reappearance resets to day0 | `test_lookup_cases_preserve_focus_first_and_routing_decisions` | Covered | Yes |
 | Active focus card reappears in a new source note and resets to day0 | `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss` | Covered | Yes |
@@ -394,8 +403,8 @@ Regression coverage:
 | Base-only restore does not rewrite base card | `test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base` | Covered | Yes |
 | Focus-to-base sink on mastery | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body` | Covered by `review_rollover` | Yes |
 | Japanese kanji-difference metadata | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered for Japanese | No, language-specific |
-| Image-backed vocabulary extraction | `test_review_materials_item_blocks_uncertain_image_backed_extraction`; `test_review_materials_item_accepts_clearly_readable_image_backed_extraction` | Covered for structured items | If supported |
-| Daily checklist separation | `test_review_materials_item_does_not_touch_daily_checklist` | Covered for default extraction | If supported |
+| Image-backed vocabulary extraction | Real attachment, visual/manual evidence, source embed, source-text deduplication, and uncertainty tests | Covered for structured items | If supported |
+| Daily checklist separation | Default no-write plus explicit confirmed dated-note update and SRS-isolation tests | Covered for structured updates | If supported |
 | Risky merge or overwrite confirmation | `test_review_materials_item_blocks_duplicate_existing_matches`; `test_review_materials_item_blocks_target_path_collision`; `test_review_material_agent_skill_requires_confirmation_for_risky_writes` | Covered for structured items and agent contract | Yes |
 | Core write guard | Core mutation and capability tests | Covered | Yes |
 | Stable review-facing card bodies | Golden vocabulary, grammar, and error fixtures | Covered for Japanese | Yes |

@@ -13,6 +13,11 @@ def write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def write_image(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\x89PNG\r\n\x1a\nsynthetic-image")
+
+
 def create_target_context(root: Path) -> None:
     write(
         root / ".lingotrace/vault-context.json",
@@ -840,6 +845,61 @@ base 内容。
         self.assertIn("status: promoted", base_body)
         self.assertIn("base 内容。", base_body)
 
+    def test_review_materials_item_stops_after_focus_match_even_when_base_has_duplicate_history(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            focus_path = root / "review/focus/vocab/合成語.md"
+            write(
+                focus_path,
+                """---
+track: class_review
+item_type: vocab
+status: active
+priority: normal
+done_today: false
+headword: 合成語
+reading: ごうせいご
+meaning_zh: 合成词
+source_notes: []
+first_seen: 2026-06-01
+last_seen: 2026-06-01
+seen_count: 1
+error_count: 0
+review_stage: day3
+next_review: 2026-06-25
+last_reviewed: 2026-06-20
+tags:
+  - jp/vocab
+---
+
+## 人工正文
+focus only
+""",
+            )
+            base_bodies: dict[Path, str] = {}
+            for folder in ("history-a", "history-b"):
+                path = root / f"review/base/vocab/{folder}/合成語.md"
+                write(path, f"---\nitem_type: vocab\nheadword: 合成語\n---\n\n{folder}\n")
+                base_bodies[path] = path.read_text(encoding="utf-8")
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={"item_type": "vocab", "headword": "合成語", "reading": "ごうせいご", "meaning_zh": "新释义"},
+                extraction_date="2026-06-22",
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            focus = focus_path.read_text(encoding="utf-8")
+            base_after = {path: path.read_text(encoding="utf-8") for path in base_bodies}
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual(["review/focus/vocab/合成語.md"], report.changed_files)
+        self.assertIn("last_seen: 2026-06-22", focus)
+        self.assertIn("meaning_zh: 合成词", focus)
+        self.assertIn("focus only", focus)
+        self.assertEqual(base_bodies, base_after)
+
     def test_review_materials_item_reactivates_mastered_focus_card(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -955,8 +1015,10 @@ meaning_zh: 合成词
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write(root / "sources/image-source.md", "## 単語\n\n![[attachments/lesson.png]]\n")
+            write_image(root / "attachments/lesson.png")
 
-            report = workflows.review_materials(
+            legacy_report = workflows.review_materials(
                 vault_root=root,
                 item={
                     "item_type": "vocab",
@@ -967,16 +1029,38 @@ meaning_zh: 合成词
                 extraction_date="2026-06-22",
                 mode="apply",
             )
+            evidence_report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "不鮮明",
+                    "reading": "ふせんめい",
+                    "meaning_zh": "不清晰",
+                    "image_backed": True,
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "uncertain",
+                        "observed_text": "不鮮明",
+                        "normalized_headword": "不鮮明",
+                    },
+                    "source_note": "sources/image-source",
+                },
+                extraction_date="2026-06-22",
+                mode="apply",
+            )
 
-        envelope = report.to_dict()
-        self.assertFalse(report.accepted)
-        self.assertEqual("uncertain_image_backed_review_material", envelope["errors"][0]["code"])
+        self.assertFalse(legacy_report.accepted)
+        self.assertFalse(evidence_report.accepted)
+        self.assertEqual("uncertain_image_backed_review_material", legacy_report.errors[0].code)
+        self.assertEqual("uncertain_image_backed_review_material", evidence_report.errors[0].code)
 
     def test_review_materials_item_accepts_clearly_readable_image_backed_extraction(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
-            write_source(root, "image-source")
+            write(root / "sources/image-source.md", "# 图片词汇\n\n## 単語\n\n![[attachments/lesson.png]]\n")
+            write_image(root / "attachments/lesson.png")
 
             report = workflows.review_materials(
                 vault_root=root,
@@ -986,7 +1070,13 @@ meaning_zh: 合成词
                     "reading": "かんばん",
                     "meaning_zh": "招牌",
                     "image_backed": True,
-                    "image_readable": True,
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "看板（かんばん）",
+                        "normalized_headword": "看板",
+                    },
                     "source_note": "[[image-source]]",
                 },
                 extraction_date="2026-06-22",
@@ -997,7 +1087,141 @@ meaning_zh: 合成词
         envelope = report.to_dict()
         self.assertTrue(report.accepted, envelope)
         self.assertEqual(["review/focus/vocab/看板.md"], envelope["changed_files"])
+        self.assertIn("attachments/lesson.png", envelope["read_files"])
         self.assertIn('  - "[[sources/image-source|image-source]]"', body)
+
+    def test_review_materials_item_requires_real_image_inspection_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "sources/image-source.md", "## 単語\n\n![[attachments/lesson.png]]\n")
+            write_image(root / "attachments/lesson.png")
+            base_item = {
+                "item_type": "vocab",
+                "headword": "看板",
+                "reading": "かんばん",
+                "meaning_zh": "招牌",
+                "image_backed": True,
+                "source_note": "sources/image-source",
+            }
+            boolean_only = workflows.review_materials(
+                vault_root=root,
+                item={**base_item, "image_readable": True},
+            )
+            ocr_only = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "ocr",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
+            missing_attachment = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "image_evidence": {
+                        "attachment": "attachments/missing.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
+            observed_mismatch = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "別の語",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
+            write(root / "sources/outside-section.md", "![[attachments/lesson.png]]\n\n## 単語\n\n仅有图片外嵌入。\n")
+            outside_vocab_section = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "source_note": "sources/outside-section",
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                },
+            )
+            normalized_visible_form = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "溢れる",
+                    "reading": "あふれる",
+                    "meaning_zh": "溢出",
+                    "image_backed": True,
+                    "source_note": "sources/image-source",
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "水が溢れた",
+                        "observed_form": "溢れた",
+                        "normalized_headword": "溢れる",
+                    },
+                },
+            )
+
+        self.assertEqual("missing_image_inspection_evidence", boolean_only.errors[0].code)
+        self.assertEqual("invalid_image_inspection_method", ocr_only.errors[0].code)
+        self.assertEqual("missing_image_attachment", missing_attachment.errors[0].code)
+        self.assertEqual("image_observed_text_mismatch", observed_mismatch.errors[0].code)
+        self.assertEqual("image_attachment_not_in_source_vocab_section", outside_vocab_section.errors[0].code)
+        self.assertTrue(normalized_visible_form.accepted, normalized_visible_form.to_dict())
+
+    def test_review_materials_item_does_not_repeat_vocab_already_written_in_source_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "sources/image-source.md",
+                "# 图片词汇\n\n## 単語\n\n- 看板（かんばん）：招牌\n\n![[attachments/lesson.png]]\n",
+            )
+            write_image(root / "attachments/lesson.png")
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "看板",
+                    "reading": "かんばん",
+                    "meaning_zh": "招牌",
+                    "image_backed": True,
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "manual",
+                        "readability": "clear",
+                        "observed_text": "看板",
+                        "normalized_headword": "看板",
+                    },
+                    "source_note": "sources/image-source",
+                },
+                mode="apply",
+            )
+
+            self.assertFalse((root / "review/focus/vocab/看板.md").exists())
+
+        self.assertFalse(report.accepted)
+        self.assertEqual("image_item_already_present_in_source_text", report.errors[0].code)
 
     def test_review_materials_item_preserves_vocab_review_cues(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1154,6 +1378,99 @@ meaning_zh: 其他项目
         self.assertTrue(report.accepted, envelope)
         self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
         self.assertEqual("## 每日学习清单\n原内容。\n", daily)
+
+    def test_review_materials_daily_checklist_requires_explicit_confirmed_structured_update(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            daily_path = root / "daily/2026-06-22.md"
+            card_path = root / "review/focus/vocab/合成語.md"
+            write(daily_path, "# 课堂原始记录\n\n老师讲了合成語。\n")
+            write(card_path, review_card(done_today="true", review_stage="day3", next_review="2026-06-22"))
+            card_before = card_path.read_text(encoding="utf-8")
+            payload = {
+                "path": "daily/2026-06-22.md",
+                "completed": ["复习词汇卡 3 张", "整理语法卡 1 张"],
+                "blockers": ["〜ようだ和〜らしい仍容易混淆"],
+                "reflection": "明天先做一组对比练习。",
+            }
+
+            preview = workflows.review_materials(vault_root=root, daily_checklist=payload, mode="preview")
+            after_preview = daily_path.read_text(encoding="utf-8")
+            blocked = workflows.review_materials(vault_root=root, daily_checklist=payload, mode="apply")
+            accepted = workflows.review_materials(
+                vault_root=root,
+                daily_checklist=payload,
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            daily_after = daily_path.read_text(encoding="utf-8")
+            card_after = card_path.read_text(encoding="utf-8")
+
+        self.assertTrue(preview.accepted, preview.to_dict())
+        self.assertEqual("# 课堂原始记录\n\n老师讲了合成語。\n", after_preview)
+        self.assertEqual("daily_checklist_confirmation_required", blocked.errors[0].code)
+        self.assertTrue(accepted.accepted, accepted.to_dict())
+        self.assertEqual(["daily/2026-06-22.md"], accepted.changed_files)
+        self.assertIn("老师讲了合成語。", daily_after)
+        self.assertIn("## 每日学习清单", daily_after)
+        self.assertIn("- 复习词汇卡 3 张", daily_after)
+        self.assertIn("## 今日卡点", daily_after)
+        self.assertIn("明天先做一组对比练习。", daily_after)
+        self.assertEqual(card_before, card_after)
+
+    def test_review_materials_daily_checklist_replaces_only_managed_block_and_rejects_unsafe_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            daily_path = root / "daily/2026.6.22.md"
+            write(daily_path, "课堂原始内容。\n")
+            first = workflows.review_materials(
+                vault_root=root,
+                daily_checklist={"path": "daily/2026.6.22.md", "completed": ["完成第一轮复习"]},
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            second = workflows.review_materials(
+                vault_root=root,
+                daily_checklist={"path": "daily/2026.6.22.md", "completed": ["完成第二轮复习"]},
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            text = daily_path.read_text(encoding="utf-8")
+            outside = workflows.review_materials(
+                vault_root=root,
+                daily_checklist={"path": "sources/2026-06-22.md", "completed": ["不应写入"]},
+            )
+            non_dated = workflows.review_materials(
+                vault_root=root,
+                daily_checklist={"path": "daily/today.md", "completed": ["不应写入"]},
+            )
+            multiline = workflows.review_materials(
+                vault_root=root,
+                daily_checklist={"path": "daily/2026.6.22.md", "reflection": "第一行\n## 注入"},
+            )
+            manual_path = root / "daily/2026-06-23.md"
+            write(manual_path, "## 每日学习清单\n\n人工维护内容。\n")
+            manual = workflows.review_materials(
+                vault_root=root,
+                daily_checklist={"path": "daily/2026-06-23.md", "completed": ["不应覆盖人工内容"]},
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            manual_after = manual_path.read_text(encoding="utf-8")
+
+        self.assertTrue(first.accepted, first.to_dict())
+        self.assertTrue(second.accepted, second.to_dict())
+        self.assertIn("课堂原始内容。", text)
+        self.assertNotIn("完成第一轮复习", text)
+        self.assertIn("完成第二轮复习", text)
+        self.assertEqual(1, text.count("## 每日学习清单"))
+        self.assertEqual("daily_checklist_outside_role", outside.errors[0].code)
+        self.assertEqual("daily_checklist_requires_dated_note", non_dated.errors[0].code)
+        self.assertEqual("invalid_daily_checklist_text", multiline.errors[0].code)
+        self.assertEqual("unmanaged_daily_checklist_exists", manual.errors[0].code)
+        self.assertEqual("## 每日学习清单\n\n人工维护内容。\n", manual_after)
 
     def test_review_rollover_previews_due_target_card_without_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
