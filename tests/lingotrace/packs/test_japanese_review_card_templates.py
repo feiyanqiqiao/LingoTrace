@@ -189,6 +189,27 @@ class JapaneseReviewCardTemplateTests(unittest.TestCase):
         self.assertNotIn("## 例句", body)
         self.assertNotRegex(body, r"(?m)^## .+\n\n(?=##|$)")
 
+    def test_empty_grammar_usage_branches_fall_back_without_empty_headings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            _, body, _ = apply_item(
+                root,
+                {
+                    "item_type": "grammar",
+                    "pattern": "〜ようだ",
+                    "meaning_zh": "好像",
+                    "formation": ["V普通形 + ようだ"],
+                    "usage_sections": [{}, {"title": "空分支"}],
+                },
+            )
+
+        self.assertIn("### 1. 基本用法", body)
+        self.assertIn("- 接续：V普通形 + ようだ", body)
+        self.assertNotIn("### 1. 用法 1", body)
+        self.assertNotIn("空分支", body)
+        self.assertNotRegex(body, r"(?m)^### .+\n(?=\n(?:###|##|$))")
+
     def test_source_links_must_resolve_uniquely_inside_source_roles(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -201,11 +222,16 @@ class JapaneseReviewCardTemplateTests(unittest.TestCase):
             ambiguous = workflows.review_materials(vault_root=root, item={**base_item, "source_note": "lesson"})
             outside = workflows.review_materials(vault_root=root, item={**base_item, "source_note": "review/grammar/x"})
             malformed = workflows.review_materials(vault_root=root, item={**base_item, "source_note": "[[lesson"})
+            multiline_alias = workflows.review_materials(
+                vault_root=root,
+                item={**base_item, "source_note": "[[sources/a/lesson|alias\n## injected]]"},
+            )
 
         self.assertEqual("missing_source_note_target", missing.errors[0].code)
         self.assertEqual("ambiguous_source_note_target", ambiguous.errors[0].code)
         self.assertEqual("source_note_outside_role", outside.errors[0].code)
         self.assertEqual("invalid_source_note_link", malformed.errors[0].code)
+        self.assertEqual("invalid_source_note_link", multiline_alias.errors[0].code)
 
     def test_missing_or_ambiguous_optional_relations_remain_plain_text_and_are_reported(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -301,6 +327,68 @@ next_review: 2026-07-20
         self.assertIn("明确确认后可以重排。", replaced_text)
         self.assertEqual("review_card_outside_role", outside.errors[0].code)
 
+    def test_full_card_payload_rejects_traversal_empty_body_and_oversized_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            payload = {
+                "path": "review/focus/vocab/自身.md",
+                "body": "## 自身\n\n可复习正文。",
+                "fields": complete_vocab_fields(),
+            }
+            traversal = workflows.review_materials(
+                vault_root=root,
+                card={**payload, "path": "review/focus/vocab/../../../sources/自身.md"},
+            )
+            empty_body = workflows.review_materials(vault_root=root, card={**payload, "body": "  \n"})
+            oversized = workflows.review_materials(
+                vault_root=root,
+                card={**payload, "path": f"review/focus/vocab/{'長' * 300}.md"},
+            )
+
+        self.assertEqual("invalid_review_card_path", traversal.errors[0].code)
+        self.assertEqual("invalid_review_card_body", empty_body.errors[0].code)
+        self.assertEqual("review_card_filename_too_long", oversized.errors[0].code)
+
+    def test_full_card_payload_keeps_unresolved_relations_as_plain_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            report = workflows.review_materials(
+                vault_root=root,
+                card={
+                    "path": "review/grammar/〜ようだ.md",
+                    "body": "# 〜ようだ\n\n## 核心\n\n好像。",
+                    "fields": {
+                        "track": "class_review",
+                        "item_type": "grammar",
+                        "status": "active",
+                        "priority": "normal",
+                        "done_today": False,
+                        "pattern": "〜ようだ",
+                        "meaning_zh": "好像",
+                        "formation": ["V普通形 + ようだ"],
+                        "source_notes": [],
+                        "first_seen": "2026-07-14",
+                        "last_seen": "2026-07-14",
+                        "seen_count": 1,
+                        "error_count": 0,
+                        "review_stage": "day0",
+                        "next_review": "2026-07-14",
+                        "last_reviewed": "",
+                        "contrast_with": ["〜みたいだ"],
+                        "tags": ["jp/grammar", "jp/class_review"],
+                    },
+                },
+                mode="apply",
+            )
+            text = (root / "review/grammar/〜ようだ.md").read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual('["〜みたいだ"]', report.artifacts["unresolved_related_items"])
+        self.assertIn("## 待补卡\n\n- 〜みたいだ", text)
+        self.assertNotIn("[[〜みたいだ]]", text)
+
     def test_yaml_round_trip_preserves_special_text_and_typed_lists(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -326,6 +414,54 @@ next_review: 2026-07-20
         self.assertEqual(["[[daily/injection|注入: 来源]]"], fields["source_notes"])
         self.assertEqual(2, text.count("\n---\n"))
 
+    def test_yaml_round_trip_preserves_numeric_and_implicit_scalar_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            report, _, path = apply_item(
+                root,
+                {
+                    "item_type": "vocab",
+                    "headword": "数字語",
+                    "reading": "123",
+                    "meaning_zh": "01",
+                    "collocations": ["yes", "1.2", "1e3", "2026-07-15"],
+                },
+            )
+            text = path.read_text(encoding="utf-8")
+            fields, _ = workflows._frontmatter_and_body(text)
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual("123", fields["reading"])
+        self.assertEqual("01", fields["meaning_zh"])
+        self.assertEqual(["yes", "1.2", "1e3", "2026-07-15"], fields["collocations"])
+        self.assertIn('reading: "123"', text)
+        self.assertIn('meaning_zh: "01"', text)
+        self.assertIn('  - "yes"', text)
+
+    def test_long_error_sentence_uses_bounded_filename_without_losing_display_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            correct_form = "長" * 300
+            report, body, path = apply_item(
+                root,
+                {
+                    "item_type": "error",
+                    "wrong_form": "短い誤文",
+                    "correct_form": correct_form,
+                    "reason": "理由",
+                    "avoidance": "方法",
+                },
+            )
+            fields, _ = workflows._frontmatter_and_body(path.read_text(encoding="utf-8"))
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertLessEqual(len(path.name.encode("utf-8")), 255)
+        self.assertEqual(correct_form, fields["correct_form"])
+        self.assertIn(correct_form, body)
+        self.assertRegex(path.stem, r"^2026-07-14_.+-[0-9a-f]{10}$")
+
     def test_reserved_filename_characters_and_non_unique_error_focus_are_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -333,6 +469,10 @@ next_review: 2026-07-20
             unsafe = workflows.review_materials(
                 vault_root=root,
                 item={"item_type": "vocab", "headword": "危険#語", "reading": "きけんご", "meaning_zh": "危险词"},
+            )
+            control = workflows.review_materials(
+                vault_root=root,
+                item={"item_type": "vocab", "headword": "危険\0語", "reading": "きけんご", "meaning_zh": "危险词"},
             )
             focus = workflows.review_materials(
                 vault_root=root,
@@ -347,6 +487,7 @@ next_review: 2026-07-20
             )
 
         self.assertEqual("unsafe_review_item_title", unsafe.errors[0].code)
+        self.assertEqual("unsafe_review_item_title", control.errors[0].code)
         self.assertEqual("invalid_error_focus", focus.errors[0].code)
 
     def test_source_self_link_is_blocked_when_roles_overlap(self) -> None:

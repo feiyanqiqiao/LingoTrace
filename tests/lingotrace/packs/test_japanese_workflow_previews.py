@@ -371,6 +371,35 @@ meaning_zh: 合成词
             envelope["planned_writes"],
         )
 
+    def test_review_materials_preview_keeps_legacy_cards_visible_without_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/focus/vocab/旧卡.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: false
+review_stage: day3
+next_review: 2026-06-25
+headword: 旧卡
+reading: きゅうか
+meaning_zh: 旧卡
+source_notes: []
+---
+
+# 旧卡
+""",
+            )
+
+            report = workflows.review_materials(vault_root=root)
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual("review/focus/vocab/旧卡.md", report.planned_writes[0]["path"])
+        self.assertEqual("day3", report.planned_writes[0]["review_stage"])
+
     def test_review_materials_item_creates_initialized_focus_vocab_card(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -570,6 +599,201 @@ source_notes:
         self.assertIn("next_review: 2026-06-25", body)
         self.assertIn("last_reviewed: 2026-06-21", body)
         self.assertIn("同一来源不应重置进度。", body)
+
+    def test_review_materials_item_keeps_distinct_same_basename_source_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "daily/a/lesson.md", "# old\n")
+            write(root / "sources/b/lesson.md", "# new\n")
+            write(
+                root / "review/focus/vocab/同名.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: true
+review_stage: day3
+next_review: 2026-06-25
+last_reviewed: 2026-06-21
+headword: 同名
+meaning_zh: 同名
+source_notes:
+  - "[[daily/a/lesson|lesson]]"
+---
+
+## 人工整理
+两个同名来源都必须保留。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "同名",
+                    "meaning_zh": "同名",
+                    "source_note": "sources/b/lesson.md",
+                },
+                extraction_date="2026-06-22",
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            fields = workflows._frontmatter(root / "review/focus/vocab/同名.md")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual(
+            ["[[daily/a/lesson|lesson]]", "[[sources/b/lesson|lesson]]"],
+            fields["source_notes"],
+        )
+        self.assertEqual("day0", fields["review_stage"])
+        self.assertEqual("2026-06-22", fields["next_review"])
+        self.assertFalse(fields["done_today"])
+
+    def test_review_materials_item_does_not_guess_ambiguous_legacy_source_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "daily/a/lesson.md", "# daily\n")
+            write(root / "sources/b/lesson.md", "# source\n")
+            write(
+                root / "review/focus/vocab/歧义.md",
+                """---
+track: class_review
+item_type: vocab
+status: active
+done_today: true
+review_stage: day3
+next_review: 2026-06-25
+last_reviewed: 2026-06-21
+headword: 歧义
+meaning_zh: 歧义
+source_notes:
+  - "[[lesson]]"
+---
+
+## 人工整理
+旧链接必须保留，但不能据此猜测来源。
+""",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "vocab",
+                    "headword": "歧义",
+                    "meaning_zh": "歧义",
+                    "source_note": "sources/b/lesson.md",
+                },
+                extraction_date="2026-06-22",
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            fields = workflows._frontmatter(root / "review/focus/vocab/歧义.md")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual(
+            ["[[lesson]]", "[[sources/b/lesson|lesson]]"],
+            fields["source_notes"],
+        )
+        self.assertEqual("day0", fields["review_stage"])
+
+    def test_review_materials_item_resets_reappearing_errors_and_grammar_weaknesses(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(
+                root / "review/errors/2026-06-20_正しい.md",
+                """---
+track: class_review
+item_type: error
+status: active
+priority: normal
+done_today: true
+correct_form: 正しい
+wrong_form: 間違い
+reason: 理由
+avoidance: 方法
+source_notes: []
+first_seen: 2026-06-20
+last_seen: 2026-06-20
+seen_count: 1
+review_stage: day3
+next_review: 2026-06-25
+last_reviewed: 2026-06-21
+tags: []
+---
+
+# 错题人工正文
+""",
+            )
+            write(
+                root / "review/grammar/〜ようだ.md",
+                """---
+track: class_review
+item_type: grammar
+status: active
+priority: normal
+done_today: true
+pattern: 〜ようだ
+meaning_zh: 好像
+formation:
+  - V普通形 + ようだ
+source_notes: []
+first_seen: 2026-06-20
+last_seen: 2026-06-20
+seen_count: 1
+error_count: 0
+review_stage: day7
+next_review: 2026-06-29
+last_reviewed: 2026-06-21
+tags: []
+---
+
+# 语法人工正文
+""",
+            )
+
+            error_report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "error",
+                    "correct_form": "正しい",
+                    "wrong_form": "間違い",
+                    "reason": "理由",
+                    "avoidance": "方法",
+                },
+                extraction_date="2026-06-22",
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            grammar_report = workflows.review_materials(
+                vault_root=root,
+                item={
+                    "item_type": "grammar",
+                    "pattern": "〜ようだ",
+                    "meaning_zh": "好像",
+                    "formation": ["V普通形 + ようだ"],
+                    "weakness": True,
+                },
+                extraction_date="2026-06-22",
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            error_fields = workflows._frontmatter(root / "review/errors/2026-06-20_正しい.md")
+            grammar_fields = workflows._frontmatter(root / "review/grammar/〜ようだ.md")
+
+        self.assertTrue(error_report.accepted, error_report.to_dict())
+        self.assertTrue(grammar_report.accepted, grammar_report.to_dict())
+        for fields in (error_fields, grammar_fields):
+            self.assertEqual("day0", fields["review_stage"])
+            self.assertEqual("2026-06-22", fields["next_review"])
+            self.assertEqual("", fields["last_reviewed"])
+            self.assertFalse(fields["done_today"])
+            self.assertEqual("high", fields["priority"])
+            self.assertEqual(2, fields["seen_count"])
+        self.assertEqual(2, error_fields["error_count"])
+        self.assertEqual(1, grammar_fields["error_count"])
 
     def test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

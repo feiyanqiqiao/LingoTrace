@@ -123,7 +123,11 @@ Treat links as a write-time correctness contract:
 - render a canonical Vault-relative extensionless wikilink only when exactly one target exists;
 - keep a missing or ambiguous optional relation as plain text under `## 待补卡`, return it in `unresolved_related_items`, and never create a dangling wikilink.
 
+Compare canonical links by their complete Vault-relative target, not by filename alone. A pathless legacy link may be treated as the same source only when it uniquely resolves to the verified canonical target; an ambiguous legacy link stays untouched and does not suppress the new verified source.
+
 Applying any mutation to an existing review card requires `existing_update_confirmed=True`. The structured `item` path may update provenance and lifecycle metadata after confirmation, but it must not replace manually curated semantic frontmatter or body content. Use an explicitly confirmed full `card` payload when the user asks to reformat an existing card.
+
+When an existing error card records the same misunderstanding again, or an existing grammar/vocabulary item is explicitly marked as a weakness, increment its occurrence/error counters, raise priority, clear `done_today`, and reset it to `day0` for same-day review. Full `card` payloads must use a safe bounded Vault-relative path and a non-empty readable body; unresolved optional relations are still kept as plain text under `## 待补卡`.
 
 If an image-backed item is not clearly readable, or if the card type, headword, grammar pattern, correct answer, or target root is uncertain, stop and ask before writing. Merges, moves, overwrites, and broad rewrites still require user confirmation. Existing-card updates also require explicit confirmation.
 
