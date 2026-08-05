@@ -13,7 +13,7 @@ Use these intent families:
 - Audio or video to listening material: create or update a listening note, intensive listening script, extensive listening note, transcript-backed note, or audio slices.
 - Source material to study note: turn an article, transcript, URL, screenshot text, video content, or pasted text into a traceable Japanese study note.
 - Word, grammar, pronunciation, or error to review: add, update, deduplicate, or organize review material.
-- Useful sentence to active output: create or update a speaking card for a reviewed phrase the user wants to be able to say.
+- Reviewed chunk or useful sentence to active output: create, merge, or update a speaking card for language the user wants to be able to say.
 - End-of-day review settlement: advance completed review items, update next review dates, or close today's review.
 - Dashboard or view maintenance: update how a table, Base, filter, formula, column, sort order, or view displays learning items.
 
@@ -41,7 +41,7 @@ Map intuitive study requests to the Japanese pack capabilities:
 | 请把这段音频做成精听稿 / 听力笔记 / 泛听笔记 | Listening note task | `listening_notes` |
 | 帮我把这篇材料整理成日语学习笔记 / 生成学习笔记 | Source note task | `source_notes` |
 | 把这个词加入复习 / 建词卡 / 建语法卡 | Review material task | `review_materials` |
-| 这句话很实用，帮我做成口语卡 / 这句以后要会说 | Speaking card task | `speaking_cards` |
+| 把我已经 review 的这些语块转入口语库 / 这句话很实用，帮我做成口语卡 | Speaking card task | `speaking_cards` |
 | 今天复习结束了，帮我结算 / 结算复习 / 更新总训练表 / 请更新总训练表 | Review rollover task | `review_rollover` |
 
 Prefer user-facing language such as:
@@ -70,6 +70,8 @@ Default behavior is risk-based:
 - Clear review-settlement requests do not need a second user confirmation. Run `preview -> apply -> second preview`, then report the saved card frontmatter changes.
 - Ambiguous requests still require clarification. If preview reports errors, stop before apply.
 
+Treat listening chunk extraction and speaking-card promotion as two separate user tasks. A listening task may create or revise `## 常用语块`, but it must stop without calling `speaking_cards`. After the user reviews those chunks offline, a later explicit request to transfer them into the speaking library is the required confirmation and does not need a second per-card or per-batch confirmation.
+
 ## Listening Notes
 
 For requests such as "请把 23.mp3 做成精听稿", the agent should provide the full daily experience:
@@ -85,8 +87,9 @@ For requests such as "请把 23.mp3 做成精听稿", the agent should provide t
    - rerun the original command with both `--reviewed-transcript <temporary-file>` and `--merge-request <llm_merge_request_path>` so the core guard validates and applies the exact pending request; do not edit the Vault's pending consensus artifact directly.
 5. If any name, number, homophone, particle, ending, or slice-boundary decision remains low-confidence, keep it unresolved, block the final note, and tell the user exactly which segment still needs confirmation.
 6. Build a listening note body with real audio slice references for intensive notes.
-7. Save the note to the user's Japanese learning library through `listening_notes`.
-8. Tell the user whether the two ASRs agreed, how many differences the model merged, which model performed the merge, whether any uncertainty remains, and the created note and slice count.
+7. Curate `0-5` productive `## 常用语块` items using model judgment. Judge them by replaceability and cross-scene communicative value, not literal length. Each item records `语块`, `类型`, `素材原句`, `替换练习`, and `交际作用`; the source sentence is only a listening anchor. Keep `daily_use_sentences` for compatibility, but store only the Japanese chunk patterns there.
+8. Save the note to the user's Japanese learning library through `listening_notes`, then stop. Never promote freshly extracted chunks to speaking cards in the same task.
+9. Tell the user whether the two ASRs agreed, how many differences the model merged, which model performed the merge, whether any uncertainty remains, and the created note and slice count.
 
 Do not ask the user to prepare an internal artifact manually. If the transcript, slice manifest, or audio tool is missing, explain the concrete missing input or tool and stop before changing files.
 
@@ -146,9 +149,18 @@ If an image-backed item is not clearly readable, or if the card type, headword, 
 
 ## Speaking Cards
 
-For requests such as "这句话很实用，帮我做成口语卡", only create a speaking card when the phrase has been manually reviewed or supplied by the user as a known usable expression.
+Use two inputs:
+
+- For a later request such as "把我已经 review 的这些语块转入口语库", treat the separately issued request as confirmation that the listening note's `## 常用语块` has been reviewed offline. Set `reviewed: true` and do not ask for another confirmation.
+- For a useful complete expression supplied directly by the user, keep supporting an ordinary `item_type: speaking_card`.
+
+Listening-derived material defaults to `item_type: chunk`. A chunk is a productive, replaceable interaction pattern; it may be short or long. Use `chunk_pattern` as its identity and practice target, keep the source sentence as a listening anchor, and use the pack's `chunk_card` template rather than reducing it to a one-sentence card.
+
+Before writing, search the configured `speaking_card_root` recursively. Match `chunk_pattern` first, then compare `jp_text` and the core exchange. When the pattern already exists, merge only useful provenance, reliable source audio, and new examples into the existing card while preserving its review state and manually curated body. Do not create a second card for the same `chunk_pattern`.
 
 Do not promote unstable ASR text, raw transcript fragments, or unnatural textbook drills into speaking cards without review.
+
+The extraction and promotion phases must never run in the same user task, even when the generated chunks appear strong enough to keep.
 
 ## Review Rollover
 

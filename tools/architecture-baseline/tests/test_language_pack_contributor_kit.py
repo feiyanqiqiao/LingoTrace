@@ -191,7 +191,7 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "extensive",
             "intensive",
             "reviewed slice manifest",
-            "common-sentence curation",
+            "productive-chunk curation",
             "pitch-accent markers",
             "Multi-engine ASR comparison",
             "unsupported",
@@ -243,7 +243,7 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "lightweight artifact schema",
             "本地候选",
             "待确认",
-            "Shadowing common sentences remain candidates",
+            "Reviewed listening chunks remain candidates",
         ):
             self.assertIn(token, listening)
 

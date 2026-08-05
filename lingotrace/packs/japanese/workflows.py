@@ -4,6 +4,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -332,7 +333,19 @@ def speaking_cards(
     mutation = _artifact_mutation(candidate, action="write_speaking_card", reason="reviewed speaking candidate")
     if isinstance(mutation, Finding):
         return _workflow_error("speaking_cards-workflow", mode, mutation.code, mutation.message, mutation.path)
-    return _run_mutations(vault_root, "speaking_cards", [mutation], mode)
+    root = Path(vault_root)
+    finding, read_files = _validate_chunk_candidate_identity(root, mutation)
+    if finding is not None:
+        return _workflow_report(
+            "speaking_cards-workflow",
+            mode,
+            errors=[finding],
+            read_files=read_files,
+            blocked_files=[mutation.path],
+        )
+    report = _run_mutations(root, "speaking_cards", [mutation], mode)
+    report.read_files = list(dict.fromkeys([*read_files, *report.read_files]))
+    return report
 
 
 def review_rollover(
@@ -569,6 +582,56 @@ def _artifact_mutation(payload: dict[str, Any], *, action: str, reason: str) -> 
         return Finding(code="invalid_artifact_body", message="Artifact body must be a non-empty string.", path=path)
     content = body if body.startswith("---\n") else f"---\ntitle: {title}\nstatus: active\n---\n\n{body}\n"
     return FileMutation(path=path, content=content, action=action, reason=reason)
+
+
+def _validate_chunk_candidate_identity(root: Path, mutation: FileMutation) -> tuple[Finding | None, list[str]]:
+    fields, _ = _frontmatter_and_body(mutation.content)
+    if fields.get("item_type") != "chunk":
+        return None, []
+    pattern = str(fields.get("chunk_pattern") or "").strip()
+    if not pattern:
+        return (
+            Finding(
+                code="missing_chunk_pattern",
+                message="A chunk speaking card requires a non-empty chunk_pattern.",
+                path=mutation.path,
+            ),
+            [],
+        )
+
+    speaking_root = root / _path_roles(root).get("speaking_card_root", "speaking/cards")
+    if not speaking_root.is_dir():
+        return None, []
+    normalized_pattern = _normalized_chunk_pattern(pattern)
+    read_files: list[str] = []
+    for path in sorted(speaking_root.rglob("*.md")):
+        relative = path.relative_to(root).as_posix()
+        read_files.append(relative)
+        if relative == mutation.path:
+            continue
+        try:
+            existing_fields, _ = _frontmatter_and_body(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            continue
+        existing_pattern = str(existing_fields.get("chunk_pattern") or "").strip()
+        if existing_pattern and _normalized_chunk_pattern(existing_pattern) == normalized_pattern:
+            return (
+                Finding(
+                    code="duplicate_chunk_pattern",
+                    message=(
+                        "A speaking chunk with the same chunk_pattern already exists. "
+                        "Merge reviewed provenance, audio, or examples into that card instead of creating another file."
+                    ),
+                    path=relative,
+                ),
+                read_files,
+            )
+    return None, read_files
+
+
+def _normalized_chunk_pattern(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    return re.sub(r"\s+", " ", normalized)
 
 
 def _listening_artifact_mutations(payload: dict[str, Any]) -> list[FileMutation] | Finding:
