@@ -18,12 +18,14 @@ from pathlib import Path
 from typing import Iterable
 
 COMMON_SECTION_PLACEHOLDER = (
-    "二阶段待编辑：请基于完整脚本，用大模型或人工判断，挑选 0-5 句真正值得背、可迁移的表达；宁缺勿滥。\n\n"
-    "- 原句：\n"
-    "  可替换骨架：\n"
-    "  使用场景：\n"
-    "  选入理由：\n\n"
-    "不要添加中文翻译字段。完成后同步更新 frontmatter 的 `daily_use_sentences`，只放日文原句或核心句。"
+    "二阶段待编辑：请基于完整脚本，用大模型或人工判断，挑选 0-5 个真正可替换、可迁移的常用语块；宁缺勿滥。\n\n"
+    "> 素材原句只作为听辨锚点，不要求整句原样背诵。\n\n"
+    "- 语块：\n"
+    "  类型：\n"
+    "  素材原句：\n"
+    "  替换练习：\n"
+    "  交际作用：\n\n"
+    "完成后同步更新 frontmatter 的 `daily_use_sentences`，只放日文语块骨架，不放素材完整句。"
 )
 DEFAULT_MATERIAL_NOTE = "这条音频由 ListenKit 自动生成转写稿。建议人工复核题号、教材抬头、专有名词和少量长句切分，再决定是否继续精修。"
 SHORT_CHOICE_MATERIAL_NOTE = "这条音频按短句应答题模式处理：脚本会优先保留题号与选项结构，必要时自动尝试慢速副本重转。仍建议人工顺耳确认题干与错误选项。"
@@ -2909,7 +2911,7 @@ def build_body(
 ) -> tuple[str, bool]:
     script_section, dialogue_content_mode = render_dialogue_script_section(sentences, chunks, slice_profile)
     existing_sections = parse_sections(existing_body or "")
-    known_headings = {"精听学习包", "脚本", "可直接背的常用句", "素材说明"}
+    known_headings = {"精听学习包", "脚本", "常用语块", "可直接背的常用句", "素材说明"}
     preserved_sections = {heading: content for heading, content in existing_sections}
     if short_choice_mode:
         script_section = choose_short_choice_script(
@@ -2917,11 +2919,16 @@ def build_body(
             preserved_sections.get("脚本"),
             audio_path,
         )
-    common_section = (
-        preserved_sections["可直接背的常用句"]
-        if "可直接背的常用句" in preserved_sections
-        else COMMON_SECTION_PLACEHOLDER
-    )
+    if "常用语块" in preserved_sections:
+        common_heading = "常用语块"
+        common_section = preserved_sections[common_heading]
+    elif "可直接背的常用句" in preserved_sections:
+        # Preserve legacy user-curated sections verbatim, including their heading.
+        common_heading = "可直接背的常用句"
+        common_section = preserved_sections[common_heading]
+    else:
+        common_heading = "常用语块"
+        common_section = COMMON_SECTION_PLACEHOLDER
     material_section = (
         choose_material_section(preserved_sections, decorate_material_note(material_note, dialogue_content_mode))
     )
@@ -2947,7 +2954,7 @@ def build_body(
         "",
         script_section,
         "",
-        "## 可直接背的常用句",
+        f"## {common_heading}",
         "",
         common_section,
         "",

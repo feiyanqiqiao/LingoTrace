@@ -213,6 +213,7 @@ Japanese reference mapping:
 - Grammar cards show `meaning_zh` in `核心内容` and `formation` in `说明`.
 - Error cards show `correct_form` in `核心内容` and `wrong_form` in `说明`.
 - Speaking cards show `jp_text` in `核心内容` and use `meaning_zh` plus `reply_hint` in `说明`.
+- Chunk cards show `chunk_pattern` in `核心内容` and prefer `chunk_meaning_zh` plus the source example in `说明`; their displayed type is `语块`.
 - Listening cards prefer `daily_use_sentences` in `核心内容` and use `practice_focus` or `weak_points` in `说明`.
 - Pronunciation cards show `target_text` in `核心内容` and `issue_tags` in `说明`.
 

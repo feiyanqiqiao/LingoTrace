@@ -286,6 +286,79 @@ class JapaneseWorkflowPreviewTests(unittest.TestCase):
         self.assertFalse(report.accepted)
         self.assertEqual("unreviewed_speaking_candidate", report.to_dict()["errors"][0]["code"])
 
+    def test_speaking_cards_reject_duplicate_chunk_pattern_and_merge_at_existing_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            existing_path = root / "speaking/cards/语块/语块_しちゃって.md"
+            existing = """---
+track: survival_speaking
+item_type: chunk
+status: active
+review_stage: day7
+next_review: 2026-07-27
+chunk_pattern: "〜しちゃって"
+source_notes:
+  - "[[listening/lesson-1]]"
+---
+
+## 核心语块
+
+- 语块：〜しちゃって
+"""
+            write(existing_path, existing)
+
+            duplicate = workflows.speaking_cards(
+                vault_root=root,
+                candidate={
+                    "path": "speaking/cards/语块/duplicate.md",
+                    "body": existing.replace("lesson-1", "lesson-2"),
+                    "reviewed": True,
+                },
+            )
+
+            self.assertFalse(duplicate.accepted)
+            self.assertEqual("duplicate_chunk_pattern", duplicate.errors[0].code)
+            self.assertEqual("speaking/cards/语块/语块_しちゃって.md", duplicate.errors[0].path)
+
+            merged_body = existing.replace(
+                '  - "[[listening/lesson-1]]"',
+                '  - "[[listening/lesson-1]]"\n  - "[[listening/lesson-2]]"',
+            )
+            merged = workflows.speaking_cards(
+                vault_root=root,
+                candidate={
+                    "path": "speaking/cards/语块/语块_しちゃって.md",
+                    "body": merged_body,
+                    "reviewed": True,
+                },
+                mode="apply",
+            )
+
+            self.assertTrue(merged.accepted, merged.to_dict())
+            self.assertFalse((root / "speaking/cards/语块/duplicate.md").exists())
+            rendered = existing_path.read_text(encoding="utf-8")
+            self.assertIn("review_stage: day7", rendered)
+            self.assertIn("[[listening/lesson-1]]", rendered)
+            self.assertIn("[[listening/lesson-2]]", rendered)
+
+    def test_speaking_cards_require_chunk_pattern_for_chunk_item_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+
+            report = workflows.speaking_cards(
+                vault_root=root,
+                candidate={
+                    "path": "speaking/cards/语块/missing-pattern.md",
+                    "body": "---\ntrack: survival_speaking\nitem_type: chunk\n---\n\n## 核心语块\n",
+                    "reviewed": True,
+                },
+            )
+
+        self.assertFalse(report.accepted)
+        self.assertEqual("missing_chunk_pattern", report.errors[0].code)
+
     def test_review_materials_apply_creates_target_card(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

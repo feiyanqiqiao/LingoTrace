@@ -212,7 +212,14 @@ class TranscribeListeningTests(unittest.TestCase):
             self.assertEqual(len(created_notes), 1)
             rendered = created_notes[0].read_text(encoding="utf-8")
             self.assertIn("daily_use_sentences: []", rendered)
+            self.assertIn("## 常用语块", rendered)
             self.assertIn(MODULE.COMMON_SECTION_PLACEHOLDER, rendered)
+            self.assertIn("- 语块：", rendered)
+            self.assertIn("  类型：", rendered)
+            self.assertIn("  素材原句：", rendered)
+            self.assertIn("  替换练习：", rendered)
+            self.assertIn("  交际作用：", rendered)
+            self.assertNotIn("## 可直接背的常用句", rendered)
 
     def test_learning_package_marks_confirmed_and_local_candidate_accents(self) -> None:
         package = MODULE.build_learning_package(
@@ -1860,6 +1867,8 @@ class TranscribeListeningTests(unittest.TestCase):
 
             rendered = note_path.read_text(encoding="utf-8")
             self.assertNotIn(MODULE.COMMON_SECTION_PLACEHOLDER, rendered)
+            self.assertIn("## 可直接背的常用句", rendered)
+            self.assertNotIn("## 常用语块", rendered)
             common_block = rendered.split("## 可直接背的常用句", 1)[1].split("## 素材说明", 1)[0]
             self.assertEqual(common_block.strip(), "")
 

@@ -24,6 +24,26 @@
       "name": "kanji_diff_pairs",
       "owner": "Japanese language pack",
       "purpose": "Structured kanji comparison pairs."
+    },
+    {
+      "name": "chunk_pattern",
+      "owner": "Japanese language pack",
+      "purpose": "Productive Japanese chunk pattern used as the speaking-practice target."
+    },
+    {
+      "name": "chunk_type",
+      "owner": "Japanese language pack",
+      "purpose": "Japanese speaking-chunk classification."
+    },
+    {
+      "name": "chunk_meaning_zh",
+      "owner": "Japanese language pack",
+      "purpose": "Chinese explanation of a productive Japanese chunk."
+    },
+    {
+      "name": "practice_tier",
+      "owner": "Japanese language pack",
+      "purpose": "Practice-priority tier for a speaking chunk."
     }
   ]
 }

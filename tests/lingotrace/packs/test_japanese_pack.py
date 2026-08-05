@@ -37,6 +37,10 @@ EXPECTED_LANGUAGE_FIELDS = {
     "meaning_zh",
     "kanji_diff",
     "kanji_diff_pairs",
+    "chunk_pattern",
+    "chunk_type",
+    "chunk_meaning_zh",
+    "practice_tier",
 }
 
 
@@ -141,7 +145,7 @@ class JapanesePackTests(unittest.TestCase):
 
         templates = manifest["templates"]
         self.assertEqual(
-            {"focus_vocab_card", "grammar_card", "error_card", "speaking_card", "daily_checklist"},
+            {"focus_vocab_card", "grammar_card", "error_card", "speaking_card", "chunk_card", "daily_checklist"},
             {record["id"] for record in templates},
         )
         for record in templates:
@@ -185,6 +189,26 @@ class JapanesePackTests(unittest.TestCase):
             self.assertIsInstance(fields["source_notes"], list)
             self.assertIsInstance(fields["tags"], list)
 
+    def test_chunk_card_template_declares_productive_chunk_contract(self) -> None:
+        text = (PACK_ROOT / "templates" / "chunk-card.md").read_text(encoding="utf-8")
+        fields, body = workflows._frontmatter_and_body(text)
+
+        self.assertEqual("survival_speaking", fields["track"])
+        self.assertEqual("chunk", fields["item_type"])
+        for field in ("chunk_pattern", "chunk_type", "practice_tier", "chunk_meaning_zh", "jp_text"):
+            self.assertIn(field, fields)
+        for heading in (
+            "## 核心语块",
+            "## 素材中的听辨锚点",
+            "## 什么时候用",
+            "## 场景对话",
+            "## 直接这样说",
+            "## 可替换练习",
+            "## 语气提示",
+            "## 没听懂时",
+        ):
+            self.assertIn(heading, body)
+
     def test_total_training_dashboard_surfaces_type_specific_review_cues(self) -> None:
         template = read_total_training_base()
         core_text = formula(template, "core_text")
@@ -194,6 +218,7 @@ class JapanesePackTests(unittest.TestCase):
             'item_type == "vocab", if(accent_display, accent_display, if(headword, headword, file.name))',
             'item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name))',
             'item_type == "error", if(correct_form, correct_form, file.name)',
+            'item_type == "chunk", if(chunk_pattern, chunk_pattern, if(jp_text, jp_text, file.name))',
             'track == "survival_speaking", if(jp_text, jp_text, file.name)',
             'track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name))',
             'track == "pronunciation", if(target_text, target_text, file.name)',
@@ -202,6 +227,7 @@ class JapanesePackTests(unittest.TestCase):
             'item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, ""))',
             'item_type == "grammar", if(formation, formation, "")',
             'item_type == "error", if(wrong_form, wrong_form, if(reason, reason, ""))',
+            'item_type == "chunk", if(chunk_meaning_zh, if(jp_text, chunk_meaning_zh + " / 例: " + jp_text, chunk_meaning_zh), if(jp_text, jp_text, ""))',
             'track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, ""))',
             'track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, ""))',
             'track == "pronunciation", if(issue_tags, issue_tags, "")',
@@ -211,6 +237,10 @@ class JapanesePackTests(unittest.TestCase):
             self.assertIn(contract, core_text)
         for contract in expected_support_contracts:
             self.assertIn(contract, support_text)
+        self.assertIn('item_type == "chunk", "语块"', formula(template, "item_type_label"))
+        self.assertIn("displayName: 常用语块", template)
+        self.assertIn("formula.item_type_label", view_block(template, "今日总训练"))
+        self.assertIn("formula.item_type_label", view_block(template, "生活口语待练"))
 
     def test_total_training_dashboard_daily_review_contract(self) -> None:
         template = read_total_training_base()
