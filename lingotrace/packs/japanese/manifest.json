@@ -61,7 +61,9 @@
         "pronunciation_accent_root",
         "pronunciation_phoneme_root",
         "source_notes_root",
-        "daily_notes_root"
+        "daily_notes_root",
+        "listening_root",
+        "speaking_card_root"
       ],
       "write_path_roles": [
         "focus_vocab_root",

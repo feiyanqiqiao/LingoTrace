@@ -64,7 +64,7 @@ DAILY_CHECKLIST_START = "<!-- lingotrace:daily-checklist:start -->"
 DAILY_CHECKLIST_END = "<!-- lingotrace:daily-checklist:end -->"
 SUPPORTED_IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 
-SOURCE_LINK_ROLES = ("source_notes_root", "daily_notes_root")
+SOURCE_LINK_ROLES = ("source_notes_root", "daily_notes_root", "listening_root", "speaking_card_root")
 RELATED_LINK_ROLES = {
     "vocab": ("focus_vocab_root", "base_vocab_root"),
     "grammar": ("grammar_root",),
