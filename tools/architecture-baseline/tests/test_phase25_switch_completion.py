@@ -77,7 +77,7 @@ class Phase25SwitchCompletionTests(unittest.TestCase):
             "Audio or video to listening material",
             "Source material to study note",
             "Word, grammar, pronunciation, or error to review",
-            "Useful sentence to active output",
+            "Reviewed chunk or useful sentence to active output",
             "End-of-day review settlement",
             "Dashboard or view maintenance",
             "请更新总训练表",

@@ -10,8 +10,9 @@ formulas:
   track_label: if(track == "class_review", "重点复习", if(track == "survival_speaking", "生活口语", if(track == "listening", "听力", "发音")))
   priority_rank: if(priority == "high", 0, 1)
   due_days: if(next_review, (date(next_review) - today()).days, "")
-  core_text: 'if(item_type == "vocab", if(accent_display, accent_display, if(headword, headword, file.name)), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(track == "survival_speaking", if(jp_text, jp_text, file.name), if(track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name)), if(track == "pronunciation", if(target_text, target_text, file.name), file.name))))))'
-  support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, "")), if(track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, "")), if(track == "pronunciation", if(issue_tags, issue_tags, ""), ""))))))'
+  item_type_label: if(item_type == "chunk", "语块", if(item_type == "speaking_card", "口语卡", item_type))
+  core_text: 'if(item_type == "vocab", if(accent_display, accent_display, if(headword, headword, file.name)), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(item_type == "chunk", if(chunk_pattern, chunk_pattern, if(jp_text, jp_text, file.name)), if(track == "survival_speaking", if(jp_text, jp_text, file.name), if(track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name)), if(track == "pronunciation", if(target_text, target_text, file.name), file.name)))))))'
+  support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(item_type == "chunk", if(chunk_meaning_zh, if(jp_text, chunk_meaning_zh + " / 例: " + jp_text, chunk_meaning_zh), if(jp_text, jp_text, "")), if(track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, "")), if(track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, "")), if(track == "pronunciation", if(issue_tags, issue_tags, ""), "")))))))'
   pressure: if(error_count, error_count, 0) + if(seen_count, seen_count, 0) + if(attempt_count, attempt_count, 0)
   due_flag: if(status == "active" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)
   next_day_flag: if(status == "active" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)
@@ -22,6 +23,8 @@ properties:
   track:
     displayName: 训练线
   item_type:
+    displayName: 条目类型
+  formula.item_type_label:
     displayName: 条目类型
   scene:
     displayName: 场景
@@ -64,7 +67,7 @@ properties:
   practice_focus:
     displayName: 训练重点
   daily_use_sentences:
-    displayName: 可背常用句
+    displayName: 常用语块
   issue_tags:
     displayName: 发音问题
   attempt_count:
@@ -107,7 +110,7 @@ views:
       - file.name
       - done_today
       - formula.track_label
-      - item_type
+      - formula.item_type_label
       - formula.core_text
       - formula.support_text
       - next_review
@@ -157,12 +160,12 @@ views:
         - status == "active"
     order:
       - file.name
+      - formula.item_type_label
       - scene
       - speaker_role
       - function
-      - jp_text
-      - meaning_zh
-      - reply_hint
+      - formula.core_text
+      - formula.support_text
       - next_review
   - type: table
     name: 听力待精听

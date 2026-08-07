@@ -86,7 +86,7 @@ Language packs own:
 - Extensive vs intensive routing policy.
 - Pronunciation or accent rendering rules.
 - Slice grouping rules for sentence, dialogue, or numbered-dialogue material.
-- Second-phase common-sentence curation.
+- Second-phase productive-chunk curation.
 - Pack-level regression tests and manual review cases.
 
 ## User Stories
@@ -203,13 +203,13 @@ Regression coverage:
 
 - `test_unreliable_timestamps_require_reviewed_manifest`
 
-### 6. Preserve Manual Sentence Selection On Rerun
+### 6. Preserve Manual Chunk Selection On Rerun
 
 As a learner, I want rerunning transcription to preserve hand-curated sentence selections and notes, so regeneration does not erase my review work.
 
 Acceptance criteria:
 
-- Existing curated common sentences are preserved unless the user explicitly asks to reset them.
+- Existing curated common chunks are preserved unless the user explicitly asks to reset them.
 - Existing manual note sections are preserved unless the user explicitly asks to replace them.
 - Existing listening mode is preserved when rerunning an existing note unless the user asks to change mode.
 - Legacy notes that already contain `## 精听学习包` are treated as `intensive`; unmarked existing notes default to `extensive`.
@@ -217,7 +217,7 @@ Acceptance criteria:
 
 Japanese reference:
 
-- Preserve `## 可直接背的常用句`.
+- Preserve `## 常用语块` and the legacy `## 可直接背的常用句` heading without silently rewriting either one.
 - Preserve frontmatter `daily_use_sentences`.
 - Preserve extra manual sections such as personal notes.
 
@@ -225,23 +225,23 @@ Regression coverage:
 
 - `test_rerun_preserves_manual_sentence_selection_and_sections`
 
-### 7. Curate A Small Set Of Directly Memorizable Sentences
+### 7. Curate A Small Set Of Productive Chunks
 
-As a learner, I want the note to highlight only a few reusable sentences, so listening input can become active output without creating filler.
+As a learner, I want the note to highlight only a few productive chunks, so listening input can become active output without memorizing source-specific full sentences.
 
 Acceptance criteria:
 
-- After transcript rendering, the agent performs a second-phase sentence-selection pass.
-- The selected set may contain 0 to 5 sentences.
-- Selection favors reusable patterns, scenes, dialogue exchanges, or structures worth memorizing.
-- Empty selection is acceptable when no sentence is genuinely useful.
-- The selected sentence list and any frontmatter summary stay aligned.
+- After transcript rendering, the agent performs a second-phase chunk-selection pass.
+- The selected set may contain 0 to 5 chunks and has no mechanical length threshold.
+- Selection favors replaceable patterns with clear cross-scene communicative value.
+- Empty selection is acceptable when no chunk is genuinely useful.
+- `daily_use_sentences` stores only the productive Japanese chunk patterns and stays aligned with the section.
 
 Japanese reference:
 
-- The section is `## 可直接背的常用句`.
-- Each item records `原句`, `可替换骨架`, `使用场景`, and `选入理由`.
-- No Chinese translation field is added to that section.
+- New notes use `## 常用语块`; legacy `## 可直接背的常用句` sections remain readable and preserved.
+- Each item records `语块`, `类型`, `素材原句`, `替换练习`, and `交际作用`.
+- The source sentence is a listening anchor, not the memorization target.
 - Dialogue material prefers reusable questions, responses, greetings, requests, confirmations, refusals, and social formulas.
 
 Regression coverage:
@@ -414,7 +414,7 @@ Acceptance criteria:
 - `segment_count` reflects the number of intensive learning blocks, or zero for non-sliced extensive notes.
 - `weak_points` records the listening difficulty or likely failure points.
 - `practice_focus` states the next concrete listening action.
-- `daily_use_sentences` stays aligned with the final common-sentence section and contains only the pack-approved original/core sentence text.
+- `daily_use_sentences` stays aligned with the final common-chunk section and contains only the pack-approved productive chunk patterns.
 - Dashboard-facing fields should be stable and concise; long explanations belong in the note body.
 
 Japanese reference:
@@ -485,13 +485,13 @@ Acceptance criteria:
 - Directory scanning or batch processing, if implemented by a tool, must be explicit, previewable, and bounded.
 - Broad batch writes should not run just because the user asked for one listening note.
 - Internal source labels such as `本地候选` or `待确认` should not appear in the final note body; they may be used internally or in separate review workflows.
-- Shadowing common sentences remain candidates for speaking cards and must not be automatically promoted.
+- Reviewed listening chunks remain candidates for speaking cards and must not be automatically promoted.
 
 Japanese reference:
 
 - The installed Japanese listening skill says batch mode is intentionally disabled in the current single-item workflow.
 - Japanese accent source labels are internal selection labels, not final listening-note body text.
-- Shadowing common sentences require an explicit speaking-card conversion request.
+- Listening chunks require a later, separate speaking-card conversion request after offline review. That later request is the confirmation; the extraction task itself must never promote them.
 
 Regression coverage:
 
@@ -531,19 +531,20 @@ User says: "这个听力笔记重新转写一下。"
 Expected agent behavior:
 
 - Detect the existing note.
-- Preserve curated common sentences and manual sections by default.
+- Preserve curated common chunks, legacy common-sentence sections, and manual sections by default.
 - Ask before risky overwrite or mode conversion.
 - Regenerate transcript-backed sections only within the declared scope.
 
 ### Downstream Speaking Card Request
 
-User says: "把这几句常用句做成口语卡。"
+User says in a later task: "把我已经 review 的这些语块转入口语库。"
 
 Expected agent behavior:
 
 - Do not handle it as listening transcription.
 - Route to `speaking_cards`.
-- Require reviewed or user-supplied usable expressions before creating cards.
+- Treat the later transfer request as confirmation that the named chunks were reviewed offline; do not ask again per card.
+- Reject extraction and promotion inside the same user task.
 
 ### Short-Choice Exam Listening Request
 
