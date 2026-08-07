@@ -44,6 +44,8 @@ def create_target_context(root: Path) -> None:
                     {"role": "pronunciation_phoneme_root", "relative_path": "review/pronunciation/phoneme"},
                     {"role": "source_notes_root", "relative_path": "sources"},
                     {"role": "daily_notes_root", "relative_path": "daily"},
+                    {"role": "listening_root", "relative_path": "listening"},
+                    {"role": "speaking_card_root", "relative_path": "speaking/cards"},
                 ]
             }
         ),
@@ -220,6 +222,16 @@ class JapaneseReviewCardTemplateTests(unittest.TestCase):
             write(root / "sources/a/lesson.md")
             write(root / "daily/b/lesson.md")
             ambiguous = workflows.review_materials(vault_root=root, item={**base_item, "source_note": "lesson"})
+            write(root / "listening/c/listening-example.md")
+            listening = workflows.review_materials(
+                vault_root=root,
+                item={**base_item, "source_note": "listening/c/listening-example"},
+            )
+            write(root / "speaking/cards/speaking-example.md")
+            speaking = workflows.review_materials(
+                vault_root=root,
+                item={**base_item, "source_note": "speaking/cards/speaking-example"},
+            )
             outside = workflows.review_materials(vault_root=root, item={**base_item, "source_note": "review/grammar/x"})
             malformed = workflows.review_materials(vault_root=root, item={**base_item, "source_note": "[[lesson"})
             multiline_alias = workflows.review_materials(
@@ -229,6 +241,8 @@ class JapaneseReviewCardTemplateTests(unittest.TestCase):
 
         self.assertEqual("missing_source_note_target", missing.errors[0].code)
         self.assertEqual("ambiguous_source_note_target", ambiguous.errors[0].code)
+        self.assertTrue(listening.accepted, listening.to_dict())
+        self.assertTrue(speaking.accepted, speaking.to_dict())
         self.assertEqual("source_note_outside_role", outside.errors[0].code)
         self.assertEqual("invalid_source_note_link", malformed.errors[0].code)
         self.assertEqual("invalid_source_note_link", multiline_alias.errors[0].code)

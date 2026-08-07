@@ -105,6 +105,17 @@ The source-note task itself should not create vocabulary, grammar, pronunciation
 
 For requests such as "把这个词加入复习", search before creating. Check the focused review layer before the base lexicon to avoid duplicates.
 
+Before drafting vocabulary collocations or vocabulary and grammar examples, search the current target Vault for attested Japanese sentences. Search enough candidates to fill the card's normal example slots; do not stop after the first match. Use this priority order:
+
+1. the source note named by the current request;
+2. other current-Vault material under configured source-note, daily-note, listening, and speaking-card roots;
+3. existing review cards as a reuse fallback;
+4. new model-authored material only for slots that still lack a reliable Vault match.
+
+For vocabulary, search the headword plus relevant inflected or surface forms, then derive common collocations from the matching sentence context. For grammar, search the canonical pattern plus its actual surface, inflected, and contracted forms. Prefer an exact Vault sentence when it is natural, self-contained, and illustrates the intended meaning or usage branch. When a good sentence depends on a name, pronoun, or omitted context, make only the smallest adaptation needed to make it independently reviewable. Do not force a semantically mismatched sentence into a card or present a model-authored sentence as Vault-attested.
+
+If Vault matches fill only part of the requested card, keep those matches and generate only the missing collocations or examples. Add every note that materially supplied a reused or minimally adapted sentence to `source_notes`; preserve the original current-source link as well. A lack of reliable Vault evidence is a fallback condition, not a reason to leave a useful card empty.
+
 When the learning point is clear, convert the user request, source note, classroom note, or reviewed pasted material into a structured review item before calling `review_materials`. The workflow owns deterministic routing, initialization, duplicate handling, source-note appending, focus/base restoration, and core write guarding for structured items.
 
 Use the review item route for:
