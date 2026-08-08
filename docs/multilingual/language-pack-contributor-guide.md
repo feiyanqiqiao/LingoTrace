@@ -1,6 +1,6 @@
 # Language Pack Contributor Guide
 
-This guide is for project members and external agents that build a new LingoTrace language pack. It is the short entry point before starting English, Korean, German, or any future language work.
+This guide is for project members and external agents that build a new LingoTrace language pack. Japanese and English are current reference implementations; use this as the short entry point before starting Korean, German, or any future language work.
 
 The goal is to make a language pack understandable without reading the full migration history. Do not treat the Japanese pack as a folder to copy. Use it as a reference implementation for shape, tests, and boundaries.
 
@@ -100,15 +100,15 @@ When a capability is not ready, fail explicitly through `unsupported_capabilitie
 
 ## Current Infrastructure Limits
 
-The current public runtime is not yet fully pack-generic:
+The public runtime now proves the full capability contract with the Japanese and English packs. Remaining limits for a third language are:
 
-- core context currently accepts only `target_language=ja` and `explanation_language=zh`.
-- initializer is still Japanese-specific through `lingotrace/init/japanese_vault.py`.
-- listening tooling is still Japanese-specific and cannot be used directly for English, Korean, or German.
+- core context currently accepts `target_language=ja` and `target_language=en`, with `explanation_language=zh`.
+- initializer planners exist for Japanese and English; a third language still needs its own pack-driven planner or a proven generic extraction.
+- the official listening tool auto-selects Japanese or English from Vault context. A third language must add locale, rendering, and pronunciation-resource evidence before declaring listening support.
 - `PHASE0_CAPABILITY_IDS` is reusable as the public capability set, but each pack can implement only a subset.
 - migration tooling and target rehearsal still assume Japanese pack inputs unless explicitly generalized.
 
-Before implementing a real non-Japanese pack, first plan the required core context and pack-driven initializer generalization. Do not work around these limits by hardcoding a second language into Japanese-specific modules.
+Before implementing a third language, first plan the required core context, initializer, and listening-locale generalization. Do not work around these limits by importing another pack's workflow or language resources.
 
 ## Agent Skill Requirements
 

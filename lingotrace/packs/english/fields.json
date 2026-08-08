@@ -24,6 +24,31 @@
       "name": "english_definition",
       "owner": "English language pack",
       "purpose": "Primary English-to-English definition fallback."
+    },
+    {
+      "name": "meaning_zh",
+      "owner": "English language pack",
+      "purpose": "Chinese explanation kept separate from target-language content."
+    },
+    {
+      "name": "chunk_pattern",
+      "owner": "English language pack",
+      "purpose": "Productive English lexical or grammatical chunk used as the speaking-practice target."
+    },
+    {
+      "name": "chunk_type",
+      "owner": "English language pack",
+      "purpose": "English speaking-chunk classification."
+    },
+    {
+      "name": "chunk_meaning_zh",
+      "owner": "English language pack",
+      "purpose": "Chinese explanation of a productive English chunk."
+    },
+    {
+      "name": "practice_tier",
+      "owner": "English language pack",
+      "purpose": "Practice-priority tier for a speaking chunk."
     }
   ]
 }

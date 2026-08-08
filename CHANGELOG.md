@@ -5,6 +5,20 @@
 
 ---
 
+## [20260808-164535]
+### 新增 (Added)
+- English language pack 实现 `listening_notes`、`source_notes`、`review_materials`、`speaking_cards`、`review_rollover` 与 `total_training_dashboard` 全能力闭环；新增英语 grammar、error、speaking、chunk 模板和 English Vault 安全初始化计划。
+- 新增完整的 English/Japanese 差距分析、文件级实施方案、验收矩阵和英语第一天使用路径。
+
+### 变更 (Changed)
+- 英语复习材料对齐 focus/base 查重与恢复、结构化图片证据、规范来源与关联链接、每日清单隔离、现有卡确认和人工正文保护，同时保留 IPA、word stress、CEFR、英英释义与 collocations 等英语专属语义。
+- 英语总训练 Base 对齐日语的 today/next-day 语义和多训练线视图，覆盖口语、听力、发音、单词重音、音素、最近新增与反复出错。
+- 官方听力工具按 Vault context 自动选择 `ja-JP` 或 `en-US`，英语链路不加载日语重音词典，并通过 English workflow 与 core guard 写入。
+- README、用户指南、操作手册、语言包贡献指南及多语言 user-story 适用性矩阵同步反映英语完整支持。
+
+### 测试 (Tests)
+- 扩展 English pack、English Vault 初始化、官方双 ASR 英语 locale/guard 路由、dashboard 与 contributor guidance 回归；通过 LingoTrace、官方听力、架构基线和 Vault 结构测试。
+
 ## [20260807-092558]
 ### 变更 (Changed)
 - 日语 Agent Skill 将词汇搭配、词汇例句和语法例句的生成顺序调整为“当前来源笔记 → 当前 Vault 其他已有句子 → 仅补齐缺失内容”；词汇按词头与活用形检索，语法按实际表面形、活用形与缩约形检索，并禁止硬套语义不匹配的库内句子。

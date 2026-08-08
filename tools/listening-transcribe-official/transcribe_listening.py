@@ -379,7 +379,7 @@ def load_offline_dictionary(required: bool = True) -> StaticAccentDictionary:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="transcribe-listening",
-        description="Generate a Japanese listening Markdown note from ListenKit transcript artifacts.",
+        description="Generate a guarded language-pack listening Markdown note from ListenKit transcript artifacts.",
     )
     parser.add_argument("audio_path", nargs="?")
     parser.add_argument("--url")
@@ -388,7 +388,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vault-root")
     parser.add_argument("--lingotrace-root")
     parser.add_argument("--listenkit-root")
-    parser.add_argument("--locale", default="ja-JP")
+    parser.add_argument(
+        "--locale",
+        default="auto",
+        help="ASR locale. The default reads the active LingoTrace language pack (ja-JP or en-US).",
+    )
     parser.add_argument("--title")
     parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper"], default="auto")
     parser.add_argument(
@@ -546,6 +550,30 @@ def language_label_for_locale(locale: str) -> str:
     if normalized.startswith("ko"):
         return "Korean"
     return locale
+
+
+def is_japanese_locale(locale: str) -> bool:
+    return locale.lower().startswith("ja")
+
+
+def resolve_target_locale(vault_root: Path, requested_locale: str) -> str:
+    if requested_locale != "auto":
+        return requested_locale
+    context_path = vault_root / ".lingotrace" / "vault-context.json"
+    try:
+        context = json.loads(context_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"Cannot resolve ASR locale from Vault context: {context_path}") from exc
+    pack_id = context.get("language_pack")
+    target_language = context.get("target_language")
+    if pack_id == "lingo-japanese" or target_language == "ja":
+        return "ja-JP"
+    if pack_id == "lingo-english" or target_language == "en":
+        return "en-US"
+    raise RuntimeError(
+        "Automatic ASR locale only supports lingo-japanese/ja and lingo-english/en; "
+        "pass --locale explicitly for another language pack."
+    )
 
 
 def huggingface_hub_cache_dir() -> Path:
@@ -1204,7 +1232,7 @@ def score_short_choice_candidate(full_text: str, sentences: list[str], audio_pat
 
 
 def split_sentences_from_text(text: str) -> list[str]:
-    return [segment.strip() for segment in re.split(r"(?<=[。！？?])", text) if segment.strip()]
+    return [segment.strip() for segment in re.split(r"(?<=[。！？!?])|(?<=[.])\s+", text) if segment.strip()]
 
 
 def sha256_file(path: Path) -> str:
@@ -1298,6 +1326,7 @@ def build_candidate(
         artifact_stem=artifact_stem,
         artifact_label=label,
     )
+    payload.setdefault("locale", locale)
     return candidate_from_payload(audio_path, payload, route_label)
 
 
@@ -1369,11 +1398,13 @@ def build_asr_comparison_report(
             "route": primary.route_label,
             "engine": str(primary.payload.get("engine", primary.route_label)),
             "segment_count": len(primary.segments),
+            "locale": str(primary.payload.get("locale", "ja-JP")),
         },
         "secondary": {
             "route": secondary.route_label,
             "engine": str(secondary.payload.get("engine", secondary.route_label)),
             "segment_count": len(secondary.segments),
+            "locale": str(secondary.payload.get("locale", "ja-JP")),
         },
         "disagreement_count": len(disagreements),
         "unresolved_count": len(disagreements),
@@ -1566,6 +1597,9 @@ def llm_merge_request_artifact(audio_path: Path, report: dict) -> dict:
             }
         )
     template["segments"] = template_segments
+    locale = str(report.get("primary", {}).get("locale", "ja-JP"))
+    language = language_label_for_locale(locale)
+    ambiguity_examples = "数字、姓名、地名、同音词或助词" if is_japanese_locale(locale) else "数字、姓名、地名、同音词或功能词"
     return {
         "schema_version": 1,
         "kind": "asr_llm_merge_request",
@@ -1573,15 +1607,16 @@ def llm_merge_request_artifact(audio_path: Path, report: dict) -> dict:
         "merge_request_id": merge_request_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "audio": {"name": audio_path.name, "sha256": sha256_file(audio_path)},
+        "locale": locale,
         "primary": report.get("primary", {}),
         "secondary": report.get("secondary", {}),
         "disagreement_count": int(report.get("disagreement_count", 0)),
         "instructions_zh": [
-            "结合前后片段和日语语义判断每处差异，不要机械拼接两路文本。",
+            f"结合前后片段和{language}语义判断每处差异，不要机械拼接两路文本。",
             "不得修改 segment_id、start、end、audio_sha256 或 merge_request_id。",
             "decision 只能使用 agreement、primary、secondary 或 merged。",
             "每个差异片段必须填写 confidence 和简短 rationale_zh。",
-            "数字、姓名、地名、同音词或助词无法可靠判断时，保留 needs_review=true 并知会用户。",
+            f"{ambiguity_examples}无法可靠判断时，保留 needs_review=true 并知会用户。",
         ],
         "allowed_decisions": ["agreement", "primary", "secondary", "merged"],
         "allowed_confidence": ["high", "medium", "low"],
@@ -1636,6 +1671,7 @@ def load_reviewed_transcript(
     reviewer = payload.get("reviewer")
     llm_review = isinstance(reviewer, dict) and reviewer.get("kind") == "llm"
     expected_segments: list[dict] | None = None
+    request: dict = {}
     if llm_review:
         if not str(reviewer.get("model", "")).strip() or not str(reviewer.get("completed_at", "")).strip():
             raise RuntimeError("LLM-reviewed transcript must record reviewer model and completed_at.")
@@ -1722,7 +1758,7 @@ def load_reviewed_transcript(
     candidate_payload = {
         "schema_version": 1,
         "engine": "reviewed-consensus",
-        "locale": "ja-JP",
+        "locale": str(request.get("locale") or request.get("primary", {}).get("locale") or payload.get("locale") or "ja-JP"),
         "full_text": "".join(item["text"] for item in segments),
         "segments": segments,
         "timing_complete": all(item.get("start") is not None and item.get("end") is not None for item in segments),
@@ -1875,8 +1911,9 @@ def compare_candidate_if_requested(
                 "route": primary.route_label,
                 "engine": str(primary.payload.get("engine", primary.route_label)),
                 "segment_count": len(primary.segments),
+                "locale": str(primary.payload.get("locale", locale)),
             },
-            "secondary": {"engine": compare_engine, "error": str(exc)},
+            "secondary": {"engine": compare_engine, "locale": locale, "error": str(exc)},
             "disagreement_count": 0,
             "unresolved_count": 0,
             "disagreements": [],
@@ -1999,6 +2036,7 @@ def build_default_frontmatter(
     short_choice_mode: bool,
     dialogue_content_mode: bool = False,
     listening_mode: str = "extensive",
+    locale: str = "ja-JP",
 ) -> list[str]:
     today = date.today().isoformat()
     difficulty = "3" if sentence_count >= 8 else "2"
@@ -2043,7 +2081,8 @@ def build_default_frontmatter(
     lines.append("review_stage: day0")
     lines.append(f"next_review: {today}")
     lines.append('last_reviewed: ""')
-    lines.extend(["tags:", "  - jp/listening", "  - jp/p0_plus"])
+    namespace = "jp" if is_japanese_locale(locale) else "en"
+    lines.extend(["tags:", f"  - {namespace}/listening", f"  - {namespace}/p0_plus"])
     source_tag = infer_source_tag(audio_path)
     if source_tag:
         lines.append(f"  - {source_tag}")
@@ -2908,6 +2947,7 @@ def build_body(
     audio_slice_refs: list[str | None] | None = None,
     listening_mode: str = "intensive",
     learning_blocks: list[LearningBlock] | None = None,
+    locale: str = "ja-JP",
 ) -> tuple[str, bool]:
     script_section, dialogue_content_mode = render_dialogue_script_section(sentences, chunks, slice_profile)
     existing_sections = parse_sections(existing_body or "")
@@ -2928,7 +2968,11 @@ def build_body(
         common_section = preserved_sections[common_heading]
     else:
         common_heading = "常用语块"
-        common_section = COMMON_SECTION_PLACEHOLDER
+        common_section = (
+            COMMON_SECTION_PLACEHOLDER
+            if is_japanese_locale(locale)
+            else COMMON_SECTION_PLACEHOLDER.replace("日文", "英文")
+        )
     material_section = (
         choose_material_section(preserved_sections, decorate_material_note(material_note, dialogue_content_mode))
     )
@@ -3284,11 +3328,12 @@ def process_one(
         material_note,
         short_choice_mode,
         slice_profile,
-        load_confirmed_accent_index(accent_vault_root or find_vault_root_from_path(audio_path)),
-        offline_dictionary or load_offline_dictionary(required=False),
+        load_confirmed_accent_index(accent_vault_root or find_vault_root_from_path(audio_path)) if is_japanese_locale(locale) else {},
+        (offline_dictionary or load_offline_dictionary(required=False)) if is_japanese_locale(locale) else StaticAccentDictionary({}),
         audio_slice_refs,
         resolved_listening_mode,
         learning_blocks,
+        locale,
     )
     if resolved_listening_mode == "intensive" and not dry_run:
         validate_intensive_slice_output(audio_path, learning_blocks or [], audio_slice_refs or [], body)
@@ -3299,6 +3344,7 @@ def process_one(
             short_choice_mode,
             dialogue_content_mode,
             resolved_listening_mode,
+            locale,
         )
     rendered = render_note(frontmatter_lines, body)
     if dry_run:
@@ -3744,7 +3790,15 @@ def apply_prepared_bundle(
     root = lingotrace_root()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    from lingotrace.packs.japanese import workflows
+    context_path = bundle.vault_root / ".lingotrace" / "vault-context.json"
+    context = json.loads(context_path.read_text(encoding="utf-8"))
+    pack_id = context.get("language_pack")
+    if pack_id == "lingo-japanese":
+        from lingotrace.packs.japanese import workflows
+    elif pack_id == "lingo-english":
+        from lingotrace.packs.english import workflows
+    else:
+        raise RuntimeError(f"Unsupported listening language pack: {pack_id}.")
 
     payload = bundle.workflow_payload(overwrite_confirmed=overwrite_confirmed)
     preview = workflows.listening_notes(vault_root=bundle.vault_root, input_artifact=payload, mode="preview").to_dict()
@@ -3808,7 +3862,8 @@ def main() -> int:
     try:
         configure_project_roots(lingotrace=args.lingotrace_root, listenkit=args.listenkit_root)
         vault_root = resolve_vault_root(args.vault_root, args.audio_path, args.output_dir, args.note_path)
-        offline_dictionary = load_offline_dictionary(required=True)
+        locale = resolve_target_locale(vault_root, args.locale)
+        offline_dictionary = load_offline_dictionary(required=True) if is_japanese_locale(locale) else StaticAccentDictionary({})
     except (OfflineDictionaryError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -3826,7 +3881,7 @@ def main() -> int:
                 url=args.url,
                 output_dir=output_dir,
                 note_override=note_path,
-                locale=args.locale,
+                locale=locale,
                 title=args.title,
                 engine=args.engine,
                 compare_engine=url_compare,
@@ -3854,7 +3909,7 @@ def main() -> int:
                 vault_root=vault_root,
                 audio_path=audio_path,
                 note_override=note_path,
-                locale=args.locale,
+                locale=locale,
                 title=args.title,
                 engine=args.engine,
                 compare_engine=compare_engine,

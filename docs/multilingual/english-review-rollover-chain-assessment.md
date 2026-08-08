@@ -1,5 +1,7 @@
 # English Applicability Review for the Review Rollover Chain
 
+> Historical assessment. Its pre-implementation gaps were resolved by the English parity work documented in `docs/iterations/20260808-english-japanese-parity-implementation.md`; use that document and the current English manifest as the operational source of truth.
+
 ## Purpose
 
 This document reviews whether the current LingoTrace review-rollover chain used by the Japanese learning vault can support an English learning vault. It focuses on runtime ownership, call flow, reusable parts, language-specific gaps, and the work required before an English implementation should be considered safe.
