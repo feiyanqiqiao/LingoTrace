@@ -166,6 +166,16 @@ Agent 可以做语义判断、内容整理和不确定性分析；路径边界�
 
 初始化不得覆盖已有文件。同步到新设备后，如果本机运行时路径不同，Agent 必须询问用户并追加本机连接，而不是覆盖其他设备的配置。
 
+### 9.1 分发与用户旅程
+
+学习者与开发者共用同一套语言包、Vault 初始化和日常 Skill，但使用不同 checkout：
+
+- 学习者通过 Git sparse checkout 只获取 `lingotrace/`，将其作为可更新的最小运行时；
+- 开发者获取完整仓库，使用测试、工具、文档和 GitHub 工作流；
+- 开发者的真实学习 Vault 仍位于仓库外，并使用学习者初始化流程。
+
+上游 GitHub Raw 文档是仓库尚未下载时的 bootstrap 入口。Agent 读取最新的 [学习者安装协议](learner-agent-setup.md)，经用户同意后安装运行时，再调用 `python -m lingotrace.init doctor` 和 Vault 初始化器。完整设计见 [安装与双用户旅程设计](installation-and-onboarding-design.md)。
+
 ## 10. 版本与升级
 
 - 运行时和语言包使用语义化版本；

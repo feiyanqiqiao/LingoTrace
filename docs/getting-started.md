@@ -32,19 +32,19 @@ LingoTrace 是完全构建在 **Obsidian**（一款强大的本地笔记软件�
 
 初始化后，让 Agent 以你的 Obsidian 学习库（Vault）为日常工作区，然后你就可以直接用人话给它下达指令了。LingoTrace 程序仓库保留在 Vault 外部，初始化器会为当前操作系统保存运行时连接。
 
-### 第一次初始化
+### 第一次安装：把一句话交给 Agent
 
-以英语 Vault 为例，先在 LingoTrace 仓库中预览：
+你不需要先下载仓库或学习命令行。把下面整句话发给能操作本机文件和命令的 Agent：
 
-```bash
-python3 -m lingotrace.init vault \
-  --language english \
-  --vault /absolute/path/to/LingoTrace-English
-```
+> 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
 
-确认没有冲突后增加 `--apply`。完成后，在 Codex 中打开 `LingoTrace-English` 作为项目工作区，而不是把私人 Vault 放进 LingoTrace 公共仓库。
+Agent 会让你选择英语或日语，建议 Vault 和运行时位置，检测 Obsidian 桌面客户端和 ListenKit，并在任何安装、下载或写入前征求同意。你可以暂缓安装 Obsidian 或 ListenKit：前者会暂时缺少完整的桌面阅读与看板体验，后者会暂时不能做音视频导入和转写；文本学习仍然可用。
+
+完成后，在 Codex 中打开 `LingoTrace-English` 或 `LingoTrace-Japanese` 作为日常项目工作区。程序运行时放在 Vault 外部，只用于更新和提供能力。
 
 如果你把 Vault 和运行时同步到 Windows、macOS 或 Linux 的另一台设备，Agent 会先查找当前系统保存的运行时路径。找不到时，它会询问你本机的 LingoTrace 目录，验证后只追加当前平台连接，不覆盖其他系统的路径。详细说明见 [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)。
+
+如果你以后想修改程序、增加语种或向上游贡献，不要在私人 Vault 中直接改运行时；另建完整开发仓库，并把 [开发者初始化协议](developer-agent-setup.md)交给 Agent。
 
 ### 目前支持的语种
 - **日语 (Japanese)**：🌟 全功能支持！包括播客泛听/精听打轴、文章阅读、语法解析、口语发音卡、每日复习看板。

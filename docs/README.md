@@ -4,10 +4,17 @@
 
 ## 用户与运行
 
+- [学习者 Agent 安装协议](learner-agent-setup.md)：普通用户的一句话安装编排入口
 - [用户使用指南](getting-started.md)
 - [Agent 操作指南](operator-manual.md)
 - [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)
 - [Listening Runtime Isolation](listening-runtime-isolation.md)
+
+## 开发与贡献
+
+- [开发者 Agent 初始化协议](developer-agent-setup.md)
+- [安装与双用户旅程设计](installation-and-onboarding-design.md)
+- [项目贡献规则](../CONTRIBUTING.md)
 
 ## 产品与架构
 

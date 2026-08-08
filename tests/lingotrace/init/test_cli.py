@@ -12,6 +12,29 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class InitializationCliTests(unittest.TestCase):
+    def test_doctor_reports_machine_readable_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = Path(tmp) / "English Vault"
+            result = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "lingotrace.init",
+                    "doctor",
+                    "--language",
+                    "english",
+                    "--vault",
+                    str(vault),
+                    "--runtime-root",
+                    str(REPO_ROOT),
+                ]
+            )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual("onboarding-doctor", payload["command"])
+        self.assertIn("python", json.loads(payload["artifacts"]["dependencies"]))
+
     def test_preview_apply_and_resolve_english_vault(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             vault = Path(tmp) / "English Vault"

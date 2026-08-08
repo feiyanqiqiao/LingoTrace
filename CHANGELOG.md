@@ -5,6 +5,19 @@
 
 ---
 
+## [20260808-193014]
+### 新增 (Added)
+- 新增可直接交给任意本地 Agent 的学习者安装协议：从上游 GitHub Raw 单句入口开始，确认语种与路径，经同意后安装最小 sparse 运行时、检测 Obsidian Desktop 与 ListenKit、预览并初始化第一个 Vault、解析语言 Skill 后交付日常学习工作区。
+- 新增开发者 Agent 初始化协议，覆盖 GitHub 账号与 `gh` 授权、个人 fork、`origin`/`upstream`、上游同步、topic branch、测试与隐私检查、推送、上游 PR、CI 状态和合并后清理；个人自用 fork 与上游贡献两种路线均有明确边界。
+- 新增 `python -m lingotrace.init doctor` 只读诊断，输出 Python、Git、GitHub CLI、Obsidian Desktop、ListenKit、运行时和跨平台推荐位置；阻止无效运行时、非绝对 Vault 路径及 Vault/运行时嵌套。
+
+### 变更 (Changed)
+- README、入门指南、操作手册、贡献指南、AGENTS、多语言架构、产品说明、用户画像、文档索引和 Vault 连接指南按“学习者最小运行时 / 开发者完整仓库”双旅程重新分流。
+- Vault 根 Agent 指令在首次需要 Base 看板或音视频能力且对应可选依赖缺失时，向用户解释影响并在征得同意后提供安装，不阻塞无关文本学习。
+
+### 测试 (Tests)
+- 新增跨平台推荐路径、必要与可选依赖、ListenKit 真实 CLI 标记、路径隔离、CLI JSON 和双用户文档契约测试；通过 LingoTrace 216 项、官方听力 100 项、架构基线 42 项和 Vault 结构 18 项测试，并实际验证最小 sparse checkout 只检出 `lingotrace/`。
+
 ## [20260808-184251]
 ### 新增 (Added)
 - Vault 初始化新增可实际执行的 `python -m lingotrace.init` 入口，支持 English/Japanese 的 preview、apply、运行时连接追加和连接解析；初始化结果包含 Vault 根 `AGENTS.md`、上下文、路径、模板、视图及当前平台运行时连接。

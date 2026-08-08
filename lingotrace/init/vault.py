@@ -244,6 +244,7 @@ Before every write-capable learning task:
 4. If no current-platform connection exists or every saved path is unavailable, ask the user for the LingoTrace runtime root on this device. Validate it, then use that runtime's `python -m lingotrace.init connect-runtime --vault <this-vault> --runtime-root <confirmed-runtime> --apply` entry (with the available Python launcher) to append it to the current platform file. Never delete another candidate automatically and never modify another platform's connection file.
 5. Read the resolved runtime's `{skill_path}` completely and follow it as the natural-language operating entry.
 6. Bind every operation to this Vault root. Route writes through the LingoTrace core and selected language-pack capability; do not edit learning files directly.
+7. Obsidian Desktop and ListenKit are optional onboarding dependencies. If Obsidian Desktop is unavailable when the user needs the Base/dashboard experience, or ListenKit is unavailable when the user first requests media import or transcription, explain the affected capability and offer to install the missing dependency only after user consent. Do not block unrelated text-learning tasks.
 
 Users should be able to ask in ordinary study language. Do not require internal function names, workflow payloads, or write-mode terminology.
 """

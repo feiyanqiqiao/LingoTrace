@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from lingotrace.init.doctor import inspect_onboarding
 from lingotrace.init.english_vault import initialize_english_vault, plan_english_vault_initialization
 from lingotrace.init.japanese_vault import initialize_japanese_vault, plan_japanese_vault_initialization
 from lingotrace.init.runtime_connections import register_runtime_connection, resolve_runtime_connection
@@ -27,6 +28,12 @@ def parse_args() -> argparse.Namespace:
     resolve = subparsers.add_parser("resolve-runtime", help="Resolve a usable runtime for the current platform.")
     resolve.add_argument("--vault", type=Path, required=True)
 
+    doctor = subparsers.add_parser("doctor", help="Inspect learner onboarding prerequisites without changing them.")
+    doctor.add_argument("--language", choices=("english", "japanese"), required=True)
+    doctor.add_argument("--vault", type=Path, required=True)
+    doctor.add_argument("--runtime-root", type=Path, required=True)
+    doctor.add_argument("--listenkit-root", type=Path)
+
     return parser.parse_args()
 
 
@@ -44,8 +51,15 @@ def main() -> int:
             args.runtime_root,
             mode="apply" if args.apply else "preview",
         )
-    else:
+    elif args.command == "resolve-runtime":
         report = resolve_runtime_connection(args.vault)
+    else:
+        report = inspect_onboarding(
+            language=args.language,
+            vault_root=args.vault,
+            runtime_root=args.runtime_root,
+            listenkit_root=args.listenkit_root,
+        )
 
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
     return report.exit_code

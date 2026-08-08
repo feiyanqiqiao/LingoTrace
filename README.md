@@ -4,13 +4,19 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 
 它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**
 
-本仓库开源 LingoTrace 公共核心、日语语言包、初始化模板、迁移工具和公共验证测试。私人 Vault 中的真实学习资料、音频、每日记录和运行产物不属于本仓库。
+本仓库开源 LingoTrace 公共核心、日语与英语语言包、初始化模板、迁移工具和公共验证测试。私人 Vault 中的真实学习资料、音频、每日记录和运行产物不属于本仓库。
 
 ---
 
-> 🌟 **如果你是普通外语学习者（非开发者），请首先阅读 [👉 LingoTrace 新手入门指南](docs/getting-started.md)，了解如何像指挥私人助理一样在 Obsidian 中沉浸式学习！**
->
-> ⚙️ **如果你是负责驱动系统的 AI Agent，或是想了解系统约束的进阶极客，请务必查阅 [👉 系统与 Agent 操作手册](docs/operator-manual.md)，其中定义了自然语言指令规范与护栏边界。**
+## 一句话开始
+
+如果你只想使用 LingoTrace 学习，不准备改代码，把下面整句话发给能操作本机文件和命令的 AI Agent：
+
+> 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
+
+Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。Obsidian 与 ListenKit 可以延期，但 LingoTrace 运行时、Python 和第一个 Vault 必须完成。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
+
+如果你想 fork 并增加语种或功能，把 [开发者初始化协议](docs/developer-agent-setup.md)交给 Agent。它会带你完成 GitHub 账号与 `gh` 检查、fork、remotes、topic branch、测试、推送、上游 PR 和 CI 检查；开发者的实际学习 Vault 仍复用上面的学习者流程。
 
 ---
 
@@ -36,24 +42,18 @@ Agent Skill 会把这些自然语言请求映射到听力笔记、来源笔记�
 
 ---
 
-## 🧭 初始化一个英语 Vault
+## 两个目录、两个工作区角色
 
-先预览，再显式应用：
+普通使用者的推荐结构是：
 
-```bash
-python3 -m lingotrace.init vault \
-  --language english \
-  --vault /absolute/path/to/LingoTrace-English
-
-python3 -m lingotrace.init vault \
-  --language english \
-  --vault /absolute/path/to/LingoTrace-English \
-  --apply
+```text
+LingoTrace runtime/       # 正式程序与语言包，用于更新
+LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 ```
 
-初始化后，在 Codex 中把 `LingoTrace-English` Vault 作为日常工作区。换到另一台设备时，如果本机运行时路径不可用，Agent 会询问新的 LingoTrace 目录并追加到当前平台连接，不修改其他平台配置。
+日常学习时在 Codex 中打开私人 Vault；修改程序时才打开完整的开发仓库。初始化器会把两者连接起来。换设备后，如果本机路径变化，Agent 会询问并追加当前平台路径，不覆盖其他系统记录。
 
-详见 [Vault 初始化与跨平台运行时连接](docs/vault-initialization-and-runtime-connections.md)。
+普通用户的最小 Git checkout 只包含 `lingotrace/` 运行时，不包含测试、开发工具和贡献文档；开发者使用完整 checkout。技术边界见 [安装与双用户旅程设计](docs/installation-and-onboarding-design.md)和 [Vault 初始化与跨平台运行时连接](docs/vault-initialization-and-runtime-connections.md)。
 
 ---
 
@@ -62,6 +62,8 @@ python3 -m lingotrace.init vault \
 为了更好地了解本系统的产品哲学、架构约束与适用人群，请参阅 `docs/` 目录下的详细分析报告：
 
 - 🗂️ **[文档索引](docs/README.md)**：当前文档入口与文档生命周期规则。
+- 🧑‍🎓 **[学习者 Agent 安装协议](docs/learner-agent-setup.md)**：从 GitHub Raw 读取的一句话安装入口。
+- 🧑‍💻 **[开发者 Agent 初始化协议](docs/developer-agent-setup.md)**：fork、分支、上游同步、PR 与 CI 的逐步流程。
 - 🏗️ **[产品与能力说明](docs/lingotrace_product_document.md)**：说明当前产品定位、学习闭环、能力和数据边界。
 - 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
 - 🌐 **[多语言架构](docs/lingotrace_multilingual_architecture_plan.md)**：当前正式架构来源，定义单语言 Vault、外部运行时、语言包和跨平台连接。

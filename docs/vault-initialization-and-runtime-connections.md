@@ -2,7 +2,20 @@
 
 LingoTrace 的公共运行时与私人 Obsidian Vault 必须分开保存。日常学习时，Codex 或兼容 Agent 以 Vault 为工作区；需要修改程序、语言包或测试时，才以 LingoTrace 仓库为工作区。
 
+普通学习者不需要先执行本文命令。请把 [学习者安装协议](learner-agent-setup.md)的一句话入口交给 Agent，由它完成运行时安装、依赖检查、预览、确认和验证。本文保留初始化器与跨平台连接的技术细节。
+
 ## 1. 初始化一个新 Vault
+
+运行时安装后，可以先运行只读诊断：
+
+```bash
+python3 -m lingotrace.init doctor \
+  --language english \
+  --vault /absolute/path/to/LingoTrace-English \
+  --runtime-root /absolute/path/to/runtime
+```
+
+诊断把 Python 和有效运行时视为必要项，把 Obsidian Desktop、Git、GitHub CLI 与 ListenKit 的发现状态写入结构化报告；可选项缺失不会阻止文本学习初始化。
 
 在 LingoTrace 仓库根目录运行。首次执行不加 `--apply`，只预览计划：
 

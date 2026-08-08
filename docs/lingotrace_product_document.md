@@ -4,6 +4,8 @@
 
 LingoTrace 是基于 Obsidian、由 AI Agent 驱动的外语学习工作流引擎。它不是课程或预制词库，而是把用户真实接触的文章、播客、视频和课堂材料转化为可追溯、可复习、可输出的私人学习系统。
 
+产品有两条入口：普通学习者从上游 GitHub 的单句 Agent 协议完成最小运行时和第一个 Vault；希望增加语种或功能的开发者使用完整 fork/branch/PR 流程，但其日常学习环境仍复用同一 Vault 初始化。
+
 当前完整支持日语和英语。每个 Vault 只绑定一种目标语言；公共运行时、语言包和私人 Vault 相互分离。
 
 ## 2. 学习闭环
@@ -100,5 +102,6 @@ LingoTrace 当前不提供：
 - [用户使用指南](getting-started.md)
 - [Agent 操作指南](operator-manual.md)
 - [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)
+- [安装与双用户旅程设计](installation-and-onboarding-design.md)
 - [多语言架构](lingotrace_multilingual_architecture_plan.md)
 - [语言包贡献指南](multilingual/language-pack-contributor-guide.md)
