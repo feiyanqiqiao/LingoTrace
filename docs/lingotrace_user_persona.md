@@ -10,16 +10,16 @@
 
 1. **进入“瓶颈期”的中高级学习者 (Intermediate/Advanced Learners)**
    - **痛点**：已经脱离了系统教材（如《新标日》），目前严重依赖真实语料（播客、YouTube、无字幕剧集）进行输入，但苦于无法高效地将这些“野生素材”转化为自己的知识点。
-   - **匹配点**：`jp-source-note-generator` 和 `jp-listening-script-generator` 完美解决了将长篇、非结构化音视频提纯为精准学习材料的痛点。
+   - **匹配点**：来源笔记和听力笔记能力解决了将长篇、非结构化音视频提纯为学习材料的痛点。
 2. **个人知识管理（PKM）重度依赖者**
    - **痛点**：厌倦了“在 B 站看视频、在备忘录记笔记、最后再手动导入 Anki”这种碎片化、割裂的学习流。
-   - **匹配点**：重度使用 Obsidian，希望“笔记”和“复习（SRS）”在同一个界面、同一种心智模型下完成。LingoTrace 的双向链接、元数据管理和 `next-day-review-updater` 完美契合了这一点。
+   - **匹配点**：重度使用 Obsidian，希望“笔记”和“复习（SRS）”在同一个界面、同一种心智模型下完成。LingoTrace 的双向链接、元数据管理和复习结算能力契合了这一点。
 3. **“影子跟读 (Shadowing)” 狂热者**
    - **痛点**：长期受困于传统播放器拉进度条、难以精准定位一句话、无法快速对比原文的问题。
    - **匹配点**：精听模式下基于 `.slices.json` 自动生成的 `### SNN` 句子切片与音频嵌入，是跟读者的终极武器。
 4. **自律且相信“刻意练习”的自驱动型用户**
    - **痛点**：市面上的产品太“傻瓜式”，包办了一切，导致学习者缺乏参与感，记不牢。
-   - **匹配点**：系统强制要求用户自己挑选 0-5 句常用句、手动确认重音、参与纠错复盘。这种“半自动化（AI 铺路 + 人工打磨）”的理念能精准击中这批用户。
+   - **匹配点**：系统保留语块审核、低置信度听力确认和纠错复盘。这种“AI 铺路 + 人工打磨”的理念能精准击中这批用户。
 
 ---
 
@@ -38,17 +38,17 @@
 
 ## 三、 用户门槛分析（Barriers to Entry）
 
-当前的 LingoTrace 就像是早期的 Linux，极其强大，但门槛极高。
+当前的 LingoTrace 面向愿意使用 Obsidian 和本地 Agent 的学习者，仍有一定配置门槛。
 
-1. **技术门槛 (Technical Threshold) —— 极高**
-   - 需要理解如何在终端 (Terminal) 中执行命令。
-   - 需要配置本地 Python 环境，解决依赖问题（如 `ListenKit`、本地离线字典库的安装）。
-   - 需要理解 AI Agent（如 Codex Skills）的运行机制、权限授予（Escalated Execution）甚至 Git 工作流。
+1. **技术门槛 (Technical Threshold) —— 中高**
+   - 首次初始化需要运行一条预览命令和一条应用命令。
+   - 听力链需要额外配置 ListenKit；文章、卡片和复习结算不依赖 ASR。
+   - 需要理解 Agent 对 Vault 与外部 LingoTrace 运行时的访问授权。
 2. **工具门槛 (Tooling Threshold) —— 高**
    - 需要是 Obsidian 的熟练用户。
-   - 必须理解 Markdown 语法、YAML Frontmatter（属性字典）、Wikilinks（双向链接）。如果不懂元数据（Metadata）对自动化系统的意义，很容易不小心破坏数据结构（例如改错 `review_stage` 或删掉 `### SNN` 锚点）。
+   - 熟悉 Markdown、Frontmatter 和 Wikilinks 会更容易检查结果；日常创建和结算可以通过自然语言完成。
 3. **心智门槛 (Philosophy Threshold) —— 中高**
-   - 必须认同并严格遵守“间隔重复（Spaced Repetition System, SRS）”理念，每天执行 `jp-next-day-review-updater` 并诚实地复习。
+   - 必须认同并遵守间隔重复理念，每天完成复习后明确要求 Agent 结算。
 
 ---
 

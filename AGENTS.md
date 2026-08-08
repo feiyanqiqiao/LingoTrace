@@ -1,10 +1,12 @@
 # AGENTS.md
 
-This repository is the public LingoTrace framework inside an Obsidian-based Japanese learning history. Treat notes, frontmatter, wikilinks, Bases, public templates, and language-pack agent skills as part of the user-facing study system.
+This repository is the public LingoTrace runtime outside users' private Obsidian Vaults. Treat notes, frontmatter, wikilinks, Bases, public templates, Vault initialization, runtime connections, and language-pack agent skills as part of the user-facing study system.
 
 ## Primary Entry Points
 
 Use `lingotrace/packs/japanese/agent_skills/SKILL.md` as the natural-language operating entry for Japanese daily learning tasks.
+
+Use `lingotrace/packs/english/agent_skills/SKILL.md` as the natural-language operating entry for English daily learning tasks. An initialized Vault's `AGENTS.md`, `.lingotrace/vault-context.json`, and current-platform runtime connection select the matching entry without requiring the user to name it.
 
 Users should be able to ask in ordinary study language, such as:
 

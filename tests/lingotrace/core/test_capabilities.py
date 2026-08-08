@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from lingotrace.core.capabilities import CapabilityRegistry, PHASE0_CAPABILITY_IDS
+from lingotrace.core.capabilities import CapabilityRegistry, PUBLIC_CAPABILITY_IDS
 from lingotrace.core.context import VaultContext
 from lingotrace.core.manifests import CapabilityDeclaration, LanguagePackManifest, UnsupportedCapability
 
@@ -62,7 +62,7 @@ class CapabilityRegistryTests(unittest.TestCase):
                 "review_rollover",
                 "total_training_dashboard",
             },
-            PHASE0_CAPABILITY_IDS,
+            PUBLIC_CAPABILITY_IDS,
         )
 
     def test_rejects_unknown_capability(self) -> None:

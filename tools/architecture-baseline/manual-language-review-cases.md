@@ -1,6 +1,6 @@
 # Manual Japanese Language Review Cases
 
-These Phase 0 PR B cases cover judgment that should not be faked by deterministic tests. All inputs are synthetic public examples.
+These cases cover language judgment that should not be faked by deterministic tests. All inputs are synthetic public examples.
 
 ## Case MLR-001: Common Sentence Reuse Value
 

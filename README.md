@@ -18,6 +18,8 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 
 LingoTrace 的主要使用方式是：用户用自然语言提出学习任务，由 Codex 或兼容的 AI agent 读取当前 Vault 所选语言包的 Agent Skill，并把任务保存到对应的日语或英语学习库。
 
+日常学习时，应把私人 Vault 作为 Agent 工作区；LingoTrace 公共仓库作为 Vault 外部运行时。初始化器会生成 Vault 根 `AGENTS.md` 和当前操作系统的运行时连接，使 Agent 能从 Vault 工作区发现语言包。Windows、macOS 和 Linux 分别保存连接，不会相互覆盖。
+
 你可以直接这样说：
 
 - “请把这段音频做成精听稿。”
@@ -34,17 +36,37 @@ Agent Skill 会把这些自然语言请求映射到听力笔记、来源笔记�
 
 ---
 
-## 📚 深度阅读与白皮书文档
+## 🧭 初始化一个英语 Vault
+
+先预览，再显式应用：
+
+```bash
+python3 -m lingotrace.init vault \
+  --language english \
+  --vault /absolute/path/to/LingoTrace-English
+
+python3 -m lingotrace.init vault \
+  --language english \
+  --vault /absolute/path/to/LingoTrace-English \
+  --apply
+```
+
+初始化后，在 Codex 中把 `LingoTrace-English` Vault 作为日常工作区。换到另一台设备时，如果本机运行时路径不可用，Agent 会询问新的 LingoTrace 目录并追加到当前平台连接，不修改其他平台配置。
+
+详见 [Vault 初始化与跨平台运行时连接](docs/vault-initialization-and-runtime-connections.md)。
+
+---
+
+## 📚 当前文档
 
 为了更好地了解本系统的产品哲学、架构约束与适用人群，请参阅 `docs/` 目录下的详细分析报告：
 
-- 📖 **[功能模块与用户旅程审计报告](docs/lingotrace_audit_report.md)**：将外语学习的实际痛点场景映射到 LingoTrace 系统工作流中的全周期拆解。
-- 🏗️ **[产品需求与架构白皮书](docs/lingotrace_product_document.md)**：包含详细的业务流转逻辑、双层词库架构分析和元数据（Frontmatter）字典级约束。
+- 🗂️ **[文档索引](docs/README.md)**：当前文档入口与文档生命周期规则。
+- 🏗️ **[产品与能力说明](docs/lingotrace_product_document.md)**：说明当前产品定位、学习闭环、能力和数据边界。
 - 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
-- 🌐 **[多语言架构总体规划方案](docs/lingotrace_multilingual_architecture_plan.md)**：多语言演进的正式规划来源，定义单目标语言 Vault、公共核心、语言包、兼容策略和阶段门槛。
+- 🌐 **[多语言架构](docs/lingotrace_multilingual_architecture_plan.md)**：当前正式架构来源，定义单语言 Vault、外部运行时、语言包和跨平台连接。
 - 🧩 **[新语言包贡献指南](docs/multilingual/language-pack-contributor-guide.md)**：项目组成员和其他 Agent 开发 Korean、German 等后续语言包时的接入边界、目录结构、禁止项和验收规则。不要直接复制 Japanese pack 的语言学规则。
 - 🤖 **[新语言包 Agent 交接模板](docs/multilingual/language-pack-agent-handoff-template.md)**：把新语言包任务交给 Codex、Claude Code、Trae 等 Agent 时可直接复用的任务说明模板。
-- 🔮 **[多语种与多 Agent 终端演进方案](docs/lingotrace_multilingual_multiagent_design.md)**：早期研究材料，用于保留问题分析和多 Agent 讨论；其中的多语言架构建议以正式总体规划为准。
 
 ---
 
@@ -63,9 +85,9 @@ Agent Skill 会把这些自然语言请求映射到听力笔记、来源笔记�
 - `lingotrace/`：公共核心、日语与英语语言包、Vault 初始化和迁移支持代码。
 - `tests/lingotrace/`：核心、语言包、初始化和迁移行为测试。
 - `tools/git/`：公共仓库安全检查，防止私人 Vault 文件进入提交。
-- `tools/architecture-baseline/`：架构契约与历史行为基线测试。
+- `tools/architecture-baseline/`：架构契约与当前行为基线测试。
 - `tools/listening-transcribe-official/`：听力链相关的公共工具和测试。
-- `docs/`：产品、架构、阶段路线和 runbook 文档。
+- `docs/`：当前产品、架构、使用和语言包契约文档。
 
 ---
 

@@ -36,20 +36,22 @@ LingoTrace 不是课程、教材内容仓库或通用背单词 App。它提供�
 
 - Obsidian。
 - Codex 或兼容的 AI agent。
-- 一个自己的私人 Obsidian 日语学习库。
+- 一个自己的私人 Obsidian 日语或英语学习库。
 - 可选：ListenKit，用于音视频导入和转写。
 - 可选：Git 或 GitHub 下载能力，用于获取 LingoTrace 公共框架。
 
-推荐目录关系：
+推荐目录关系。公共运行时和私人 Vault 是并列的独立目录：
 
 ```text
 your-workspace/
   LingoTrace/
   ListenKit/              # 可选，用于听力转写
-  your-japanese-library/  # 你的私人 Obsidian 日语学习库
+  your-language-vault/    # 你的私人 Obsidian 日语或英语学习库
 ```
 
-公开仓库只保存可复用框架、语言包、模板、测试和说明文档。你的真实学习笔记、音频、每日记录和运行产物应留在自己的学习库里。
+公开仓库只保存可复用框架、语言包、模板、测试和说明文档。你的真实学习笔记、音频、每日记录和运行产物应留在自己的学习库里。日常学习时以 Vault 为 Agent 工作区；修改程序时才以 LingoTrace 仓库为工作区。
+
+初始化器会在 Vault 根生成 `AGENTS.md`，并在 `.lingotrace/runtime-connections/` 中保存当前平台的运行时连接。macOS、Windows 和 Linux 各自使用独立文件；Agent 找不到本机运行时时会询问用户并追加新路径，不覆盖其他平台或同平台的已有候选。命令和文件格式见 [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)。
 
 ## 3. 日常怎么使用
 
@@ -63,7 +65,7 @@ your-workspace/
 - “这句话很实用，帮我做成口语卡。”
 - “今天复习结束了，帮我结算。”
 
-Agent Skill 会根据请求选择合适的能力，并保存到你的日语学习库。缺少音频、来源、日期或必要上下文时，agent 会先向你确认。
+Agent Skill 会根据请求选择合适的能力，并保存到你的日语或英语学习库。缺少音频、来源、日期、运行时连接或必要上下文时，agent 会先向你确认。
 
 上面的句子只是示例，不是固定提示词。Agent 会先识别你的真实学习意图，再选择对应能力。“更新总训练表”和“请更新总训练表”是明确的每日复习结算请求。只有“处理一下总训练表”“总训练表有点问题”这类未说明是结算还是视图维护的表达，agent 才应先问一句确认问题。
 

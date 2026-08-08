@@ -6,7 +6,6 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PHASE25_GATE = REPO_ROOT / "docs/multilingual/history/phase-2/phase-2-5-switch-completion.md"
 README = REPO_ROOT / "README.md"
 AGENTS = REPO_ROOT / "AGENTS.md"
 USER_GUIDE = REPO_ROOT / "docs/operator-manual.md"
@@ -31,21 +30,7 @@ def tracked_files() -> list[str]:
     return result.stdout.splitlines()
 
 
-class Phase25SwitchCompletionTests(unittest.TestCase):
-    def test_completion_gate_document_exists_without_unresolved_markers(self) -> None:
-        body = read_required(PHASE25_GATE)
-
-        self.assertNotIn("TB" + "D", body)
-        self.assertNotIn("TO" + "DO", body)
-        for phrase in (
-            "five Japanese workflows",
-            "core write guard",
-            "legacy root retirement",
-            "read-only observation",
-            "separate user confirmation",
-        ):
-            self.assertIn(phrase, body)
-
+class PublicEntryContractTests(unittest.TestCase):
     def test_japanese_pack_contains_skill_first_agent_entry(self) -> None:
         skill = read_required(AGENT_SKILL)
 

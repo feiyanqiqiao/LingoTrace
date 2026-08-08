@@ -7,7 +7,7 @@ from .manifests import LanguagePackManifest
 from .reports import Finding
 
 
-PHASE0_CAPABILITY_IDS = {
+PUBLIC_CAPABILITY_IDS = {
     "listening_notes",
     "source_notes",
     "review_materials",
@@ -15,6 +15,9 @@ PHASE0_CAPABILITY_IDS = {
     "review_rollover",
     "total_training_dashboard",
 }
+
+# Compatibility alias for integrations that imported the early architecture name.
+PHASE0_CAPABILITY_IDS = PUBLIC_CAPABILITY_IDS
 
 
 @dataclass(frozen=True)
@@ -29,7 +32,7 @@ class CapabilityRegistry:
         self._manifest = manifest
 
     def require(self, capability_id: str, context: VaultContext) -> CapabilityDecision:
-        if capability_id not in PHASE0_CAPABILITY_IDS:
+        if capability_id not in PUBLIC_CAPABILITY_IDS:
             return _rejected(capability_id, "unknown_capability", f"Unknown capability: {capability_id}.")
 
         if capability_id not in context.enabled_capabilities:

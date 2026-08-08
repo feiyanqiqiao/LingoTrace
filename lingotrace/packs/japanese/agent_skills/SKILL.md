@@ -4,6 +4,14 @@ Use this skill when a user asks in natural language to maintain Japanese learnin
 
 This skill is the daily operating entry for agents. Users should not need to mention internal workflow names, Python functions, CLI flags, Vault schema, or write modes.
 
+## Runtime Discovery
+
+When the current workspace is an initialized Vault, follow its root `AGENTS.md` before handling a learning request. Resolve the LingoTrace runtime from the current operating system's file under `.lingotrace/runtime-connections/` and bind every workflow to the current Vault root.
+
+If the current platform has no saved connection, or every saved runtime path is unavailable, ask the user where LingoTrace is located on this device. Validate that the selected directory contains `lingotrace/__init__.py` and this Japanese skill, then append the new candidate to the current platform file. Never replace another saved candidate automatically, and never modify macOS, Windows, or Linux connection files other than the one for the current platform.
+
+After resolving the runtime, use its core and Japanese pack for all write-capable tasks. Do not treat the public runtime repository as the learning Vault and do not edit Vault learning files directly.
+
 ## Intent Recognition
 
 Before choosing a workflow, infer the user's real learning intent from ordinary language. Do not match only the example phrases below.

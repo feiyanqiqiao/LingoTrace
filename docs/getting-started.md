@@ -30,7 +30,21 @@ LingoTrace 是完全构建在 **Obsidian**（一款强大的本地笔记软件�
 请在本地部署或者使用以下任意一款带有 Agent 能力的 AI 工具：
 **Codex、Claude、Hermes Agent、OpenClaw、Trae Work、QoderWork 或 WorkBuddy**。
 
-让你的 Agent 指向你的 Obsidian 学习库（Vault），然后你就可以直接用人话给它下达指令了！
+初始化后，让 Agent 以你的 Obsidian 学习库（Vault）为日常工作区，然后你就可以直接用人话给它下达指令了。LingoTrace 程序仓库保留在 Vault 外部，初始化器会为当前操作系统保存运行时连接。
+
+### 第一次初始化
+
+以英语 Vault 为例，先在 LingoTrace 仓库中预览：
+
+```bash
+python3 -m lingotrace.init vault \
+  --language english \
+  --vault /absolute/path/to/LingoTrace-English
+```
+
+确认没有冲突后增加 `--apply`。完成后，在 Codex 中打开 `LingoTrace-English` 作为项目工作区，而不是把私人 Vault 放进 LingoTrace 公共仓库。
+
+如果你把 Vault 和运行时同步到 Windows、macOS 或 Linux 的另一台设备，Agent 会先查找当前系统保存的运行时路径。找不到时，它会询问你本机的 LingoTrace 目录，验证后只追加当前平台连接，不覆盖其他系统的路径。详细说明见 [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)。
 
 ### 目前支持的语种
 - **日语 (Japanese)**：🌟 全功能支持！包括播客泛听/精听打轴、文章阅读、语法解析、口语发音卡、每日复习看板。
