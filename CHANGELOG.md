@@ -5,6 +5,10 @@
 
 ---
 
+## [20260808-175928]
+### 变更 (Changed)
+- 按用户明确授权，将仓库根目录 `LICENSE` 删除纳入本次上游同步 PR，保持 fork 与上游提交内容一致。
+
 ## [20260808-164535]
 ### 新增 (Added)
 - English language pack 实现 `listening_notes`、`source_notes`、`review_materials`、`speaking_cards`、`review_rollover` 与 `total_training_dashboard` 全能力闭环；新增英语 grammar、error、speaking、chunk 模板和 English Vault 安全初始化计划。
