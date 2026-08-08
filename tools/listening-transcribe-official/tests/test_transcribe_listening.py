@@ -31,16 +31,17 @@ REQUIREMENTS_PATH = Path(__file__).resolve().parents[1] / "requirements-listenin
 JAPANESE_WORKFLOWS_PATH = Path(__file__).resolve().parents[3] / "lingotrace/packs/japanese/workflows.py"
 
 
-def create_lingotrace_vault(root: Path) -> None:
+def create_lingotrace_vault(root: Path, *, language_pack: str = "lingo-japanese") -> None:
+    is_english = language_pack == "lingo-english"
     config = root / ".lingotrace"
     config.mkdir(parents=True, exist_ok=True)
     (config / "vault-context.json").write_text(
         json.dumps(
             {
                 "vault_schema_version": 1,
-                "target_language": "ja",
+                "target_language": "en" if is_english else "ja",
                 "explanation_language": "zh",
-                "language_pack": "lingo-japanese",
+                "language_pack": language_pack,
                 "language_pack_version": "0.1.0",
                 "enabled_capabilities": ["listening_notes"],
             }
@@ -72,6 +73,62 @@ def create_lingotrace_vault(root: Path) -> None:
 
 
 class TranscribeListeningTests(unittest.TestCase):
+    def test_auto_locale_follows_active_language_pack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root, language_pack="lingo-english")
+
+            self.assertEqual(MODULE.resolve_target_locale(root, "auto"), "en-US")
+            self.assertEqual(MODULE.resolve_target_locale(root, "en-GB"), "en-GB")
+
+    def test_english_frontmatter_and_placeholders_use_english_namespace(self) -> None:
+        frontmatter = MODULE.build_default_frontmatter(
+            Path("listening/lesson/attach/lesson.mp3"), 1, False, locale="en-US"
+        )
+        body, _ = MODULE.build_body(
+            "A useful lesson",
+            "lesson.mp3",
+            ["This is a useful phrase."],
+            [MODULE.Chunk(start=0.0, end=1.0, text="This is a useful phrase.")],
+            Path("lesson.mp3"),
+            listening_mode="extensive",
+            locale="en-US",
+        )
+
+        self.assertIn("  - en/listening", frontmatter)
+        self.assertNotIn("  - jp/listening", frontmatter)
+        self.assertIn("只放英文语块骨架", body)
+        self.assertNotIn("只放日文语块骨架", body)
+
+    def test_english_llm_merge_request_preserves_locale_and_language(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio_path = Path(tmpdir) / "lesson.mp3"
+            audio_path.write_bytes(b"audio")
+            report = {
+                "primary": {"engine": "faster-whisper", "locale": "en-US"},
+                "secondary": {"engine": "apple", "locale": "en-US"},
+                "consensus_segments": [],
+                "disagreements": [],
+                "disagreement_count": 0,
+            }
+
+            request = MODULE.llm_merge_request_artifact(audio_path, report)
+
+        self.assertEqual(request["locale"], "en-US")
+        self.assertIn("English语义", request["instructions_zh"][0])
+        self.assertIn("功能词", request["instructions_zh"][-1])
+
+    def test_candidate_records_requested_locale_when_asr_payload_omits_it(self) -> None:
+        payload = {
+            "engine": "faster-whisper",
+            "full_text": "A useful phrase.",
+            "segments": [{"start": 0.0, "end": 1.0, "text": "A useful phrase."}],
+        }
+        with mock.patch.object(MODULE, "invoke_listenkit", return_value=payload):
+            candidate = MODULE.build_candidate(Path("lesson.mp3"), "en-US", "base")
+
+        self.assertEqual(candidate.payload["locale"], "en-US")
+
     def test_old_listening_wrappers_are_retired_from_public_runtime(self) -> None:
         tracked = subprocess.run(
             ["git", "ls-files", "codex-skills/jp-listening-script-generator/scripts"],
@@ -1116,6 +1173,47 @@ class TranscribeListeningTests(unittest.TestCase):
                 )
                 self.assertTrue((root / "listening" / "lesson" / "lesson_天气.md").is_file())
                 self.assertNotIn("lingotrace-listening-prepare", bundle.summary)
+            finally:
+                bundle.cleanup()
+
+    def test_prepared_bundle_applies_through_english_pack_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            create_lingotrace_vault(root, language_pack="lingo-english")
+            audio_path = root / "listening" / "lesson" / "attach" / "lesson.mp3"
+            audio_path.parent.mkdir(parents=True)
+            audio_path.write_bytes(b"audio")
+
+            def fake_process(stage_audio: Path, *_args, **_kwargs) -> str:
+                material_dir = MODULE.material_dir_for_audio(stage_audio)
+                note_path = material_dir / "lesson_useful-phrases.md"
+                note_path.write_text("---\ntrack: listening\n---\n\n# Useful phrases\n", encoding="utf-8")
+                return f"Created {note_path}"
+
+            with mock.patch.object(MODULE, "process_one", side_effect=fake_process):
+                bundle = MODULE.prepare_local_listening_bundle(
+                    vault_root=root,
+                    audio_path=audio_path,
+                    note_override=None,
+                    locale="en-US",
+                    title=None,
+                    engine="faster-whisper",
+                    compare_engine=None,
+                    faster_whisper_python=None,
+                    faster_whisper_model="small",
+                    faster_whisper_compute_type="int8",
+                    offline_dictionary=MODULE.StaticAccentDictionary({}),
+                    listening_mode="extensive",
+                    slice_manifest_override=None,
+                    slice_profile="auto",
+                    reviewed_transcript=None,
+                )
+            try:
+                preview, applied = MODULE.apply_prepared_bundle(bundle, apply=True, overwrite_confirmed=False)
+                self.assertTrue(preview["accepted"], preview)
+                assert applied is not None
+                self.assertTrue(applied["accepted"], applied)
+                self.assertTrue((root / "listening/lesson/lesson_useful-phrases.md").is_file())
             finally:
                 bundle.cleanup()
 

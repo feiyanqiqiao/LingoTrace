@@ -1,11 +1,22 @@
 filters:
   and:
     - file.ext == "md"
+    - or:
+        - track == "class_review"
+        - track == "survival_speaking"
+        - track == "listening"
+        - track == "pronunciation"
 formulas:
+  track_label: if(track == "class_review", "重点复习", if(track == "survival_speaking", "生活口语", if(track == "listening", "听力", "发音")))
+  priority_rank: if(priority == "high", 0, 1)
+  due_days: if(next_review, (date(next_review) - today()).days, "")
+  item_type_label: if(item_type == "chunk", "语块", if(item_type == "speaking_card", "口语卡", item_type))
   due_flag: 'if(status == "active" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
   next_day_flag: 'if(status == "active" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
-  core_text: 'if(item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, if(meaning_zh, meaning_zh, file.name)))), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(item_type == "pronunciation", if(target_text, target_text, file.name), file.name))))'
-  support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(item_type == "pronunciation", if(issue_tags, issue_tags, ""), ""))))'
+  core_text: 'if(item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, if(meaning_zh, meaning_zh, file.name)))), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(item_type == "chunk", if(chunk_pattern, chunk_pattern, if(en_text, en_text, file.name)), if(track == "survival_speaking", if(en_text, en_text, file.name), if(track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name)), if(item_type == "pronunciation", if(target_text, target_text, file.name), file.name)))))))'
+  support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(item_type == "chunk", if(chunk_meaning_zh, if(en_text, chunk_meaning_zh + " / 例: " + en_text, chunk_meaning_zh), if(en_text, en_text, "")), if(track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, "")), if(track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, "")), if(item_type == "pronunciation", if(issue_tags, issue_tags, ""), "")))))))'
+  pressure: if(error_count, error_count, 0) + if(seen_count, seen_count, 0) + if(attempt_count, attempt_count, 0)
+  recent_flag: if(first_seen && date(first_seen) >= today() - "7d", true, false)
 properties:
   file.name:
     displayName: 文件名
@@ -19,6 +30,28 @@ properties:
     displayName: 辅助说明
   item_type:
     displayName: 题型
+  formula.item_type_label:
+    displayName: 条目类型
+  track:
+    displayName: 训练线
+  formula.track_label:
+    displayName: 分类
+  formula.due_days:
+    displayName: 距复习天数
+  en_text:
+    displayName: 英语表达
+  ipa:
+    displayName: IPA
+  word_stress:
+    displayName: 单词重音
+  weak_points:
+    displayName: 听力难点
+  practice_focus:
+    displayName: 训练重点
+  daily_use_sentences:
+    displayName: 常用语块
+  attempt_count:
+    displayName: 录音次数
   next_review:
     displayName: 下次复习
   formula.due_flag:
@@ -34,13 +67,16 @@ views:
     order:
       - file.name
       - done_today
-      - item_type
+      - formula.track_label
+      - formula.item_type_label
       - formula.core_text
       - formula.support_text
       - next_review
     sort:
       - property: done_today
         direction: DESC
+      - property: formula.priority_rank
+        direction: ASC
       - property: next_review
         direction: ASC
       - property: item_type
@@ -53,17 +89,109 @@ views:
       formula.core_text: 320
       formula.support_text: 420
   - type: table
-    name: 最近新增
+    name: 重点复习高风险
     filters:
       and:
+        - track == "class_review"
+        - status == "active"
+        - priority == "high" || error_count > 0 || seen_count >= 2
+    order:
+      - file.name
+      - formula.item_type_label
+      - formula.core_text
+      - formula.support_text
+      - seen_count
+      - error_count
+      - next_review
+  - type: table
+    name: 生活口语待练
+    filters:
+      and:
+        - track == "survival_speaking"
         - status == "active"
     order:
       - file.name
-      - item_type
+      - formula.item_type_label
+      - en_text
       - formula.core_text
+      - formula.support_text
+      - next_review
+  - type: table
+    name: 听力待精听
+    filters:
+      and:
+        - track == "listening"
+        - status == "active"
+    order:
+      - file.name
+      - difficulty
+      - transcript_status
+      - weak_points
+      - daily_use_sentences
+      - practice_focus
+      - next_review
+  - type: table
+    name: 发音待录音
+    filters:
+      and:
+        - track == "pronunciation"
+        - status == "active"
+    order:
+      - file.name
+      - target_text
+      - issue_tags
+      - attempt_count
+      - next_review
+  - type: table
+    name: 单词重音待练
+    filters:
+      and:
+        - track == "pronunciation"
+        - pronunciation_kind == "accent"
+        - status == "active"
+    order:
+      - file.name
+      - target_text
+      - word_stress
+      - issue_tags
+      - next_review
+  - type: table
+    name: 音素待练
+    filters:
+      and:
+        - track == "pronunciation"
+        - pronunciation_kind == "phoneme"
+        - status == "active"
+    order:
+      - file.name
+      - target_text
+      - issue_tags
+      - attempt_count
+      - next_review
+  - type: table
+    name: 最近新增
+    filters:
+      and:
+        - formula.recent_flag == true
+    order:
+      - file.name
+      - formula.track_label
+      - formula.core_text
+      - first_seen
       - next_review
     sort:
       - property: file.name
         direction: ASC
     columnSize:
       file.name: 260
+  - type: table
+    name: 重复出现 / 反复出错
+    filters: seen_count >= 2 || error_count >= 2 || attempt_count >= 2
+    order:
+      - file.name
+      - formula.track_label
+      - seen_count
+      - error_count
+      - attempt_count
+      - priority
+      - next_review

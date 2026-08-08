@@ -1,16 +1,12 @@
 ---
 track: class_review
-item_type: vocab
+item_type: grammar
 status: active
 priority: normal
 done_today: false
-headword: "{{headword}}"
-ipa: "{{ipa}}"
-word_stress: "{{word_stress}}"
-part_of_speech: "{{part_of_speech}}"
-english_definition: "{{english_definition}}"
+pattern: "{{pattern}}"
 meaning_zh: "{{meaning_zh}}"
-collocations: []
+formation: []
 source_notes: []
 first_seen: "{{date}}"
 last_seen: "{{date}}"
@@ -19,29 +15,31 @@ error_count: 0
 review_stage: day0
 next_review: "{{date}}"
 last_reviewed: ""
-confusable_with: []
 contrast_with: []
+usage_scenes: []
 tags:
-  - en/vocab
+  - en/grammar
   - en/class_review
 ---
+
+# {{pattern}}
 
 ## 快速复习
 
 - 中文：{{meaning_zh}}
-- IPA：{{ipa}}
-- 重音：{{word_stress}}
-- 词性：{{part_of_speech}}
+- 结构：{{formation}}
+- 核心语感：{{core_nuance}}
 
-## English Definition
+## 语域与使用场景
 
-{{english_definition}}
-
-## 常用搭配
-
-- {{collocation}}
+- 语域：{{register}}
+- CEFR：{{cefr}}
 
 ## 例句
 
 - {{example_en}}
   - 中文：{{example_zh}}
+
+## 来源
+
+- {{source_note}}

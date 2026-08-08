@@ -14,7 +14,6 @@ REVIEW_MATERIALS_GUIDANCE = REPO_ROOT / "docs/multilingual/review-materials-user
 LISTENING_GUIDANCE = REPO_ROOT / "docs/multilingual/listening-notes-user-stories.md"
 JAPANESE_AGENT_SKILL = REPO_ROOT / "lingotrace/packs/japanese/agent_skills/SKILL.md"
 README = REPO_ROOT / "README.md"
-PHASE1_CONTRIBUTOR_GUIDE = REPO_ROOT / "docs/multilingual/history/phase-1/contributor-guide.md"
 
 UNRESOLVED_MARKER_PATTERN = r"\b(" + "|".join(("TB" + "D", "TO" + "DO")) + r")\b"
 PRIVATE_PATH_MARKERS = {
@@ -78,10 +77,11 @@ class LanguagePackContributorKitTests(unittest.TestCase):
         guide = read_required(GUIDE)
 
         for token in (
-            "core context currently accepts only `target_language=ja`",
-            "initializer is still Japanese-specific",
-            "listening tooling is still Japanese-specific",
-            "PHASE0_CAPABILITY_IDS",
+            "core context currently accepts `target_language=ja` and `target_language=en`",
+            "shared initializer can preview and apply Japanese and English Vault scaffolds",
+            "platform-specific runtime connections",
+            "official listening tool auto-selects Japanese or English",
+            "PUBLIC_CAPABILITY_IDS",
             "source_notes",
             "review_materials",
             "review_rollover",
@@ -123,7 +123,6 @@ class LanguagePackContributorKitTests(unittest.TestCase):
         for relative_path in (
             "docs/multilingual/language-pack-contributor-guide.md",
             "docs/lingotrace_multilingual_architecture_plan.md",
-            "docs/multilingual/history/phase-0/language-pack-conformance-checklist.md",
             "docs/multilingual/listening-notes-user-stories.md",
             "docs/multilingual/review-materials-user-stories.md",
             "lingotrace/packs/japanese/manifest.json",
@@ -149,7 +148,7 @@ class LanguagePackContributorKitTests(unittest.TestCase):
         self.assertNotIn("`review_materials` | Planned Reference Guidance", guide)
         self.assertNotIn("`review_materials` | Planned Reference Guidance", guide_zh)
         for token in (
-            "jp-review-material-maintainer",
+            "public `review_materials` capability",
             "focus-first",
             "base lexicon",
             "grammar cards",
@@ -186,7 +185,7 @@ class LanguagePackContributorKitTests(unittest.TestCase):
         self.assertNotIn("`listening_notes` | Planned Reference Guidance", guide)
         self.assertNotIn("`listening_notes` | Planned Reference Guidance", guide_zh)
         for token in (
-            "jp-listening-script-generator",
+            "`listening_notes` capability",
             "ListenKit",
             "extensive",
             "intensive",
@@ -321,12 +320,12 @@ class LanguagePackContributorKitTests(unittest.TestCase):
                     self.assertIn(label, text)
 
     def test_public_entry_docs_point_to_language_pack_contributor_kit(self) -> None:
-        combined = read_required(README) + "\n" + read_required(PHASE1_CONTRIBUTOR_GUIDE)
+        combined = read_required(README) + "\n" + read_required(GUIDE)
 
         for token in (
             "docs/multilingual/language-pack-contributor-guide.md",
             "docs/multilingual/language-pack-agent-handoff-template.md",
-            "Do not use the Japanese pack as a copy template",
+            "Do not treat the Japanese pack as a folder to copy",
         ):
             self.assertIn(token, combined)
 

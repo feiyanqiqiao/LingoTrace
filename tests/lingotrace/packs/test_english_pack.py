@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lingotrace.core.capabilities import PHASE0_CAPABILITY_IDS
+from lingotrace.core.capabilities import PUBLIC_CAPABILITY_IDS
 from lingotrace.core.manifests import load_language_pack_manifest
 from lingotrace.packs.english import workflows
 
@@ -31,7 +31,10 @@ EXPECTED_PATH_ROLES = {
     "daily_notes_root": "daily",
 }
 
-EXPECTED_LANGUAGE_FIELDS = {"ipa", "word_stress", "part_of_speech", "collocations", "english_definition"}
+EXPECTED_LANGUAGE_FIELDS = {
+    "ipa", "word_stress", "part_of_speech", "collocations", "english_definition",
+    "meaning_zh", "chunk_pattern", "chunk_type", "chunk_meaning_zh", "practice_tier",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +45,11 @@ EXPECTED_LANGUAGE_FIELDS = {"ipa", "word_stress", "part_of_speech", "collocation
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def write_image(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\x89PNG\r\n\x1a\nsynthetic-image")
 
 
 def create_target_context(root: Path) -> None:
@@ -55,8 +63,10 @@ def create_target_context(root: Path) -> None:
                 "language_pack": "lingo-english",
                 "language_pack_version": "0.1.0",
                 "enabled_capabilities": [
+                    "listening_notes",
                     "source_notes",
                     "review_materials",
+                    "speaking_cards",
                     "review_rollover",
                     "total_training_dashboard",
                 ],
@@ -149,7 +159,7 @@ def review_card(
 
 
 # ---------------------------------------------------------------------------
-# Manifest & static tests (Phase 2.0 baseline)
+# Manifest and static capability tests
 # ---------------------------------------------------------------------------
 
 
@@ -166,19 +176,19 @@ class EnglishPackTests(unittest.TestCase):
         self.assertEqual("en", result.manifest.target_language)
 
     def test_declared_capabilities_are_subset_of_phase0_ids(self):
-        """2. All declared capabilities use reviewed IDs from PHASE0_CAPABILITY_IDS."""
+        """2. All declared capabilities use reviewed public capability IDs."""
         result = load_language_pack_manifest(MANIFEST_PATH)
         assert result.manifest is not None
         declared_ids = set(result.manifest.capabilities) | set(result.manifest.unsupported_capabilities)
-        self.assertTrue(declared_ids.issubset(PHASE0_CAPABILITY_IDS))
-        self.assertEqual(PHASE0_CAPABILITY_IDS, declared_ids)
+        self.assertTrue(declared_ids.issubset(PUBLIC_CAPABILITY_IDS))
+        self.assertEqual(PUBLIC_CAPABILITY_IDS, declared_ids)
 
-    def test_unsupported_capabilities_have_fallback_none(self):
-        """3. Unsupported capabilities declare fallback: 'none' and have failure policies."""
+    def test_all_phase0_capabilities_are_supported(self):
+        """3. English leaves no public capability unsupported."""
         result = load_language_pack_manifest(MANIFEST_PATH)
         assert result.manifest is not None
-        self.assertIn("listening_notes", result.manifest.unsupported_capabilities)
-        self.assertIn("speaking_cards", result.manifest.unsupported_capabilities)
+        self.assertEqual({}, result.manifest.unsupported_capabilities)
+        self.assertEqual(PUBLIC_CAPABILITY_IDS, set(result.manifest.capabilities))
 
     def test_language_fields_are_english_pack_owned(self):
         """4. fields.json declares English-owned fields, not Japanese fields."""
@@ -230,17 +240,28 @@ class EnglishWorkflowPreviewTests(unittest.TestCase):
             self.assertFalse(report.accepted)
             self.assertEqual("missing_vault_root", report.to_dict()["errors"][0]["code"])
 
-    def test_listening_and_speaking_workflows_return_unsupported(self) -> None:
+    def test_listening_and_speaking_workflows_preview_guarded_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
 
-            listening = workflows.listening_notes(vault_root=root)
-            speaking = workflows.speaking_cards(vault_root=root)
+            listening = workflows.listening_notes(
+                vault_root=root,
+                input_artifact={"path": "listening/sample.md", "body": "## Transcript\nHello."},
+            )
+            speaking = workflows.speaking_cards(
+                vault_root=root,
+                candidate={
+                    "path": "speaking/cards/hello.md", "reviewed": True,
+                    "body": "---\nitem_type: speaking_card\nen_text: Hello.\n---\n\n## Target\nHello.\n",
+                },
+            )
 
         for report in (listening, speaking):
-            self.assertFalse(report.accepted)
-            self.assertEqual("unsupported_capability", report.to_dict()["errors"][0]["code"])
+            self.assertTrue(report.accepted, report.to_dict())
+            self.assertEqual("preview", report.mode)
+            self.assertEqual([], report.changed_files)
+            self.assertEqual(1, len(report.planned_writes))
 
     def test_source_notes_previews_without_writes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -315,6 +336,7 @@ ipa: /tɛst/
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            write(root / "sources/source-note.md", "# Source\n")
 
             preview = workflows.review_materials(
                 vault_root=root,
@@ -348,6 +370,208 @@ ipa: /tɛst/
             self.assertIn("headword: ubiquitous", body)
             self.assertIn("ipa: /juːˈbɪk.wɪ.təs/", body)
             self.assertIn("review_stage: day0", body)
+
+
+# ---------------------------------------------------------------------------
+# English/Japanese parity contracts
+# ---------------------------------------------------------------------------
+
+
+class EnglishParityWorkflowTests(unittest.TestCase):
+    def test_listening_bundle_applies_note_and_real_slice_inside_role(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            report = workflows.listening_notes(
+                vault_root=root, mode="apply",
+                input_artifact={
+                    "note_path": "listening/demo.md",
+                    "files": [
+                        {"path": "listening/demo.md", "content": "# Demo\n\n## Transcript\nHello world.\n"},
+                        {"path": "listening/demo-slices/S01.mp3", "content": b"synthetic-audio"},
+                    ],
+                },
+            )
+            self.assertTrue(report.accepted, report.to_dict())
+            self.assertEqual(["listening/demo-slices/S01.mp3", "listening/demo.md"], sorted(report.changed_files))
+            self.assertEqual(b"synthetic-audio", (root / "listening/demo-slices/S01.mp3").read_bytes())
+
+    def test_listening_bundle_cannot_escape_listening_role(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            report = workflows.listening_notes(vault_root=root, input_artifact={"path": "sources/not-listening.md", "body": "# Wrong root"})
+        self.assertFalse(report.accepted)
+        self.assertEqual("listening_artifact_outside_role", report.errors[0].code)
+
+    def test_speaking_card_requires_review_and_deduplicates_chunk_pattern(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            unreviewed = workflows.speaking_cards(vault_root=root, candidate={"path": "speaking/cards/a.md", "body": "# A"})
+            self.assertFalse(unreviewed.accepted)
+            self.assertEqual("unreviewed_speaking_candidate", unreviewed.errors[0].code)
+            write(root / "speaking/cards/existing.md", "---\nitem_type: chunk\nchunk_pattern: It goes without saying that ...\n---\n\n# Existing\n")
+            duplicate = workflows.speaking_cards(
+                vault_root=root,
+                candidate={"path": "speaking/cards/new.md", "reviewed": True, "body": "---\nitem_type: chunk\nchunk_pattern: It goes without saying that ...\n---\n\n# New\n"},
+            )
+        self.assertFalse(duplicate.accepted)
+        self.assertEqual("duplicate_chunk_pattern", duplicate.errors[0].code)
+
+    def test_structured_vocab_renders_english_cues_and_canonical_source_link(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "sources/article.md", "# Article\n")
+            report = workflows.review_materials(
+                vault_root=root, mode="apply", extraction_date="2026-08-08",
+                item={
+                    "item_type": "vocab", "headword": "ubiquitous", "ipa": "/juːˈbɪk.wɪ.təs/",
+                    "word_stress": "bi", "part_of_speech": "adjective",
+                    "english_definition": "present or found everywhere", "meaning_zh": "无处不在的",
+                    "collocations": ["ubiquitous computing"],
+                    "examples": [{"en": "Smartphones are ubiquitous.", "zh": "智能手机无处不在。"}],
+                    "source_note": "sources/article",
+                },
+            )
+            body = (root / "review/focus/vocab/ubiquitous.md").read_text(encoding="utf-8")
+        self.assertTrue(report.accepted, report.to_dict())
+        for expected in ("IPA：/juːˈbɪk.wɪ.təs/", "重音：bi", "词性：adjective", "## English Definition", "present or found everywhere", "ubiquitous computing", "Smartphones are ubiquitous.", "[[sources/article|article]]"):
+            self.assertIn(expected, body)
+
+    def test_structured_items_route_to_grammar_error_and_pronunciation_roles(self) -> None:
+        cases = (
+            ({"item_type": "grammar", "pattern": "used to + verb", "meaning_zh": "过去常常", "formation": ["used to + base verb"]}, "review/grammar/used-to-+-verb.md"),
+            ({"item_type": "error", "correct_form": "I agree.", "wrong_form": "I am agree.", "reason": "agree is a verb", "avoidance": "Use agree directly."}, "review/errors/2026-08-08_I-agree..md"),
+            ({"item_type": "pronunciation", "target_text": "record", "pronunciation_kind": "accent", "issue_tags": ["noun-verb stress"]}, "review/pronunciation/accent/record.md"),
+            ({"item_type": "pronunciation", "target_text": "ship / sheep", "pronunciation_kind": "phoneme", "issue_tags": ["ɪ-iː"]}, "review/pronunciation/phoneme/ship-sheep.md"),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            for item, expected_path in cases:
+                report = workflows.review_materials(vault_root=root, mode="apply", item=item, extraction_date="2026-08-08")
+                self.assertTrue(report.accepted, report.to_dict())
+                self.assertTrue((root / expected_path).is_file(), expected_path)
+
+    def test_existing_card_update_requires_confirmation_and_preserves_body(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "sources/new-source.md", "# New source\n")
+            card = root / "review/focus/vocab/known.md"
+            write(card, "---\nitem_type: vocab\nstatus: active\ndone_today: true\nreview_stage: day30\nnext_review: 2026-09-01\nheadword: known\nipa: /noʊn/\nmeaning_zh: 已知的\nsource_notes: []\nseen_count: 1\nerror_count: 0\n---\n\n## Manual\nKeep me.\n")
+            item = {"item_type": "vocab", "headword": "known", "ipa": "/noʊn/", "meaning_zh": "已知的", "source_note": "sources/new-source"}
+            blocked = workflows.review_materials(vault_root=root, mode="apply", item=item, extraction_date="2026-08-08")
+            self.assertFalse(blocked.accepted)
+            applied = workflows.review_materials(vault_root=root, mode="apply", item=item, extraction_date="2026-08-08", existing_update_confirmed=True)
+            body = card.read_text(encoding="utf-8")
+        self.assertTrue(applied.accepted, applied.to_dict())
+        self.assertIn("## Manual\nKeep me.", body)
+        self.assertIn("review_stage: day0", body)
+        self.assertIn("[[sources/new-source|new-source]]", body)
+
+    def test_mastered_vocab_reactivation_preserves_manual_english_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "sources/new-source.md", "# Source\n")
+            card = root / "review/focus/vocab/known.md"
+            write(
+                card,
+                "---\ntrack: class_review\nitem_type: vocab\nstatus: mastered\ndone_today: false\n"
+                "review_stage: mastered\nnext_review:\nlast_reviewed: 2026-08-01\nheadword: known\n"
+                "ipa: /noʊn/\nmeaning_zh: 已知的\nsource_notes: []\n---\n\n## Manual\nKeep this nuance.\n",
+            )
+
+            report = workflows.review_materials(
+                vault_root=root,
+                item={"item_type": "vocab", "headword": "known", "source_note": "sources/new-source"},
+                extraction_date="2026-08-08",
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            body = card.read_text(encoding="utf-8")
+
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertIn("status: active", body)
+        self.assertIn("review_stage: day0", body)
+        self.assertIn("next_review: 2026-08-08", body)
+        self.assertIn("[[sources/new-source|new-source]]", body)
+        self.assertIn("Keep this nuance.", body)
+
+    def test_image_vocab_requires_structured_visual_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            write(root / "sources/image-source.md", "# Image words\n\n## Vocabulary\n\n![[attachments/lesson.png]]\n")
+            write_image(root / "attachments/lesson.png")
+            base_item = {
+                "item_type": "vocab",
+                "headword": "signboard",
+                "ipa": "/ˈsaɪn.bɔːrd/",
+                "meaning_zh": "招牌",
+                "image_backed": True,
+                "source_note": "sources/image-source",
+            }
+            legacy = workflows.review_materials(vault_root=root, item={**base_item, "image_readable": True})
+            accepted = workflows.review_materials(
+                vault_root=root,
+                item={
+                    **base_item,
+                    "image_evidence": {
+                        "attachment": "attachments/lesson.png",
+                        "inspection_method": "visual",
+                        "readability": "clear",
+                        "observed_text": "SIGNBOARD",
+                        "observed_form": "SIGNBOARD",
+                        "normalized_headword": "signboard",
+                    },
+                },
+                extraction_date="2026-08-08",
+                mode="apply",
+            )
+
+        self.assertFalse(legacy.accepted)
+        self.assertEqual("missing_image_inspection_evidence", legacy.errors[0].code)
+        self.assertTrue(accepted.accepted, accepted.to_dict())
+        self.assertEqual(["review/focus/vocab/signboard.md"], accepted.changed_files)
+        self.assertIn("attachments/lesson.png", accepted.read_files)
+
+    def test_daily_checklist_is_confirmed_and_does_not_change_review_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            create_target_context(root)
+            daily = root / "daily/2026-08-08.md"
+            card = root / "review/focus/vocab/known.md"
+            write(daily, "# English study\n\nManual notes.\n")
+            write(card, review_card(headword="known", meaning_zh="已知的", review_stage="day3"))
+            card_before = card.read_text(encoding="utf-8")
+            payload = {
+                "path": "daily/2026-08-08.md",
+                "completed": ["复习英语词汇卡 3 张"],
+                "blockers": ["word stress 仍不稳定"],
+                "reflection": "明天先做发音对比。",
+            }
+
+            preview = workflows.review_materials(vault_root=root, daily_checklist=payload, mode="preview")
+            blocked = workflows.review_materials(vault_root=root, daily_checklist=payload, mode="apply")
+            applied = workflows.review_materials(
+                vault_root=root,
+                daily_checklist=payload,
+                existing_update_confirmed=True,
+                mode="apply",
+            )
+            daily_after = daily.read_text(encoding="utf-8")
+            card_after = card.read_text(encoding="utf-8")
+
+        self.assertTrue(preview.accepted, preview.to_dict())
+        self.assertEqual("daily_checklist_confirmation_required", blocked.errors[0].code)
+        self.assertTrue(applied.accepted, applied.to_dict())
+        self.assertIn("Manual notes.", daily_after)
+        self.assertIn("复习英语词汇卡 3 张", daily_after)
+        self.assertEqual(card_before, card_after)
 
 
 # ---------------------------------------------------------------------------
@@ -563,7 +787,8 @@ seen_count: 2
         self.assertIn("meaning_zh: 无处不在的", base_body)
         self.assertIn("english_definition: present, appearing, or found everywhere", base_body)
         self.assertIn("collocations: ubiquitous computing", base_body)
-        self.assertIn("source_notes: [[base-source]], [[focus-source]]", base_body)
+        self.assertIn('- "[[base-source]]"', base_body)
+        self.assertIn('- "[[focus-source]]"', base_body)
         self.assertIn("seen_count: 2", base_body)
         self.assertIn("这段英文释义必须保留。", base_body)
 
@@ -611,7 +836,7 @@ Review card body.
         self.assertIn("ipa: /juːˈbɪk.wɪ.təs/", base_body)
         self.assertIn("meaning_zh: 无处不在的", base_body)
         self.assertIn("english_definition: present, appearing, or found everywhere", base_body)
-        self.assertIn("source_notes: [[focus-source]]", base_body)
+        self.assertIn('- "[[focus-source]]"', base_body)
 
     # US-5, US-6, US-7: Non-focus scope safety ----------------------------
 
@@ -673,7 +898,7 @@ Review card body.
             before = card_path.read_text(encoding="utf-8")
 
         self.assertFalse(report.accepted)
-        self.assertEqual("invalid_review_stage", report.to_dict()["errors"][0]["code"])
+        self.assertEqual("unknown_review_stage", report.to_dict()["errors"][0]["code"])
         # file must be unchanged
         self.assertIn("review_stage: day999", before)
 
@@ -729,11 +954,23 @@ Review card body.
         self.assertIn("order:", content)
 
         # Must have both views
-        self.assertIn("今日总训练", content)
-        self.assertIn("最近新增", content)
+        for view_name in (
+            "今日总训练",
+            "重点复习高风险",
+            "生活口语待练",
+            "听力待精听",
+            "发音待录音",
+            "单词重音待练",
+            "音素待练",
+            "最近新增",
+            "重复出现 / 反复出错",
+        ):
+            self.assertIn(view_name, content)
 
         # Must use if() not ifs()
         self.assertNotIn("ifs(", content)
+        self.assertNotIn("jp_text", content)
+        self.assertNotIn("accent_display", content)
 
     def test_total_training_dashboard_surfaces_english_type_specific_review_cues(self) -> None:
         dashboard_path = PACK_ROOT / "views" / "total-training.base"

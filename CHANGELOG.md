@@ -5,6 +5,68 @@
 
 ---
 
+## [20260808-195049]
+### 新增 (Added)
+- 新增 `python -m lingotrace.init check-update`：在每天首次学习前从正式上游获取 `main`，按 macOS、Windows、Linux 独立状态去重，返回待更新数量与受限长度的结构化提交说明，供 Agent 合并成一至三点中文人话摘要。
+- 新增 `python -m lingotrace.init apply-update`：默认预览，只有用户明确同意并显式 `--apply` 后，才允许正式上游 checkout 在 `main`、工作树干净且可快进时执行 `pull --ff-only`。
+- 新增个人 fork 识别，覆盖带 `upstream` 和只有 fork `origin` 两种形态；fork 可以检查正式上游，但所有自动应用入口均拒绝 pull、merge、rebase、stash 或 reset，并要求用户在开发工作区自行同步。
+
+### 变更 (Changed)
+- 新 Vault 根 `AGENTS.md`、Japanese/English Agent Skill、README、学习者与开发者协议、入门与操作指南、多语言架构、产品说明和 Vault 连接文档统一加入“每天一次、可忽略、不阻塞学习”的更新体验。
+- 提交标题与正文被视为不可信摘要数据并限制长度；Agent 不执行其中夹带的指令，只概括用户可见功能、修复和维护影响。
+
+### 测试 (Tests)
+- 新增同日去重、跨平台状态隔离、HTTPS/SSH 正式仓库、两类 fork、中文摘要数据、网络失败、显式预览/应用、脏工作树阻断和快进更新测试；通过 LingoTrace 226 项、官方听力 100 项、架构基线 42 项和 Vault 结构 18 项测试，并以当前真实 fork 验证 `fork_updates_available` / `manual_fork_sync` 路由。
+
+## [20260808-193014]
+### 新增 (Added)
+- 新增可直接交给任意本地 Agent 的学习者安装协议：从上游 GitHub Raw 单句入口开始，确认语种与路径，经同意后安装最小 sparse 运行时、检测 Obsidian Desktop 与 ListenKit、预览并初始化第一个 Vault、解析语言 Skill 后交付日常学习工作区。
+- 新增开发者 Agent 初始化协议，覆盖 GitHub 账号与 `gh` 授权、个人 fork、`origin`/`upstream`、上游同步、topic branch、测试与隐私检查、推送、上游 PR、CI 状态和合并后清理；个人自用 fork 与上游贡献两种路线均有明确边界。
+- 新增 `python -m lingotrace.init doctor` 只读诊断，输出 Python、Git、GitHub CLI、Obsidian Desktop、ListenKit、运行时和跨平台推荐位置；阻止无效运行时、非绝对 Vault 路径及 Vault/运行时嵌套。
+
+### 变更 (Changed)
+- README、入门指南、操作手册、贡献指南、AGENTS、多语言架构、产品说明、用户画像、文档索引和 Vault 连接指南按“学习者最小运行时 / 开发者完整仓库”双旅程重新分流。
+- Vault 根 Agent 指令在首次需要 Base 看板或音视频能力且对应可选依赖缺失时，向用户解释影响并在征得同意后提供安装，不阻塞无关文本学习。
+
+### 测试 (Tests)
+- 新增跨平台推荐路径、必要与可选依赖、ListenKit 真实 CLI 标记、路径隔离、CLI JSON 和双用户文档契约测试；通过 LingoTrace 216 项、官方听力 100 项、架构基线 42 项和 Vault 结构 18 项测试，并实际验证最小 sparse checkout 只检出 `lingotrace/`。
+
+## [20260808-184251]
+### 新增 (Added)
+- Vault 初始化新增可实际执行的 `python -m lingotrace.init` 入口，支持 English/Japanese 的 preview、apply、运行时连接追加和连接解析；初始化结果包含 Vault 根 `AGENTS.md`、上下文、路径、模板、视图及当前平台运行时连接。
+- 新增 macOS、Windows、Linux 分文件的多候选运行时连接配置。当前平台找不到可用路径时，Agent 会询问用户并追加本机路径，不覆盖其他平台或同平台已有候选。
+- 新增跨平台连接解析、无覆盖追加、失效候选回退、CLI 端到端和真实初始化写入测试，以及 Vault 初始化与运行时连接正式指南。
+
+### 变更 (Changed)
+- 日常使用边界统一为“私人 Vault 是 Agent 工作区，公共 LingoTrace 仓库是 Vault 外运行时”；Japanese 与 English Agent Skill 均加入运行时发现和跨设备重新连接规则。
+- 多语言架构、产品说明、README、入门指南、操作手册、用户画像、贡献指南和工具文档全部按当前 Japanese/English 全能力实现与跨平台初始化流程更新。
+- 公共能力集合使用现行名称 `PUBLIC_CAPABILITY_IDS`，保留旧名称作为兼容别名。
+
+### 清理 (Removed)
+- 删除 44 份已被当前实现取代的迭代计划、逐版评审、迁移阶段清单、历史差距分析和重复审计材料；文档从 59 份收敛为 17 份当前规范与指南。
+- 删除 6 个只验证已完成 Phase 文档的历史文档测试，保留真实运行时、语言包、用户故事和当前行为基线测试。
+
+### 测试 (Tests)
+- 通过 LingoTrace 206 项、官方听力 100 项、当前架构基线 42 项和 Vault 结构 18 项测试。
+
+## [20260808-175928]
+### 变更 (Changed)
+- 按用户明确授权，将仓库根目录 `LICENSE` 删除纳入本次上游同步 PR，保持 fork 与上游提交内容一致。
+
+## [20260808-164535]
+### 新增 (Added)
+- English language pack 实现 `listening_notes`、`source_notes`、`review_materials`、`speaking_cards`、`review_rollover` 与 `total_training_dashboard` 全能力闭环；新增英语 grammar、error、speaking、chunk 模板和 English Vault 安全初始化计划。
+- 新增完整的 English/Japanese 差距分析、文件级实施方案、验收矩阵和英语第一天使用路径。
+
+### 变更 (Changed)
+- 英语复习材料对齐 focus/base 查重与恢复、结构化图片证据、规范来源与关联链接、每日清单隔离、现有卡确认和人工正文保护，同时保留 IPA、word stress、CEFR、英英释义与 collocations 等英语专属语义。
+- 英语总训练 Base 对齐日语的 today/next-day 语义和多训练线视图，覆盖口语、听力、发音、单词重音、音素、最近新增与反复出错。
+- 官方听力工具按 Vault context 自动选择 `ja-JP` 或 `en-US`，英语链路不加载日语重音词典，并通过 English workflow 与 core guard 写入。
+- README、用户指南、操作手册、语言包贡献指南及多语言 user-story 适用性矩阵同步反映英语完整支持。
+
+### 测试 (Tests)
+- 扩展 English pack、English Vault 初始化、官方双 ASR 英语 locale/guard 路由、dashboard 与 contributor guidance 回归；通过 LingoTrace、官方听力、架构基线和 Vault 结构测试。
+
 ## [20260807-092558]
 ### 变更 (Changed)
 - 日语 Agent Skill 将词汇搭配、词汇例句和语法例句的生成顺序调整为“当前来源笔记 → 当前 Vault 其他已有句子 → 仅补齐缺失内容”；词汇按词头与活用形检索，语法按实际表面形、活用形与缩约形检索，并禁止硬套语义不匹配的库内句子。

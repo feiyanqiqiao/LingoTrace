@@ -1,5 +1,7 @@
 # Listening Runtime Isolation
 
+> This document describes the currently verified macOS Python/ASR isolation setup. Vault-to-LingoTrace runtime discovery itself is cross-platform and is documented in [Vault initialization and runtime connections](vault-initialization-and-runtime-connections.md); registering a Windows or Linux runtime path does not by itself install or validate platform-specific listening dependencies.
+
 LingoTrace and ListenKit use separate Python 3.14 virtual environments. Homebrew Python 3.14 is only the bootstrap interpreter; normal transcription runs never install or upgrade packages.
 
 ## Ownership

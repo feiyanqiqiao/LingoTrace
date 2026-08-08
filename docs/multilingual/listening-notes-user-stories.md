@@ -8,9 +8,9 @@ Related guidance index: [Language Pack Capability Guidance](language-pack-capabi
 
 ## Purpose
 
-This document defines the user-facing behavior that should survive migration of the listening script generation workflow across language packs. It is based on the old Japanese listening note template, the `jp-listening-script-generator` skill, and the current public listening contract tests.
+This document defines the current user-facing behavior required from the `listening_notes` capability across language packs. Japanese and English implementations plus current public tests provide the reference evidence.
 
-The migration rule is simple: listening-note behavior is not considered migrated until it has a user story, acceptance criteria, and regression or manual-review evidence.
+Listening-note behavior is not considered supported until it has a user story, acceptance criteria, and regression or manual-review evidence.
 
 ## Applicability
 
@@ -42,23 +42,23 @@ Labels:
 
 | User story | Shared | Japanese | English | Notes |
 | --- | --- | --- | --- | --- |
-| `US-1` One audio or URL to a traceable note | `Required` | `Covered` | `Unsupported` | English currently declares listening transcription unsupported. |
-| `US-2` Separate listening from source notes and review cards | `Required` | `Covered` | `Covered` | Unsupported packs still need to avoid falling back to another pack's workflow. |
-| `US-3` Extensive listening without slices | `Optional` | `Covered` | `Unsupported` | Required only when a pack implements listening-note generation. |
-| `US-4` Intensive notes from reliable slice evidence | `Optional` | `Covered` | `Unsupported` | Slice validation is required only for intensive listening support. |
-| `US-5` Reviewed manifest for unreliable timestamps | `Optional` | `Covered` | `Unsupported` | Required when automatic segmentation is used for intensive notes. |
-| `US-6` Preserve manual sentence selection on rerun | `Required` | `Covered` | `Unsupported` | Required for packs that can regenerate existing listening notes. |
-| `US-7` Curate directly memorizable sentences | `Optional` | `Partial` | `Unsupported` | Naturalness remains manual or model-reviewed. |
-| `US-8` Preserve provenance and raw artifacts | `Required` | `Covered` | `Unsupported` | Artifact locations are pack-owned. |
-| `US-9` Clear runtime/resource failure | `Required` | `Covered` | `Unsupported` | Unsupported packs should fail clearly without invoking Japanese tooling. |
-| `US-10` Explicit unsupported declaration | `Required` | `N/A` | `Covered` | Applies to packs that do not implement listening notes. |
-| `US-11` Language-specific pronunciation cues | `Language-Specific` | `Covered` | `Planned` | Japanese pitch accent is reference behavior, not core. |
-| `US-12` Multi-ASR cross-check | `Optional` | `Covered` | `Unsupported` | Japanese defaults every listening script to dual ASR, emits a provider-neutral LLM merge request, validates the returned consensus, and reports the merge to the user. |
-| `US-13` Short-choice exam structure | `Optional` | `Covered` | `Unsupported` | Required only for packs that support exam-style listening notes. |
-| `US-14` Listening frontmatter and dashboard readiness | `Required` | `Covered` | `Unsupported` | Required for packs that render listening notes into the review dashboard. |
-| `US-15` Conservative dialogue rendering | `Optional` | `Covered` | `Unsupported` | Required only when dialogue listening is supported. |
-| `US-16` Dry-run, naming, and uncertain-output gate | `Required` | `Partial` | `Unsupported` | Naming quality still needs manual review for real media. |
-| `US-17` Single-item safety and no default batch writes | `Required` | `Covered` | `Unsupported` | Applies to any future listening implementation. |
+| `US-1` One audio or URL to a traceable note | `Required` | `Covered` | `Covered` | The official tool selects `en-US` from English Vault context and writes through the English guard. |
+| `US-2` Separate listening from source notes and review cards | `Required` | `Covered` | `Covered` | Both packs keep extraction and later card promotion separate. |
+| `US-3` Extensive listening without slices | `Optional` | `Covered` | `Covered` | English supports the shared extensive-listening route. |
+| `US-4` Intensive notes from reliable slice evidence | `Optional` | `Covered` | `Covered` | English uses the same validated slice evidence and English-owned note fields. |
+| `US-5` Reviewed manifest for unreliable timestamps | `Optional` | `Covered` | `Covered` | The official language-neutral tool enforces reviewed manifests for uncertain boundaries. |
+| `US-6` Preserve manual sentence selection on rerun | `Required` | `Covered` | `Covered` | Existing curated sections are preserved independent of target language. |
+| `US-7` Curate directly memorizable sentences | `Optional` | `Partial` | `Partial` | Naturalness and productive value remain model-reviewed in both languages. |
+| `US-8` Preserve provenance and raw artifacts | `Required` | `Covered` | `Covered` | English uses the same guarded artifact bundle under its listening role. |
+| `US-9` Clear runtime/resource failure | `Required` | `Covered` | `Covered` | English reports missing ASR/slice tooling and does not load Japanese dictionaries. |
+| `US-10` Explicit unsupported declaration | `Required` | `N/A` | `N/A` | Both current packs implement listening notes. |
+| `US-11` Language-specific pronunciation cues | `Language-Specific` | `Covered` | `Covered` | Japanese may annotate pitch accent; English keeps plain transcript and owns stress/phoneme cards separately. |
+| `US-12` Multi-ASR cross-check | `Optional` | `Covered` | `Covered` | Both locales use provider-neutral dual-ASR comparison and validated LLM consensus. |
+| `US-13` Short-choice exam structure | `Optional` | `Covered` | `N/A` | The current short-choice heuristics are Japanese exam-specific. |
+| `US-14` Listening frontmatter and dashboard readiness | `Required` | `Covered` | `Covered` | English emits `en/listening` fields and has listening dashboard views. |
+| `US-15` Conservative dialogue rendering | `Optional` | `Covered` | `Covered` | Language-neutral dialogue fallback is available to English listening notes. |
+| `US-16` Dry-run, naming, and uncertain-output gate | `Required` | `Partial` | `Partial` | Naming quality still needs model or human review for real media. |
+| `US-17` Single-item safety and no default batch writes | `Required` | `Covered` | `Covered` | The official tool rejects default batch writes for both packs. |
 
 ## Ownership Boundary
 
@@ -126,12 +126,12 @@ Acceptance criteria:
 - Useful sentence promotion to speaking cards is routed to `speaking_cards`.
 - The listening workflow may report downstream candidates but must not silently create review cards or speaking cards.
 
-Japanese reference:
+Current capability boundary:
 
-- `jp-listening-script-generator` is for fixed listening-practice notes.
-- `jp-source-note-generator` owns flexible source notes.
-- `jp-review-material-maintainer` owns review cards.
-- `jp-survival-speaking-card-generator` owns speaking-card promotion.
+- `listening_notes` owns fixed listening-practice notes.
+- `source_notes` owns flexible source notes.
+- `review_materials` owns review cards.
+- `speaking_cards` owns speaking-card promotion.
 
 Regression coverage:
 
@@ -305,10 +305,10 @@ Acceptance criteria:
 - Unsupported packs must not call Japanese runtime, Japanese dictionaries, Japanese path names, or Japanese templates.
 - A future implementation must cite this guidance and document language-specific exceptions.
 
-Japanese reference:
+Current reference:
 
-- Japanese is the current reference implementation.
-- English currently declares listening transcription unsupported rather than reusing the Japanese listening chain.
+- Japanese and English both implement listening through their own pack workflow and the shared official tool.
+- A future unsupported pack must still declare the capability unsupported rather than reusing either implementation.
 
 Regression coverage:
 

@@ -39,8 +39,16 @@
 
 ## 4. 提交流程规范
 
-1. **环境与测试**：在提交修改之前，请确保您的代码在本地运行通过，特别是针对 `codex-skills/` 下的核心 Agent 行为，必须先进行 `--dry-run` 测试。
-2. **代码风格**：请遵循项目现有的编码规范，不随意引入不相关的格式化变动。
-3. **安全与隐私**：**绝对禁止**将个人 Vault（知识库）的私人笔记、受版权保护的商业音视频、本地缓存等提交到 Git 中。提交前必须确保通过本地 `tools/git/check-public-staged-files.sh` 的白名单校验。
+如果你不熟悉 fork、GitHub CLI、分支、PR 或 CI，把 [开发者初始化协议](docs/developer-agent-setup.md)完整交给 Agent。它覆盖从 GitHub 账号和 `gh auth` 到 fork、`origin`/`upstream`、topic branch、推送、上游 PR、CI 检查和合并后清理的全过程。
+
+核心要求：
+
+1. **远端角色**：贡献者的 `origin` 指向自己的 fork，`upstream` 指向 `https://github.com/feiyanqiqiao/LingoTrace.git`。
+2. **分支**：`main` 只用于同步上游；每次改动从最新上游 `main` 创建 topic branch，不直接提交到 `main`。
+3. **环境与测试**：提交前运行与改动相匹配的目标测试和公共全量测试；支持 dry-run 的写入流程先 dry-run。
+4. **代码风格**：遵循现有规范，不引入无关格式化或批量改写。
+5. **安全与隐私**：绝对禁止提交个人 Vault、版权音视频、本地缓存、凭据或转写产物。暂存后必须运行 `bash tools/git/check-public-staged-files.sh`。
+6. **PR 与 CI**：把 fork 的 topic branch 推送到 `origin`，从该分支向上游 `main` 提交 PR；检查所有必需 CI，通过不等于已 merge。
+7. **学习环境**：开发者的私人学习 Vault 仍通过 [学习者安装协议](docs/learner-agent-setup.md)初始化，并保存在源码仓库外。
 
 欢迎与我们一起打造终极的开源外语学习引擎！
