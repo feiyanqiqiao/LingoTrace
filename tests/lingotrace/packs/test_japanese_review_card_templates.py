@@ -453,6 +453,14 @@ next_review: 2026-07-20
         self.assertIn('meaning_zh: "01"', text)
         self.assertIn('  - "yes"', text)
 
+    def test_frontmatter_parser_accepts_negative_integer_scalars(self) -> None:
+        text = "---\nreview_offset: -1\nseen_count: 2\n---\n\nbody\n"
+        fields, body = workflows._frontmatter_and_body(text)
+
+        self.assertEqual(-1, fields["review_offset"])
+        self.assertEqual(2, fields["seen_count"])
+        self.assertEqual("body\n", body)
+
     def test_long_error_sentence_uses_bounded_filename_without_losing_display_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
