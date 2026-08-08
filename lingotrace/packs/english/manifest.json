@@ -13,15 +13,54 @@
   },
   "capabilities": [
     {
+      "id": "listening_notes",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": [
+        "listening_root"
+      ],
+      "write_path_roles": [
+        "listening_root"
+      ],
+      "external_tools": [
+        "listenkit_markdown",
+        "listenkit_slice_export"
+      ],
+      "behavior_evidence": [
+        "EN-LISTEN-001",
+        "EN-LISTEN-002",
+        "EN-LISTEN-003",
+        "EN-LISTEN-004"
+      ],
+      "conformance_tests": [
+        "tests/lingotrace/packs/test_english_pack.py"
+      ],
+      "manual_review_cases": []
+    },
+    {
       "id": "source_notes",
       "maturity": "stable",
       "depends_on": [],
-      "read_path_roles": ["source_notes_root"],
-      "write_path_roles": ["source_notes_root"],
-      "external_tools": [],
-      "behavior_evidence": ["EN-SOURCE-001"],
-      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
-      "manual_review_cases": ["English source note creation from reading material"]
+      "read_path_roles": [
+        "source_notes_root",
+        "listening_root"
+      ],
+      "write_path_roles": [
+        "source_notes_root"
+      ],
+      "external_tools": [
+        "listenkit_markdown"
+      ],
+      "behavior_evidence": [
+        "EN-SOURCE-001",
+        "EN-SOURCE-002"
+      ],
+      "conformance_tests": [
+        "tests/lingotrace/packs/test_english_pack.py"
+      ],
+      "manual_review_cases": [
+        "source-note direction selection remains a human or reviewer-accepted semantic judgment"
+      ]
     },
     {
       "id": "review_materials",
@@ -32,18 +71,63 @@
         "base_vocab_root",
         "grammar_root",
         "error_root",
-        "source_notes_root"
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
+        "source_notes_root",
+        "daily_notes_root",
+        "listening_root",
+        "speaking_card_root"
       ],
       "write_path_roles": [
         "focus_vocab_root",
         "base_vocab_root",
         "grammar_root",
-        "error_root"
+        "error_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
+        "daily_notes_root"
       ],
       "external_tools": [],
-      "behavior_evidence": ["EN-MAT-001"],
-      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
-      "manual_review_cases": ["English vocabulary card creation with IPA and collocations"]
+      "behavior_evidence": [
+        "EN-REVIEW-001",
+        "EN-REVIEW-002",
+        "EN-REVIEW-003",
+        "EN-REVIEW-004"
+      ],
+      "conformance_tests": [
+        "tests/lingotrace/packs/test_english_pack.py"
+      ],
+      "manual_review_cases": [
+        "semantic routing for English grammar, error, word-stress, and phoneme cards"
+      ]
+    },
+    {
+      "id": "speaking_cards",
+      "maturity": "stable",
+      "depends_on": [
+        "review_materials"
+      ],
+      "read_path_roles": [
+        "speaking_card_root",
+        "speaking_guide_root",
+        "listening_root",
+        "source_notes_root"
+      ],
+      "write_path_roles": [
+        "speaking_card_root"
+      ],
+      "external_tools": [],
+      "behavior_evidence": [
+        "EN-SPEAK-001",
+        "EN-SPEAK-002",
+        "EN-SPEAK-003"
+      ],
+      "conformance_tests": [
+        "tests/lingotrace/packs/test_english_pack.py"
+      ],
+      "manual_review_cases": [
+        "naturalness and immediate-usefulness acceptance"
+      ]
     },
     {
       "id": "review_rollover",
@@ -54,6 +138,10 @@
         "base_vocab_root",
         "grammar_root",
         "error_root",
+        "speaking_card_root",
+        "listening_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
         "daily_notes_root"
       ],
       "write_path_roles": [
@@ -61,11 +149,21 @@
         "base_vocab_root",
         "grammar_root",
         "error_root",
+        "speaking_card_root",
+        "listening_root",
+        "pronunciation_accent_root",
+        "pronunciation_phoneme_root",
         "daily_notes_root"
       ],
       "external_tools": [],
-      "behavior_evidence": ["EN-ROLL-001"],
-      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
+      "behavior_evidence": [
+        "EN-ROLLOVER-001",
+        "EN-ROLLOVER-002",
+        "EN-ROLLOVER-003"
+      ],
+      "conformance_tests": [
+        "tests/lingotrace/packs/test_english_pack.py"
+      ],
       "manual_review_cases": []
     },
     {
@@ -73,32 +171,40 @@
       "maturity": "stable",
       "depends_on": [],
       "read_path_roles": [
-        "daily_notes_root", "focus_vocab_root", "base_vocab_root",
-        "grammar_root", "error_root", "pronunciation_accent_root",
+        "daily_notes_root",
+        "focus_vocab_root",
+        "base_vocab_root",
+        "grammar_root",
+        "error_root",
+        "speaking_card_root",
+        "listening_root",
+        "pronunciation_accent_root",
         "pronunciation_phoneme_root"
       ],
       "write_path_roles": [],
       "external_tools": [],
-      "behavior_evidence": ["EN-DASH-001"],
-      "conformance_tests": ["tests/lingotrace/packs/test_english_pack.py"],
+      "behavior_evidence": [
+        "EN-DASH-001"
+      ],
+      "conformance_tests": [
+        "tests/lingotrace/packs/test_english_pack.py"
+      ],
       "manual_review_cases": []
     }
   ],
-  "unsupported_capabilities": [
+  "unsupported_capabilities": [],
+  "external_tools": [
     {
-      "id": "listening_notes",
-      "failure_reason": "English listening transcription tools are not yet available.",
-      "failure_policy": "stop_before_write",
-      "fallback": "none"
+      "id": "listenkit_markdown",
+      "minimum_required": "generate-markdown command is available",
+      "failure_policy": "stop_before_write"
     },
     {
-      "id": "speaking_cards",
-      "failure_reason": "English speaking card validation is not yet implemented.",
-      "failure_policy": "stop_before_write",
-      "fallback": "none"
+      "id": "listenkit_slice_export",
+      "minimum_required": "deterministic slice export command is available",
+      "failure_policy": "stop_before_write"
     }
   ],
-  "external_tools": [],
   "language_fields": [
     {
       "name": "ipa",
@@ -113,15 +219,52 @@
     {
       "name": "part_of_speech",
       "owner": "English language pack",
-      "purpose": "Grammatical category (noun, verb, adjective, etc.)."
+      "purpose": "Grammatical category such as noun, verb, or adjective."
+    },
+    {
+      "name": "english_definition",
+      "owner": "English language pack",
+      "purpose": "Concise English-to-English definition."
+    },
+    {
+      "name": "meaning_zh",
+      "owner": "English language pack",
+      "purpose": "Chinese explanation kept separate from target-language content."
     },
     {
       "name": "collocations",
       "owner": "English language pack",
-      "purpose": "Common collocations and phrases for the headword."
+      "purpose": "Common collocations and lexical bundles."
+    },
+    {
+      "name": "chunk_pattern",
+      "owner": "English language pack",
+      "purpose": "Productive English chunk used as the speaking-practice target."
+    },
+    {
+      "name": "chunk_type",
+      "owner": "English language pack",
+      "purpose": "English speaking-chunk classification."
+    },
+    {
+      "name": "chunk_meaning_zh",
+      "owner": "English language pack",
+      "purpose": "Chinese explanation of a productive English chunk."
+    },
+    {
+      "name": "practice_tier",
+      "owner": "English language pack",
+      "purpose": "Practice-priority tier for a speaking chunk."
     }
   ],
-  "item_types": ["vocab", "grammar", "error", "pronunciation"],
+  "item_types": [
+    "vocab",
+    "grammar",
+    "pronunciation",
+    "error",
+    "speaking_card",
+    "chunk"
+  ],
   "tag_namespace": "en",
   "default_path_roles": {
     "focus_vocab_root": "review/focus/vocab",
@@ -144,19 +287,43 @@
       "artifact_class": "recreate-from-pack"
     },
     {
+      "id": "grammar_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/english/templates/grammar-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "error_card",
+      "capability_id": "review_materials",
+      "path": "lingotrace/packs/english/templates/error-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "speaking_card",
+      "capability_id": "speaking_cards",
+      "path": "lingotrace/packs/english/templates/speaking-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
+      "id": "chunk_card",
+      "capability_id": "speaking_cards",
+      "path": "lingotrace/packs/english/templates/chunk-card.md",
+      "artifact_class": "recreate-from-pack"
+    },
+    {
       "id": "daily_checklist",
       "capability_id": "review_rollover",
       "path": "lingotrace/packs/english/templates/daily-checklist.md",
       "artifact_class": "recreate-from-pack"
-    },
-    {
-      "id": "total_training_base",
-      "capability_id": "total_training_dashboard",
-      "path": "lingotrace/packs/english/views/total-training.base",
-      "artifact_class": "recreate-from-pack"
     }
   ],
   "workflow_entrypoints": [
+    {
+      "id": "listening_notes_workflow",
+      "capability_id": "listening_notes",
+      "entrypoint": "lingotrace.packs.english.workflows:listening_notes",
+      "call_policy": "through_core_write_guard"
+    },
     {
       "id": "source_notes_workflow",
       "capability_id": "source_notes",
@@ -167,6 +334,12 @@
       "id": "review_materials_workflow",
       "capability_id": "review_materials",
       "entrypoint": "lingotrace.packs.english.workflows:review_materials",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "speaking_cards_workflow",
+      "capability_id": "speaking_cards",
+      "entrypoint": "lingotrace.packs.english.workflows:speaking_cards",
       "call_policy": "through_core_write_guard"
     },
     {
@@ -188,7 +361,29 @@
       "entrypoint": "lingotrace.packs.english.validators:validate_review_rollover"
     }
   ],
-  "display_rules": [],
+  "resources": [],
+  "display_rules": [
+    {
+      "id": "word_stress_display_rule",
+      "field": "word_stress",
+      "owner": "English language pack",
+      "rule": "display word stress separately from IPA and never invent a confirmed pronunciation"
+    },
+    {
+      "id": "meaning_language_rule",
+      "field": "meaning_zh",
+      "owner": "English language pack",
+      "rule": "Chinese explanation remains separate from target-language content"
+    }
+  ],
+  "default_views": [
+    {
+      "id": "total_training_dashboard",
+      "capability_id": "total_training_dashboard",
+      "path": "lingotrace/packs/english/views/total-training.base",
+      "artifact_class": "recreate-from-pack"
+    }
+  ],
   "initialization_artifacts": [
     {
       "id": "default_vault_context",

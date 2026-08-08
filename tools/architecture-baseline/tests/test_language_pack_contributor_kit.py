@@ -78,9 +78,9 @@ class LanguagePackContributorKitTests(unittest.TestCase):
         guide = read_required(GUIDE)
 
         for token in (
-            "core context currently accepts only `target_language=ja`",
-            "initializer is still Japanese-specific",
-            "listening tooling is still Japanese-specific",
+            "core context currently accepts `target_language=ja` and `target_language=en`",
+            "initializer planners exist for Japanese and English",
+            "official listening tool auto-selects Japanese or English",
             "PHASE0_CAPABILITY_IDS",
             "source_notes",
             "review_materials",

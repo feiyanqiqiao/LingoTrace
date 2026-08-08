@@ -42,19 +42,19 @@ Labels:
 
 | User story                                             | Shared              | Japanese  | English   | Notes                                                                                         |
 | ------------------------------------------------------ | ------------------- | --------- | --------- | --------------------------------------------------------------------------------------------- |
-| `US-1` Search before creating review cards             | `Required`          | `Covered` | `Partial` | English has structured creation paths; full focus/base lookup parity needs explicit coverage. |
-| `US-2` Route items to the correct card type            | `Required`          | `Covered` | `Partial` | Card families differ by language pack; pronunciation routing is optional when unsupported.    |
-| `US-3` Preserve source provenance                      | `Required`          | `Covered` | `Partial` | Provenance fields may use pack-owned names.                                                   |
+| `US-1` Search before creating review cards             | `Required`          | `Covered` | `Covered` | English searches focus before base and blocks duplicate matches.                              |
+| `US-2` Route items to the correct card type            | `Required`          | `Covered` | `Covered` | English routes vocabulary, grammar, error, word-stress, and phoneme cards to pack-owned roles. |
+| `US-3` Preserve source provenance                      | `Required`          | `Covered` | `Covered` | English resolves and appends canonical source links without replacing manual content.          |
 | `US-4` Initialize new active review cards              | `Required`          | `Covered` | `Covered` | Shared SRS initialization fields are expected for active review cards.                        |
-| `US-5` Reactivate known material                       | `Required`          | `Covered` | `Planned` | English should add explicit active/mastered/base reactivation tests before claiming parity.          |
-| `US-6` Keep base lexicon sink out of extraction        | `Required`          | `Covered` | `Partial` | The shared boundary is required; pack-specific base restore details need coverage.            |
-| `US-7` Preserve language-specific review cues          | `Language-Specific` | `Covered` | `Partial` | Japanese accent/kanji fields are not shared; English needs its own cue policy.                |
-| `US-8` Image-backed vocabulary extraction              | `Optional`          | `Covered` | `Partial` | English still uses a legacy readability flag and does not yet satisfy the structured-evidence contract. |
-| `US-9` Daily checklist separation                      | `Optional`          | `Covered` | `N/A`     | Required only for packs with daily checklist integration.                                     |
-| `US-10` Confirm before risky merge, move, or overwrite | `Required`          | `Covered` | `Partial` | Agent confirmation policy is shared; each pack needs local examples.                          |
+| `US-5` Reactivate known material                       | `Required`          | `Covered` | `Covered` | English restores mastered focus/base vocabulary to day0 through the guarded workflow.          |
+| `US-6` Keep base lexicon sink out of extraction        | `Required`          | `Covered` | `Covered` | English restores a base match into focus rather than mutating the mastery sink.                |
+| `US-7` Preserve language-specific review cues          | `Language-Specific` | `Covered` | `Covered` | English owns IPA, word stress, English definitions, collocations, and CEFR cues.               |
+| `US-8` Image-backed vocabulary extraction              | `Optional`          | `Covered` | `Covered` | English enforces the same structured visual/manual inspection evidence contract.               |
+| `US-9` Daily checklist separation                      | `Optional`          | `Covered` | `Covered` | English checklist updates are explicit, confirmed, and isolated from SRS fields.               |
+| `US-10` Confirm before risky merge, move, or overwrite | `Required`          | `Covered` | `Covered` | Existing English card mutations require explicit confirmation.                                 |
 | `US-11` Core write guardrails                          | `Required`          | `Covered` | `Covered` | Core mutation and capability checks apply to all packs.                                       |
-| `US-12` Render stable, reviewable card bodies          | `Required`          | `Covered` | `Partial` | Japanese has deterministic vocabulary, grammar, and error renderers; English needs its own templates. |
-| `US-13` Prevent dangling or incorrect internal links   | `Required`          | `Covered` | `Planned` | Japanese resolves provenance and relations inside declared roles before writing.              |
+| `US-12` Render stable, reviewable card bodies          | `Required`          | `Covered` | `Covered` | English has deterministic vocabulary, grammar, error, speaking, and chunk renderers.           |
+| `US-13` Prevent dangling or incorrect internal links   | `Required`          | `Covered` | `Covered` | English resolves links inside declared roles and keeps unresolved optional relations as text.  |
 
 ## Ownership Boundary
 
