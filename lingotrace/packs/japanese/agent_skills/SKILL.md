@@ -90,6 +90,7 @@ For requests such as "请把 23.mp3 做成精听稿", the agent should provide t
 7. Curate `0-5` productive `## 常用语块` items using model judgment. Judge them by replaceability and cross-scene communicative value, not literal length. Each item records `语块`, `类型`, `素材原句`, `替换练习`, and `交际作用`; the source sentence is only a listening anchor. Keep `daily_use_sentences` for compatibility, but store only the Japanese chunk patterns there.
 8. Save the note to the user's Japanese learning library through `listening_notes`, then stop. Never promote freshly extracted chunks to speaking cards in the same task.
 9. Tell the user whether the two ASRs agreed, how many differences the model merged, which model performed the merge, whether any uncertainty remains, and the created note and slice count.
+10. When creating or updating a slice manifest manually, always check the `slice_profile` configuration in the manifest. If it specifies `"number_markers": "included"`, align the start time (`start`) of each slice to begin exactly before the announcer's spoken section number (e.g., "1", "2", "3") in the audio, rather than cutting directly to the dialogue text. If automatic timing alignment fails, reference existing adjacent `.slices.json` files in the same folder to verify the offset style.
 
 Do not ask the user to prepare an internal artifact manually. If the transcript, slice manifest, or audio tool is missing, explain the concrete missing input or tool and stop before changing files.
 
