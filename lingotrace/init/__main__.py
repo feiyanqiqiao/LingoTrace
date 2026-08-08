@@ -8,6 +8,7 @@ from lingotrace.init.doctor import inspect_onboarding
 from lingotrace.init.english_vault import initialize_english_vault, plan_english_vault_initialization
 from lingotrace.init.japanese_vault import initialize_japanese_vault, plan_japanese_vault_initialization
 from lingotrace.init.runtime_connections import register_runtime_connection, resolve_runtime_connection
+from lingotrace.init.runtime_updates import apply_runtime_update, check_runtime_update
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,6 +35,16 @@ def parse_args() -> argparse.Namespace:
     doctor.add_argument("--runtime-root", type=Path, required=True)
     doctor.add_argument("--listenkit-root", type=Path)
 
+    check_update = subparsers.add_parser("check-update", help="Check official upstream once per local day.")
+    check_update.add_argument("--vault", type=Path, required=True)
+    check_update.add_argument("--runtime-root", type=Path, required=True)
+    check_update.add_argument("--force", action="store_true")
+
+    apply_update = subparsers.add_parser("apply-update", help="Preview or apply a safe official runtime update.")
+    apply_update.add_argument("--vault", type=Path, required=True)
+    apply_update.add_argument("--runtime-root", type=Path, required=True)
+    apply_update.add_argument("--apply", action="store_true")
+
     return parser.parse_args()
 
 
@@ -53,12 +64,24 @@ def main() -> int:
         )
     elif args.command == "resolve-runtime":
         report = resolve_runtime_connection(args.vault)
-    else:
+    elif args.command == "doctor":
         report = inspect_onboarding(
             language=args.language,
             vault_root=args.vault,
             runtime_root=args.runtime_root,
             listenkit_root=args.listenkit_root,
+        )
+    elif args.command == "check-update":
+        report = check_runtime_update(
+            args.vault,
+            args.runtime_root,
+            force=args.force,
+        )
+    else:
+        report = apply_runtime_update(
+            args.vault,
+            args.runtime_root,
+            mode="apply" if args.apply else "preview",
         )
 
     print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))

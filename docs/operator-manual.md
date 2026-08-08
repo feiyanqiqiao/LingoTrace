@@ -55,6 +55,8 @@ your-workspace/
 
 初始化器会在 Vault 根生成 `AGENTS.md`，并在 `.lingotrace/runtime-connections/` 中保存当前平台的运行时连接。macOS、Windows 和 Linux 各自使用独立文件；Agent 找不到本机运行时时会询问用户并追加新路径，不覆盖其他平台或同平台的已有候选。命令和文件格式见 [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)。
 
+每天第一次学习请求前，Agent 还会运行一次上游更新检查。当天状态按平台保存在 `.lingotrace/runtime-update-checks/`，所以不会在每条请求前重复联网。有更新时应合并成一至三点中文说明并询问是否更新，同时明确可以忽略；网络失败、拒绝更新或个人 fork 都不能阻止学习任务。技术契约见 [每日首次学习的运行时更新设计](daily-runtime-update-design.md)。
+
 ## 3. 日常怎么使用
 
 日常使用时，直接对 AI agent 说学习目标。不要把内部路径、函数名或实现细节当作用户指令。

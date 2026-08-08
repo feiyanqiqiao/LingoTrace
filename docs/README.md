@@ -8,6 +8,7 @@
 - [用户使用指南](getting-started.md)
 - [Agent 操作指南](operator-manual.md)
 - [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)
+- [每日首次学习的运行时更新设计](daily-runtime-update-design.md)
 - [Listening Runtime Isolation](listening-runtime-isolation.md)
 
 ## 开发与贡献

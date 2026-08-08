@@ -26,6 +26,7 @@ Do not copy full schemas or workflow details into this document. Read the agent 
 - A developer starts from `docs/developer-agent-setup.md`, uses a full checkout and a topic branch, and then reuses the learner setup for their real Vault.
 - Do not make learners fork the project, install GitHub CLI, read contributor documents, or run the public development test suite.
 - Before changing onboarding behavior, read `docs/installation-and-onboarding-design.md` and keep the learner and developer routes distinct.
+- Both journeys perform the non-blocking daily update check defined in `docs/daily-runtime-update-design.md`. Official runtimes may update only after explicit consent; personal forks must be left for the user to synchronize in the developer workspace.
 
 ## Path Roles
 

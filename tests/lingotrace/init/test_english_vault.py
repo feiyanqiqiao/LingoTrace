@@ -71,6 +71,9 @@ class EnglishVaultInitializationTests(unittest.TestCase):
             self.assertIn("lingotrace/packs/english/agent_skills/SKILL.md", instructions)
             self.assertIn("Obsidian Desktop and ListenKit are optional onboarding dependencies", instructions)
             self.assertIn("Do not block unrelated text-learning tasks", instructions)
+            self.assertIn("check-update --vault <this-vault>", instructions)
+            self.assertIn("one to three plain-Chinese points", instructions)
+            self.assertIn("If the report identifies a personal fork, do not pull", instructions)
 
     def test_invalid_runtime_root_blocks_initialization_before_writing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

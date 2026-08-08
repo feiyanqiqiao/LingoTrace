@@ -136,11 +136,15 @@ Workspace: /path/to/LingoTrace
 
 同一个运行时可以服务多个 Vault，但一次学习操作只能绑定一个 Vault。Vault 的目标语言由 `.lingotrace/vault-context.json` 决定，资料路径由 `.lingotrace/paths.json` 决定；运行时连接只回答“本机到哪里读取 LingoTrace 程序”，不能改变目标语言或学习资料路径。
 
+每天首次学习的上游检查另外使用 `.lingotrace/runtime-update-checks/<platform>.json`。它只保存本地日期、运行时路径、提交标识、更新数量和结果，不保存学习内容，也不覆盖其他平台状态。检查与安全应用命令见 [每日首次学习的运行时更新设计](daily-runtime-update-design.md)。
+
 ## 5. 安全边界
 
 - 初始化默认先预览，只有显式 `--apply` 才写入。
 - 初始化不覆盖已有文件。
 - 运行时注册只追加当前平台候选。
+- 上游检查每天、每平台最多自动运行一次；用户明确同意前不更新。
+- 个人 fork 永不由日常学习 Agent 自动 pull、merge、rebase、stash 或 reset。
 - Agent 不应把公共仓库当作私人 Vault。
 - Agent 不应绕过 LingoTrace core 直接修改学习文件。
 - 私人笔记、音频、Obsidian 状态和运行时连接不得进入公共 Git 提交。

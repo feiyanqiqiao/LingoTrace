@@ -65,6 +65,8 @@ preview -> apply -> second preview
 
 同一个运行时可以服务多个 Vault，但一次任务只能写一个 Vault。所有写入必须通过 Vault 上下文、能力检查、路径角色和 core 写入保护。
 
+每天第一次学习前，Agent 检查正式上游一次。有更新时只给出简短中文说明和选择权；正式运行时经明确同意后更新，个人 fork 只提示开发者自行同步。检查或更新不是学习任务的阻塞门槛。
+
 ## 5. 人与 Agent 的分工
 
 Agent 适合：
@@ -103,5 +105,6 @@ LingoTrace 当前不提供：
 - [Agent 操作指南](operator-manual.md)
 - [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)
 - [安装与双用户旅程设计](installation-and-onboarding-design.md)
+- [每日首次学习的运行时更新设计](daily-runtime-update-design.md)
 - [多语言架构](lingotrace_multilingual_architecture_plan.md)
 - [语言包贡献指南](multilingual/language-pack-contributor-guide.md)

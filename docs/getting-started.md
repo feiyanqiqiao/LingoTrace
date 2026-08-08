@@ -42,6 +42,10 @@ Agent 会让你选择英语或日语，建议 Vault 和运行时位置，检测 
 
 完成后，在 Codex 中打开 `LingoTrace-English` 或 `LingoTrace-Japanese` 作为日常项目工作区。程序运行时放在 Vault 外部，只用于更新和提供能力。
 
+以后每天第一次开始学习时，Agent 会检查一次 LingoTrace 正式版有没有更新。如果有，它会用中文告诉你主要新增或修复了什么，再问你要不要现在更新。你完全可以不回答或说“先不更新”，Agent 会继续处理今天的学习内容，同一天不会反复追问。
+
+如果你用的是正式版，明确同意后 Agent 才会安全更新；如果你连接的是自己 fork、改造过的版本，Agent 不会擅自拉取或合并，而会请你到开发仓库自行处理，避免破坏个人改动。
+
 如果你把 Vault 和运行时同步到 Windows、macOS 或 Linux 的另一台设备，Agent 会先查找当前系统保存的运行时路径。找不到时，它会询问你本机的 LingoTrace 目录，验证后只追加当前平台连接，不覆盖其他系统的路径。详细说明见 [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)。
 
 如果你以后想修改程序、增加语种或向上游贡献，不要在私人 Vault 中直接改运行时；另建完整开发仓库，并把 [开发者初始化协议](developer-agent-setup.md)交给 Agent。

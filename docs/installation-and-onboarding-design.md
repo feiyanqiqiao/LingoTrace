@@ -110,3 +110,7 @@ python3 -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
 - 开发者文档明确区分个人 fork、上游仓库、topic branch、CI 和下一次改动前的上游同步。
 - 初始化仍先预览、不覆盖，并验证生成的 Vault 可以解析当前平台运行时和语言 Skill。
 - README 和文档索引在首屏清楚分流学习者与开发者。
+
+## 7. 每日更新延续
+
+初始化不是一次性安装后就失去上游联系。两类用户在每天第一次学习前都执行一次轻量上游检查；正式 checkout 可在用户明确同意后安全快进，个人 fork 只提示自行同步。用户可以忽略更新并继续学习。完整状态、话术、fork 识别和更新保护见 [每日首次学习的运行时更新设计](daily-runtime-update-design.md)。

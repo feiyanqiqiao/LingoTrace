@@ -79,7 +79,9 @@ git -C <runtime-root> checkout main
 
 如果 Git 无法使用但 Python 可用，可以在获得同意后从上游 `main` 下载官方源码归档作为降级方案；必须验证归档中存在 `lingotrace/__init__.py`，并告知用户以后不能用 Git 增量更新。
 
-以后用户要求更新正式运行时时，先确认 sparse checkout 仍在 `main`、工作区干净且 `origin` 是可信上游，再执行 `git -C <runtime-root> pull --ff-only origin main` 并重新运行诊断和运行时解析。发现本地改动时不得覆盖，应提示改用完整开发者工作区处理。
+初始化完成后，每天第一次学习请求前执行 `python3 -m lingotrace.init check-update --vault <vault-root> --runtime-root <runtime-root>`。当天已经检查时命令不会再次联网。有更新时根据结构化 commit 信息，用一至三点中文概括新增、修复或维护内容，询问是否现在更新，并明确用户可以忽略、继续学习。
+
+只有用户清楚地说“更新”或同等明确表达后，才执行 `python3 -m lingotrace.init apply-update --vault <vault-root> --runtime-root <runtime-root> --apply`。正式 sparse checkout 只有在 `main` 干净且可以快进时才会更新；识别为个人 fork 时不得自动 pull、merge、rebase、stash 或 reset，应请用户在开发仓库自行同步。检查失败或用户不更新都不阻止学习。
 
 ## 第 4 步：运行统一诊断
 

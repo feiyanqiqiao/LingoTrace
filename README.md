@@ -26,6 +26,8 @@ LingoTrace 的主要使用方式是：用户用自然语言提出学习任务，
 
 日常学习时，应把私人 Vault 作为 Agent 工作区；LingoTrace 公共仓库作为 Vault 外部运行时。初始化器会生成 Vault 根 `AGENTS.md` 和当前操作系统的运行时连接，使 Agent 能从 Vault 工作区发现语言包。Windows、macOS 和 Linux 分别保存连接，不会相互覆盖。
 
+每天第一次开始学习时，Agent 会顺手检查一次正式上游有没有更新。有更新时，它会用中文概括一至三点并问你是否现在更新；你可以不理会，继续当天学习。正式上游运行时只有在你明确同意后才安全快进；如果连接的是你自己的 fork，Agent 不会代替你 pull 或合并，只会提醒你到开发仓库自行同步。
+
 你可以直接这样说：
 
 - “请把这段音频做成精听稿。”
@@ -55,6 +57,8 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 
 普通用户的最小 Git checkout 只包含 `lingotrace/` 运行时，不包含测试、开发工具和贡献文档；开发者使用完整 checkout。技术边界见 [安装与双用户旅程设计](docs/installation-and-onboarding-design.md)和 [Vault 初始化与跨平台运行时连接](docs/vault-initialization-and-runtime-connections.md)。
 
+每日检查按设备和操作系统分别记录，同一天不会反复联网或反复询问。检查失败、网络不可用、忽略更新或 fork 提示都不会阻止原来的学习任务。详见 [每日首次学习的运行时更新设计](docs/daily-runtime-update-design.md)。
+
 ---
 
 ## 📚 当前文档
@@ -64,6 +68,7 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 - 🗂️ **[文档索引](docs/README.md)**：当前文档入口与文档生命周期规则。
 - 🧑‍🎓 **[学习者 Agent 安装协议](docs/learner-agent-setup.md)**：从 GitHub Raw 读取的一句话安装入口。
 - 🧑‍💻 **[开发者 Agent 初始化协议](docs/developer-agent-setup.md)**：fork、分支、上游同步、PR 与 CI 的逐步流程。
+- 🔄 **[每日首次学习的运行时更新设计](docs/daily-runtime-update-design.md)**：每天一次检查、人话摘要、忽略选项与 fork 安全边界。
 - 🏗️ **[产品与能力说明](docs/lingotrace_product_document.md)**：说明当前产品定位、学习闭环、能力和数据边界。
 - 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
 - 🌐 **[多语言架构](docs/lingotrace_multilingual_architecture_plan.md)**：当前正式架构来源，定义单语言 Vault、外部运行时、语言包和跨平台连接。

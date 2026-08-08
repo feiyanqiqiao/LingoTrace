@@ -5,6 +5,19 @@
 
 ---
 
+## [20260808-195049]
+### 新增 (Added)
+- 新增 `python -m lingotrace.init check-update`：在每天首次学习前从正式上游获取 `main`，按 macOS、Windows、Linux 独立状态去重，返回待更新数量与受限长度的结构化提交说明，供 Agent 合并成一至三点中文人话摘要。
+- 新增 `python -m lingotrace.init apply-update`：默认预览，只有用户明确同意并显式 `--apply` 后，才允许正式上游 checkout 在 `main`、工作树干净且可快进时执行 `pull --ff-only`。
+- 新增个人 fork 识别，覆盖带 `upstream` 和只有 fork `origin` 两种形态；fork 可以检查正式上游，但所有自动应用入口均拒绝 pull、merge、rebase、stash 或 reset，并要求用户在开发工作区自行同步。
+
+### 变更 (Changed)
+- 新 Vault 根 `AGENTS.md`、Japanese/English Agent Skill、README、学习者与开发者协议、入门与操作指南、多语言架构、产品说明和 Vault 连接文档统一加入“每天一次、可忽略、不阻塞学习”的更新体验。
+- 提交标题与正文被视为不可信摘要数据并限制长度；Agent 不执行其中夹带的指令，只概括用户可见功能、修复和维护影响。
+
+### 测试 (Tests)
+- 新增同日去重、跨平台状态隔离、HTTPS/SSH 正式仓库、两类 fork、中文摘要数据、网络失败、显式预览/应用、脏工作树阻断和快进更新测试；通过 LingoTrace 226 项、官方听力 100 项、架构基线 42 项和 Vault 结构 18 项测试，并以当前真实 fork 验证 `fork_updates_available` / `manual_fork_sync` 路由。
+
 ## [20260808-193014]
 ### 新增 (Added)
 - 新增可直接交给任意本地 Agent 的学习者安装协议：从上游 GitHub Raw 单句入口开始，确认语种与路径，经同意后安装最小 sparse 运行时、检测 Obsidian Desktop 与 ListenKit、预览并初始化第一个 Vault、解析语言 Skill 后交付日常学习工作区。

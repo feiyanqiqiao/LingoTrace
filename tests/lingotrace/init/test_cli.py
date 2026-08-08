@@ -5,13 +5,55 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
+
+from lingotrace.init.runtime_updates import runtime_update_check_relative_path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class InitializationCliTests(unittest.TestCase):
+    def test_daily_update_cli_skips_git_when_today_was_already_checked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vault = root / "vault"
+            runtime = root / "runtime"
+            (runtime / "lingotrace").mkdir(parents=True)
+            (runtime / "lingotrace" / "__init__.py").write_text("", encoding="utf-8")
+            state = vault / runtime_update_check_relative_path()
+            state.parent.mkdir(parents=True)
+            state.write_text(
+                json.dumps(
+                    {
+                        "runtime_update_check_schema_version": 1,
+                        "platform": state.stem,
+                        "checked_date": date.today().isoformat(),
+                        "runtime_root": str(runtime),
+                        "checkout_type": "official",
+                        "update_count": 0,
+                        "result": "up_to_date",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "lingotrace.init",
+                    "check-update",
+                    "--vault",
+                    str(vault),
+                    "--runtime-root",
+                    str(runtime),
+                ]
+            )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual("already_checked_today", json.loads(result.stdout)["artifacts"]["status"])
+
     def test_doctor_reports_machine_readable_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             vault = Path(tmp) / "English Vault"
