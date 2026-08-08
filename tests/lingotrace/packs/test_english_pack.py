@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lingotrace.core.capabilities import PHASE0_CAPABILITY_IDS
+from lingotrace.core.capabilities import PUBLIC_CAPABILITY_IDS
 from lingotrace.core.manifests import load_language_pack_manifest
 from lingotrace.packs.english import workflows
 
@@ -159,7 +159,7 @@ def review_card(
 
 
 # ---------------------------------------------------------------------------
-# Manifest & static tests (Phase 2.0 baseline)
+# Manifest and static capability tests
 # ---------------------------------------------------------------------------
 
 
@@ -176,19 +176,19 @@ class EnglishPackTests(unittest.TestCase):
         self.assertEqual("en", result.manifest.target_language)
 
     def test_declared_capabilities_are_subset_of_phase0_ids(self):
-        """2. All declared capabilities use reviewed IDs from PHASE0_CAPABILITY_IDS."""
+        """2. All declared capabilities use reviewed public capability IDs."""
         result = load_language_pack_manifest(MANIFEST_PATH)
         assert result.manifest is not None
         declared_ids = set(result.manifest.capabilities) | set(result.manifest.unsupported_capabilities)
-        self.assertTrue(declared_ids.issubset(PHASE0_CAPABILITY_IDS))
-        self.assertEqual(PHASE0_CAPABILITY_IDS, declared_ids)
+        self.assertTrue(declared_ids.issubset(PUBLIC_CAPABILITY_IDS))
+        self.assertEqual(PUBLIC_CAPABILITY_IDS, declared_ids)
 
     def test_all_phase0_capabilities_are_supported(self):
-        """3. English no longer leaves a Phase 0 capability unsupported."""
+        """3. English leaves no public capability unsupported."""
         result = load_language_pack_manifest(MANIFEST_PATH)
         assert result.manifest is not None
         self.assertEqual({}, result.manifest.unsupported_capabilities)
-        self.assertEqual(PHASE0_CAPABILITY_IDS, set(result.manifest.capabilities))
+        self.assertEqual(PUBLIC_CAPABILITY_IDS, set(result.manifest.capabilities))
 
     def test_language_fields_are_english_pack_owned(self):
         """4. fields.json declares English-owned fields, not Japanese fields."""

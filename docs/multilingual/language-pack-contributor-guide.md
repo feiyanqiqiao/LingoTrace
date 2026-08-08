@@ -50,17 +50,18 @@ Do not place new runtime work in old root folders. Do not create private Vault f
 
 ## Capabilities And Maturity
 
-The shared capability IDs come from `PHASE0_CAPABILITY_IDS`:
+The shared capability IDs come from `PUBLIC_CAPABILITY_IDS`:
 
 - `listening_notes`
 - `source_notes`
 - `review_materials`
 - `speaking_cards`
 - `review_rollover`
+- `total_training_dashboard`
 
-Pack-owned dashboard views, such as a total-training dashboard, are not workflow capability IDs, but they still need capability guidance and pack-level tests when provided.
+Each pack can implement a subset, but every implemented capability needs manifest evidence, Agent guidance, and pack-level tests.
 
-A new pack does not need to implement all five capabilities in the first PR. The recommended first slice is:
+A new pack does not need to implement every capability in the first PR. The recommended first slice is:
 
 - `source_notes`
 - `review_materials`
@@ -103,9 +104,9 @@ When a capability is not ready, fail explicitly through `unsupported_capabilitie
 The public runtime now proves the full capability contract with the Japanese and English packs. Remaining limits for a third language are:
 
 - core context currently accepts `target_language=ja` and `target_language=en`, with `explanation_language=zh`.
-- initializer planners exist for Japanese and English; a third language still needs its own pack-driven planner or a proven generic extraction.
+- the shared initializer can preview and apply Japanese and English Vault scaffolds, including portable Agent instructions and platform-specific runtime connections; a third language still needs a reviewed pack wrapper and initialization evidence.
 - the official listening tool auto-selects Japanese or English from Vault context. A third language must add locale, rendering, and pronunciation-resource evidence before declaring listening support.
-- `PHASE0_CAPABILITY_IDS` is reusable as the public capability set, but each pack can implement only a subset.
+- `PUBLIC_CAPABILITY_IDS` is the public capability set, but each pack can implement only a subset.
 - migration tooling and target rehearsal still assume Japanese pack inputs unless explicitly generalized.
 
 Before implementing a third language, first plan the required core context, initializer, and listening-locale generalization. Do not work around these limits by importing another pack's workflow or language resources.

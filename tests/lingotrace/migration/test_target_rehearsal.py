@@ -25,8 +25,11 @@ class TargetVaultRehearsalTests(unittest.TestCase):
         self.assertEqual("write_json", planned_by_path[".lingotrace/vault-context.json"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/focus-vocab-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["views/total-training.base"]["action"])
-        for entry in envelope["planned_writes"]:
-            self.assertEqual("recreate-from-pack", entry["artifact_class"])
+        self.assertEqual("recreate-from-pack", planned_by_path["AGENTS.md"]["artifact_class"])
+        runtime_entries = [
+            entry for entry in envelope["planned_writes"] if entry["artifact_class"] == "vault-local-runtime-connection"
+        ]
+        self.assertEqual(1, len(runtime_entries))
 
     def test_rehearsal_blocks_existing_target_conflicts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

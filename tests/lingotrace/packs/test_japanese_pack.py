@@ -6,7 +6,7 @@ import re
 import unittest
 from pathlib import Path
 
-from lingotrace.core.capabilities import PHASE0_CAPABILITY_IDS
+from lingotrace.core.capabilities import PUBLIC_CAPABILITY_IDS
 from lingotrace.core.manifests import load_language_pack_manifest
 from lingotrace.packs.japanese import workflows
 
@@ -105,7 +105,7 @@ class JapanesePackTests(unittest.TestCase):
         self.assertEqual("lingo-japanese", result.manifest.language_pack_id)
         self.assertEqual("0.1.0", result.manifest.language_pack_version)
         self.assertEqual("ja", result.manifest.target_language)
-        self.assertEqual(PHASE0_CAPABILITY_IDS, set(result.manifest.capabilities))
+        self.assertEqual(PUBLIC_CAPABILITY_IDS, set(result.manifest.capabilities))
         self.assertEqual({}, result.manifest.unsupported_capabilities)
 
         for capability in result.manifest.capabilities.values():

@@ -4,19 +4,29 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 
 它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**
 
-本仓库开源 LingoTrace 公共核心、日语语言包、初始化模板、迁移工具和公共验证测试。私人 Vault 中的真实学习资料、音频、每日记录和运行产物不属于本仓库。
+本仓库开源 LingoTrace 公共核心、日语与英语语言包、初始化模板、迁移工具和公共验证测试。私人 Vault 中的真实学习资料、音频、每日记录和运行产物不属于本仓库。
 
 ---
 
-> 🌟 **如果你是普通外语学习者（非开发者），请首先阅读 [👉 LingoTrace 新手入门指南](docs/getting-started.md)，了解如何像指挥私人助理一样在 Obsidian 中沉浸式学习！**
->
-> ⚙️ **如果你是负责驱动系统的 AI Agent，或是想了解系统约束的进阶极客，请务必查阅 [👉 系统与 Agent 操作手册](docs/operator-manual.md)，其中定义了自然语言指令规范与护栏边界。**
+## 一句话开始
+
+如果你只想使用 LingoTrace 学习，不准备改代码，把下面整句话发给能操作本机文件和命令的 AI Agent：
+
+> 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
+
+Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。Obsidian 与 ListenKit 可以延期，但 LingoTrace 运行时、Python 和第一个 Vault 必须完成。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
+
+如果你想 fork 并增加语种或功能，把 [开发者初始化协议](docs/developer-agent-setup.md)交给 Agent。它会带你完成 GitHub 账号与 `gh` 检查、fork、remotes、topic branch、测试、推送、上游 PR 和 CI 检查；开发者的实际学习 Vault 仍复用上面的学习者流程。
 
 ---
 
 ## 🚀 日常入口与核心工作流
 
 LingoTrace 的主要使用方式是：用户用自然语言提出学习任务，由 Codex 或兼容的 AI agent 读取当前 Vault 所选语言包的 Agent Skill，并把任务保存到对应的日语或英语学习库。
+
+日常学习时，应把私人 Vault 作为 Agent 工作区；LingoTrace 公共仓库作为 Vault 外部运行时。初始化器会生成 Vault 根 `AGENTS.md` 和当前操作系统的运行时连接，使 Agent 能从 Vault 工作区发现语言包。Windows、macOS 和 Linux 分别保存连接，不会相互覆盖。
+
+每天第一次开始学习时，Agent 会顺手检查一次正式上游有没有更新。有更新时，它会用中文概括一至三点并问你是否现在更新；你可以不理会，继续当天学习。正式上游运行时只有在你明确同意后才安全快进；如果连接的是你自己的 fork，Agent 不会代替你 pull 或合并，只会提醒你到开发仓库自行同步。
 
 你可以直接这样说：
 
@@ -34,17 +44,36 @@ Agent Skill 会把这些自然语言请求映射到听力笔记、来源笔记�
 
 ---
 
-## 📚 深度阅读与白皮书文档
+## 两个目录、两个工作区角色
+
+普通使用者的推荐结构是：
+
+```text
+LingoTrace runtime/       # 正式程序与语言包，用于更新
+LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
+```
+
+日常学习时在 Codex 中打开私人 Vault；修改程序时才打开完整的开发仓库。初始化器会把两者连接起来。换设备后，如果本机路径变化，Agent 会询问并追加当前平台路径，不覆盖其他系统记录。
+
+普通用户的最小 Git checkout 只包含 `lingotrace/` 运行时，不包含测试、开发工具和贡献文档；开发者使用完整 checkout。技术边界见 [安装与双用户旅程设计](docs/installation-and-onboarding-design.md)和 [Vault 初始化与跨平台运行时连接](docs/vault-initialization-and-runtime-connections.md)。
+
+每日检查按设备和操作系统分别记录，同一天不会反复联网或反复询问。检查失败、网络不可用、忽略更新或 fork 提示都不会阻止原来的学习任务。详见 [每日首次学习的运行时更新设计](docs/daily-runtime-update-design.md)。
+
+---
+
+## 📚 当前文档
 
 为了更好地了解本系统的产品哲学、架构约束与适用人群，请参阅 `docs/` 目录下的详细分析报告：
 
-- 📖 **[功能模块与用户旅程审计报告](docs/lingotrace_audit_report.md)**：将外语学习的实际痛点场景映射到 LingoTrace 系统工作流中的全周期拆解。
-- 🏗️ **[产品需求与架构白皮书](docs/lingotrace_product_document.md)**：包含详细的业务流转逻辑、双层词库架构分析和元数据（Frontmatter）字典级约束。
+- 🗂️ **[文档索引](docs/README.md)**：当前文档入口与文档生命周期规则。
+- 🧑‍🎓 **[学习者 Agent 安装协议](docs/learner-agent-setup.md)**：从 GitHub Raw 读取的一句话安装入口。
+- 🧑‍💻 **[开发者 Agent 初始化协议](docs/developer-agent-setup.md)**：fork、分支、上游同步、PR 与 CI 的逐步流程。
+- 🔄 **[每日首次学习的运行时更新设计](docs/daily-runtime-update-design.md)**：每天一次检查、人话摘要、忽略选项与 fork 安全边界。
+- 🏗️ **[产品与能力说明](docs/lingotrace_product_document.md)**：说明当前产品定位、学习闭环、能力和数据边界。
 - 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
-- 🌐 **[多语言架构总体规划方案](docs/lingotrace_multilingual_architecture_plan.md)**：多语言演进的正式规划来源，定义单目标语言 Vault、公共核心、语言包、兼容策略和阶段门槛。
+- 🌐 **[多语言架构](docs/lingotrace_multilingual_architecture_plan.md)**：当前正式架构来源，定义单语言 Vault、外部运行时、语言包和跨平台连接。
 - 🧩 **[新语言包贡献指南](docs/multilingual/language-pack-contributor-guide.md)**：项目组成员和其他 Agent 开发 Korean、German 等后续语言包时的接入边界、目录结构、禁止项和验收规则。不要直接复制 Japanese pack 的语言学规则。
 - 🤖 **[新语言包 Agent 交接模板](docs/multilingual/language-pack-agent-handoff-template.md)**：把新语言包任务交给 Codex、Claude Code、Trae 等 Agent 时可直接复用的任务说明模板。
-- 🔮 **[多语种与多 Agent 终端演进方案](docs/lingotrace_multilingual_multiagent_design.md)**：早期研究材料，用于保留问题分析和多 Agent 讨论；其中的多语言架构建议以正式总体规划为准。
 
 ---
 
@@ -63,9 +92,9 @@ Agent Skill 会把这些自然语言请求映射到听力笔记、来源笔记�
 - `lingotrace/`：公共核心、日语与英语语言包、Vault 初始化和迁移支持代码。
 - `tests/lingotrace/`：核心、语言包、初始化和迁移行为测试。
 - `tools/git/`：公共仓库安全检查，防止私人 Vault 文件进入提交。
-- `tools/architecture-baseline/`：架构契约与历史行为基线测试。
+- `tools/architecture-baseline/`：架构契约与当前行为基线测试。
 - `tools/listening-transcribe-official/`：听力链相关的公共工具和测试。
-- `docs/`：产品、架构、阶段路线和 runbook 文档。
+- `docs/`：当前产品、架构、使用和语言包契约文档。
 
 ---
 

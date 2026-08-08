@@ -1859,8 +1859,10 @@ def _parse_yaml_scalar(raw_value: str) -> Any:
         return []
     if raw_value in {"true", "false"}:
         return raw_value == "true"
-    if raw_value.isdigit():
+    try:
         return int(raw_value)
+    except ValueError:
+        pass
     if len(raw_value) >= 2 and raw_value[0] == raw_value[-1] == '"':
         try:
             return json.loads(raw_value)

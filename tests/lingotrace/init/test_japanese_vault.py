@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from lingotrace.init.japanese_vault import plan_japanese_vault_initialization
+from lingotrace.init.japanese_vault import initialize_japanese_vault, plan_japanese_vault_initialization
+from lingotrace.init.runtime_connections import runtime_connection_relative_path
 
 
 class JapaneseVaultInitializationTests(unittest.TestCase):
@@ -25,6 +26,8 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
 
         self.assertEqual("write_json", planned_by_path[".lingotrace/vault-context.json"]["action"])
         self.assertEqual("write_json", planned_by_path[".lingotrace/paths.json"]["action"])
+        self.assertEqual("write_text", planned_by_path["AGENTS.md"]["action"])
+        self.assertEqual("write_json", planned_by_path[runtime_connection_relative_path()]["action"])
         self.assertEqual("create_directory", planned_by_path["review/focus/vocab"]["action"])
         self.assertEqual("create_directory", planned_by_path["review/pronunciation/accent"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/focus-vocab-card.md"]["action"])
@@ -32,8 +35,10 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/error-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["views/total-training.base"]["action"])
 
-        for entry in envelope["planned_writes"]:
-            self.assertEqual("recreate-from-pack", entry["artifact_class"])
+        self.assertEqual(
+            "vault-local-runtime-connection",
+            planned_by_path[runtime_connection_relative_path()]["artifact_class"],
+        )
 
     def test_generated_context_binds_one_target_language_and_one_pack(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -85,6 +90,20 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
             self.assertFalse((root / "review").exists())
             self.assertFalse((root / "templates").exists())
             self.assertFalse((root / "views").exists())
+
+    def test_apply_creates_complete_japanese_vault(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "Japanese Vault"
+            report = initialize_japanese_vault(root)
+
+            self.assertTrue(report.accepted, report.to_dict())
+            self.assertTrue((root / "AGENTS.md").is_file())
+            self.assertTrue((root / runtime_connection_relative_path()).is_file())
+            self.assertTrue((root / "templates/focus-vocab-card.md").is_file())
+            self.assertIn(
+                "lingotrace/packs/japanese/agent_skills/SKILL.md",
+                (root / "AGENTS.md").read_text(encoding="utf-8"),
+            )
 
 
 if __name__ == "__main__":

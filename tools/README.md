@@ -2,11 +2,9 @@
 
 此目录只放可重复使用、适合纳入版本控制的工具。一次性资料修复脚本、临时转写产物与历史脚本应放入 `tmp/legacy/`，不要留在 `tools/`。
 
-## Phase 1 Runtime
+## Public Runtime
 
-Phase 1 的公共 runtime 入口位于 `lingotrace/`，测试位于 `tests/lingotrace/`。贡献者应从 `docs/multilingual/language-pack-contributor-guide.md` 了解可修改范围、禁止范围、测试命令与公开提交检查。
-
-这一阶段只建立核心契约、Japanese pack 边界、新 Japanese Vault dry-run scaffold、migration inventory dry-run 和贡献者文档；不代表英语支持、真实私有资料迁移、日常切换或旧框架移除已交付。
+公共 runtime 位于 `lingotrace/`，测试位于 `tests/lingotrace/`。Japanese 和 English pack 均提供完整能力。Vault 初始化、跨平台运行时连接和连接解析通过 `python -m lingotrace.init` 使用；贡献者应从 `docs/multilingual/language-pack-contributor-guide.md` 了解可修改范围、禁止范围、测试命令与公开提交检查。
 
 ## Listening Transcribe
 

@@ -8,9 +8,9 @@ Related guidance index: [Language Pack Capability Guidance](language-pack-capabi
 
 ## Purpose
 
-This document defines the user-facing behavior that should survive migration of the review-material extraction and maintenance workflow across language packs. It is based on the old Japanese `jp-review-material-maintainer` skill and the current public `review_materials` capability.
+This document defines the current user-facing behavior required from the public `review_materials` capability across language packs. Japanese and English implementations plus current public tests provide the reference evidence.
 
-The migration rule is simple: review-material behavior is not considered migrated until it has a user story, acceptance criteria, and regression or manual-review evidence.
+Review-material behavior is not considered supported until it has a user story, acceptance criteria, and regression or manual-review evidence.
 
 ## Applicability
 
@@ -275,7 +275,7 @@ Acceptance criteria:
 
 Japanese reference:
 
-- Old `jp-review-material-maintainer` treated images embedded under `## 単語` as possible vocabulary sources.
+- The current Japanese `review_materials` capability treats images embedded under `## 単語` as possible vocabulary sources.
 
 Regression coverage:
 

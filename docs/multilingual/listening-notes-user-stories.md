@@ -8,9 +8,9 @@ Related guidance index: [Language Pack Capability Guidance](language-pack-capabi
 
 ## Purpose
 
-This document defines the user-facing behavior that should survive migration of the listening script generation workflow across language packs. It is based on the old Japanese listening note template, the `jp-listening-script-generator` skill, and the current public listening contract tests.
+This document defines the current user-facing behavior required from the `listening_notes` capability across language packs. Japanese and English implementations plus current public tests provide the reference evidence.
 
-The migration rule is simple: listening-note behavior is not considered migrated until it has a user story, acceptance criteria, and regression or manual-review evidence.
+Listening-note behavior is not considered supported until it has a user story, acceptance criteria, and regression or manual-review evidence.
 
 ## Applicability
 
@@ -126,12 +126,12 @@ Acceptance criteria:
 - Useful sentence promotion to speaking cards is routed to `speaking_cards`.
 - The listening workflow may report downstream candidates but must not silently create review cards or speaking cards.
 
-Japanese reference:
+Current capability boundary:
 
-- `jp-listening-script-generator` is for fixed listening-practice notes.
-- `jp-source-note-generator` owns flexible source notes.
-- `jp-review-material-maintainer` owns review cards.
-- `jp-survival-speaking-card-generator` owns speaking-card promotion.
+- `listening_notes` owns fixed listening-practice notes.
+- `source_notes` owns flexible source notes.
+- `review_materials` owns review cards.
+- `speaking_cards` owns speaking-card promotion.
 
 Regression coverage:
 
