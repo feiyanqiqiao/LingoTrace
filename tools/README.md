@@ -4,7 +4,7 @@
 
 ## Public Runtime
 
-公共 runtime 位于 `lingotrace/`，测试位于 `tests/lingotrace/`。Japanese 和 English pack 均提供完整能力。Vault 初始化、跨平台运行时连接和连接解析通过 `python -m lingotrace.init` 使用；贡献者应从 `docs/multilingual/language-pack-contributor-guide.md` 了解可修改范围、禁止范围、测试命令与公开提交检查。
+公共 runtime 位于 `lingotrace/`，测试位于 `tests/lingotrace/`。Japanese 和 English pack 均提供完整能力。Vault 初始化、跨平台 LingoTrace/ListenKit 连接和连接解析通过 `python -m lingotrace.init` 使用；贡献者应从 `docs/multilingual/language-pack-contributor-guide.md` 了解可修改范围、禁止范围、测试命令与公开提交检查。
 
 ## Listening Transcribe
 

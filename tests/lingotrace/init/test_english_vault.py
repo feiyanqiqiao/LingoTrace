@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from lingotrace.init.english_vault import initialize_english_vault, plan_english_vault_initialization
+from lingotrace.init.listenkit_connections import listenkit_connection_relative_path
 from lingotrace.init.runtime_connections import current_platform, runtime_connection_relative_path
 
 
@@ -74,6 +76,25 @@ class EnglishVaultInitializationTests(unittest.TestCase):
             self.assertIn("check-update --vault <this-vault>", instructions)
             self.assertIn("one to three plain-Chinese points", instructions)
             self.assertIn("If the report identifies a personal fork, do not pull", instructions)
+            self.assertIn("resolve-listenkit --vault <this-vault>", instructions)
+            self.assertIn("reinstalling ListenKit or selecting an existing ListenKit directory", instructions)
+
+    def test_initialization_can_record_a_confirmed_listenkit_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vault = root / "English Vault"
+            listenkit = root / "ListenKit"
+            (listenkit / "cli").mkdir(parents=True)
+            (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+
+            report = initialize_english_vault(vault, listenkit_root=listenkit)
+
+            self.assertTrue(report.accepted, report.to_dict())
+            connection = json.loads(
+                (vault / listenkit_connection_relative_path()).read_text(encoding="utf-8")
+            )
+            self.assertEqual(str(listenkit), connection["connections"][0]["listenkit_root"])
 
     def test_invalid_runtime_root_blocks_initialization_before_writing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

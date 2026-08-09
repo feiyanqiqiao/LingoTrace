@@ -138,6 +138,8 @@ Workspace: /path/to/LingoTrace
 
 每天首次学习的上游检查另外使用 `.lingotrace/runtime-update-checks/<platform>.json`。它只保存本地日期、运行时路径、提交标识、更新数量和结果，不保存学习内容，也不覆盖其他平台状态。检查与安全应用命令见 [每日首次学习的运行时更新设计](daily-runtime-update-design.md)。
 
+ListenKit 使用独立的 `.lingotrace/listenkit-connections/<platform>.json`，不与 LingoTrace 运行时路径混写。安装目录建议、用户自选路径和失联恢复见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
+
 ## 5. 安全边界
 
 - 初始化默认先预览，只有显式 `--apply` 才写入。
