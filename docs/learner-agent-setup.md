@@ -33,11 +33,11 @@
 
 | 平台 | Vault | LingoTrace 运行时 | ListenKit 程序 |
 | --- | --- | --- | --- |
-| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/dependencies/ListenKit` |
-| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\dependencies\ListenKit` |
-| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/dependencies/ListenKit` |
+| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/ListenKit` |
+| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\ListenKit` |
+| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit` |
 
-日语把目录名改为 `LingoTrace-Japanese`。显示解析后的绝对路径并让用户确认。Vault 和运行时必须分开，且不能互相嵌套。ListenKit 建议目录不是强制值；用户可以选择其他绝对路径。
+日语把目录名改为 `LingoTrace-Japanese`。显示解析后的绝对路径并让用户确认。Vault 和运行时必须分开，且不能互相嵌套。ListenKit 默认建议始终是实际 LingoTrace 运行时所在目录的同级 `ListenKit`；如果用户为运行时选择了其他位置，应随之重新计算，而不是继续使用表中的示例。ListenKit 建议目录不是强制值，用户可以选择其他绝对路径。
 
 ## 第 2 步：只读预检
 

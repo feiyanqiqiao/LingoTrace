@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path, PureWindowsPath
-from typing import Any, Mapping
+from typing import Any
 
 from lingotrace.core.reports import CommandReport, Finding
-from lingotrace.init.runtime_connections import current_platform
+from lingotrace.init.runtime_connections import current_platform, resolve_runtime_connection
 
 
 LISTENKIT_CONNECTION_SCHEMA_VERSION = 1
@@ -19,26 +18,14 @@ def listenkit_connection_relative_path(platform_name: str | None = None) -> str:
 
 def recommended_listenkit_root(
     *,
+    runtime_root: str | Path,
     platform_name: str | None = None,
-    home: str | Path | None = None,
-    environ: Mapping[str, str] | None = None,
 ) -> str:
     platform_id = current_platform(platform_name)
-    environment = dict(os.environ if environ is None else environ)
-    home_path = Path(home) if home is not None else Path.home()
-
-    if platform_id == "macos":
-        root = home_path / "Library" / "Application Support" / "LingoTrace" / "dependencies" / "ListenKit"
-    elif platform_id == "windows":
-        raw_home = environment.get("USERPROFILE", str(home) if home is not None else str(home_path))
-        windows_home = PureWindowsPath(raw_home)
-        local_app_data = PureWindowsPath(
-            environment.get("LOCALAPPDATA", str(windows_home / "AppData" / "Local"))
-        )
-        root = local_app_data / "LingoTrace" / "dependencies" / "ListenKit"
+    if platform_id == "windows":
+        root = PureWindowsPath(str(runtime_root)).parent / "ListenKit"
     else:
-        data_home = Path(environment.get("XDG_DATA_HOME", str(home_path / ".local" / "share")))
-        root = data_home / "lingotrace" / "dependencies" / "ListenKit"
+        root = Path(runtime_root).parent / "ListenKit"
     return str(root)
 
 
@@ -152,17 +139,19 @@ def resolve_listenkit_connection(
     vault_root: str | Path,
     *,
     platform_name: str | None = None,
-    home: str | Path | None = None,
-    environ: Mapping[str, str] | None = None,
 ) -> CommandReport:
     vault = Path(vault_root)
     platform_id = current_platform(platform_name)
     relative_path = listenkit_connection_relative_path(platform_id)
     connection_path = vault / relative_path
-    recommendation = recommended_listenkit_root(
-        platform_name=platform_id,
-        home=home,
-        environ=environ,
+    runtime_report = resolve_runtime_connection(vault, platform_name=platform_id)
+    recommendation = (
+        recommended_listenkit_root(
+            runtime_root=runtime_report.artifacts["runtime_root"],
+            platform_name=platform_id,
+        )
+        if runtime_report.accepted
+        else None
     )
 
     if not connection_path.exists():
@@ -202,10 +191,15 @@ def resolve_listenkit_connection(
             )
         stale_candidates.append(str(listenkit_root))
 
+    location_instruction = (
+        f"suggested location: {recommendation}"
+        if recommendation is not None
+        else "resolve the LingoTrace runtime before suggesting its sibling ListenKit directory"
+    )
     message = (
         "Configured ListenKit paths are unavailable on this device. Ask the user whether to reinstall ListenKit "
-        f"(suggested location: {recommendation}) or provide an existing ListenKit directory. Validate the selected "
-        "directory and append it to the current platform connection file."
+        f"({location_instruction}) or provide an existing ListenKit directory. Validate the selected directory "
+        "and append it to the current platform connection file."
     )
     artifacts = _recovery_artifacts(recommendation)
     artifacts["unavailable_listenkit_roots"] = json.dumps(stale_candidates, ensure_ascii=False)
@@ -226,12 +220,16 @@ def is_usable_listenkit_root(root: Path) -> bool:
 def _listenkit_required_report(
     platform_id: str,
     relative_path: str,
-    recommendation: str,
+    recommendation: str | None,
     reason: str,
 ) -> CommandReport:
+    if recommendation is None:
+        location_instruction = "Resolve the LingoTrace runtime first, then suggest its sibling ListenKit directory."
+    else:
+        location_instruction = f"Suggest the LingoTrace runtime's sibling directory ({recommendation})."
     message = (
-        f"{reason} Ask the user whether to install ListenKit at the suggested location ({recommendation}), choose "
-        "another installation location, or provide an existing ListenKit directory. After validation, save only "
+        f"{reason} {location_instruction} Ask the user whether to install there, choose another installation "
+        "location, or provide an existing ListenKit directory. After validation, save only "
         f"the {platform_id} connection to {relative_path}; do not modify other platforms."
     )
     return CommandReport(
@@ -243,9 +241,8 @@ def _listenkit_required_report(
     )
 
 
-def _recovery_artifacts(recommendation: str) -> dict[str, str]:
-    return {
-        "recommended_listenkit_root": recommendation,
+def _recovery_artifacts(recommendation: str | None) -> dict[str, str]:
+    artifacts = {
         "recovery_options": json.dumps(
             [
                 {"id": "reinstall", "description": "Install ListenKit again after user consent."},
@@ -254,6 +251,9 @@ def _recovery_artifacts(recommendation: str) -> dict[str, str]:
             ensure_ascii=False,
         ),
     }
+    if recommendation is not None:
+        artifacts["recommended_listenkit_root"] = recommendation
+    return artifacts
 
 
 def _listenkit_root_findings(root: Path) -> list[Finding]:

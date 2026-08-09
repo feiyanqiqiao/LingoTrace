@@ -43,9 +43,10 @@ class OnboardingDocumentationContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         for required in (
-            "Application Support/LingoTrace/dependencies/ListenKit",
-            "%LOCALAPPDATA%\\LingoTrace\\dependencies\\ListenKit",
-            "${XDG_DATA_HOME:-~/.local/share}/lingotrace/dependencies/ListenKit",
+            "LingoTrace 运行时所在目录的同级 `ListenKit`",
+            "/Users/name/Documents/Project/ListenKit",
+            "%LOCALAPPDATA%\\LingoTrace\\ListenKit",
+            "${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit",
             ".lingotrace/listenkit-connections/<platform>.json",
             "resolve-listenkit",
             "重新安装 ListenKit",

@@ -4,13 +4,14 @@ ListenKit 是 LingoTrace 的可选媒体依赖，负责音视频获取、转写�
 
 ## 1. 安装前必须确认位置
 
-Agent 在下载或安装 ListenKit 前，必须先显示当前平台的建议目录，并允许用户指定其他绝对路径：
+Agent 在下载或安装 ListenKit 前，必须先解析当前设备的 LingoTrace 运行时。ListenKit 的默认建议永远是 **LingoTrace 运行时所在目录的同级 `ListenKit`**，同时允许用户指定其他绝对路径。
 
-| 平台 | ListenKit 程序建议目录 |
-| --- | --- |
-| macOS | `~/Library/Application Support/LingoTrace/dependencies/ListenKit` |
-| Windows | `%LOCALAPPDATA%\LingoTrace\dependencies\ListenKit` |
-| Linux | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/dependencies/ListenKit` |
+| 场景 | 已解析的 LingoTrace 运行时 | ListenKit 程序建议目录 |
+| --- | --- | --- |
+| macOS 开发仓库示例 | `/Users/name/Documents/Project/LingoTrace` | `/Users/name/Documents/Project/ListenKit` |
+| macOS 普通运行时 | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/ListenKit` |
+| Windows 普通运行时 | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\ListenKit` |
+| Linux 普通运行时 | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit` |
 
 建议目录只是默认选项，不是强制目录。Agent 必须显示解析后的绝对路径并让用户确认。用户可以选择开发目录、独立磁盘或其他位置，只要该目录与私人 Vault 分离且不会覆盖已有文件。
 
@@ -71,7 +72,7 @@ ListenKit 连接与 LingoTrace 运行时连接相互独立：
   "platform": "macos",
   "connections": [
     {
-      "listenkit_root": "/Users/name/Library/Application Support/LingoTrace/dependencies/ListenKit",
+      "listenkit_root": "/Users/name/Documents/Project/ListenKit",
       "source": "user-confirmed"
     }
   ]
@@ -93,7 +94,7 @@ python3 -m lingotrace.init resolve-listenkit \
 
 如果当前平台没有连接，或全部候选目录失效，Agent 必须向用户提供两条人话选项：
 
-1. **重新安装 ListenKit**：显示当前平台建议目录，同时允许用户另选位置；取得同意后读取上游最新安装说明并执行。
+1. **重新安装 ListenKit**：显示当前已解析的 LingoTrace 运行时同级 `ListenKit` 建议目录，同时允许用户另选位置；取得同意后读取上游最新安装说明并执行。
 2. **指定已经安装的 ListenKit**：请用户提供目录，验证后通过 `connect-listenkit` 追加到当前平台连接。
 
 Agent 不得根据文件夹名称、另一平台路径或历史记忆猜测新位置，也不得为了修复当前设备而覆盖其他平台记录。ListenKit 失联只阻止需要媒体工具的任务，不阻止阅读、词汇、语法、口语卡或复习结算等文本学习任务。

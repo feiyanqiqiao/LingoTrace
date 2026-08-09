@@ -8,7 +8,7 @@
 ## [20260809-103712]
 ### 新增 (Added)
 - 新增 `connect-listenkit` 与 `resolve-listenkit`：将用户确认的 ListenKit 程序目录按 macOS、Windows、Linux 分文件保存到私人 Vault，同平台可保留多个候选，换设备或移动目录后不会覆盖其他平台记录。
-- 新增跨平台 ListenKit 程序建议目录：macOS 使用 `~/Library/Application Support/LingoTrace/dependencies/ListenKit`，Windows 使用 `%LOCALAPPDATA%\LingoTrace\dependencies\ListenKit`，Linux 使用 `${XDG_DATA_HOME:-~/.local/share}/lingotrace/dependencies/ListenKit`；建议值始终允许用户改为其他绝对路径。
+- 新增跨平台 ListenKit 程序建议目录：默认取当前已解析的 LingoTrace 运行时所在目录的同级 `ListenKit`，因此开发仓库 `/path/to/Project/LingoTrace` 对应 `/path/to/Project/ListenKit`，普通运行时 `.../LingoTrace/runtime` 对应 `.../LingoTrace/ListenKit`；建议值始终允许用户改为其他绝对路径。
 - 新增 ListenKit 失联恢复协议：当前平台没有连接或所有候选失效时，结构化返回“重新安装”和“指定已有目录”两种选择，并提供建议安装位置。
 
 ### 变更 (Changed)

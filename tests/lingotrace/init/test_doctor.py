@@ -34,6 +34,7 @@ class OnboardingDoctorTests(unittest.TestCase):
         dependencies = json.loads(report.artifacts["dependencies"])
         self.assertEqual("found", dependencies["python"]["status"])
         self.assertEqual("missing_optional", dependencies["obsidian_desktop"]["status"])
+        self.assertEqual(str(runtime.parent / "ListenKit"), report.artifacts["recommended_listenkit_root"])
 
     def test_missing_python_and_invalid_runtime_are_required_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -139,18 +140,18 @@ class OnboardingDoctorTests(unittest.TestCase):
             macos["runtime_root"],
         )
         self.assertEqual(
-            "/Users/example/Library/Application Support/LingoTrace/dependencies/ListenKit",
+            "/Users/example/Library/Application Support/LingoTrace/ListenKit",
             macos["listenkit_root"],
         )
         self.assertEqual(r"C:\Users\Example\AppData\Local\LingoTrace\runtime", windows["runtime_root"])
         self.assertEqual(
-            r"C:\Users\Example\AppData\Local\LingoTrace\dependencies\ListenKit",
+            r"C:\Users\Example\AppData\Local\LingoTrace\ListenKit",
             windows["listenkit_root"],
         )
         self.assertEqual(r"C:\Users\Example\Documents\Obsidian\LingoTrace-Japanese", windows["vault_root"])
         self.assertEqual("/home/example/.local/share/lingotrace/runtime", linux["runtime_root"])
         self.assertEqual(
-            "/home/example/.local/share/lingotrace/dependencies/ListenKit",
+            "/home/example/.local/share/lingotrace/ListenKit",
             linux["listenkit_root"],
         )
 

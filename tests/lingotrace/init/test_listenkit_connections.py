@@ -17,26 +17,24 @@ from lingotrace.init.runtime_connections import current_platform
 class ListenKitConnectionTests(unittest.TestCase):
     def test_recommended_locations_are_platform_specific_and_overridable(self) -> None:
         self.assertEqual(
-            "/Users/example/Library/Application Support/LingoTrace/dependencies/ListenKit",
-            recommended_listenkit_root(platform_name="macos", home="/Users/example", environ={}),
-        )
-        self.assertEqual(
-            r"C:\Users\Example\AppData\Local\LingoTrace\dependencies\ListenKit",
+            "/Users/example/Documents/Project/ListenKit",
             recommended_listenkit_root(
-                platform_name="windows",
-                home=r"C:\Users\Example",
-                environ={
-                    "USERPROFILE": r"C:\Users\Example",
-                    "LOCALAPPDATA": r"C:\Users\Example\AppData\Local",
-                },
+                runtime_root="/Users/example/Documents/Project/LingoTrace",
+                platform_name="macos",
             ),
         )
         self.assertEqual(
-            "/srv/user-data/lingotrace/dependencies/ListenKit",
+            r"C:\Users\Example\AppData\Local\LingoTrace\ListenKit",
             recommended_listenkit_root(
+                runtime_root=r"C:\Users\Example\AppData\Local\LingoTrace\runtime",
+                platform_name="windows",
+            ),
+        )
+        self.assertEqual(
+            "/srv/user-data/lingotrace/ListenKit",
+            recommended_listenkit_root(
+                runtime_root="/srv/user-data/lingotrace/runtime",
                 platform_name="linux",
-                home="/home/example",
-                environ={"XDG_DATA_HOME": "/srv/user-data"},
             ),
         )
 

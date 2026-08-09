@@ -48,12 +48,14 @@ def inspect_onboarding(
     gh_command = which("gh")
     obsidian_path = _find_obsidian(platform_id, home_path, environment, which)
     listenkit_path = _find_listenkit(runtime, listenkit)
+    listenkit_recommendation = recommended_listenkit_root(
+        runtime_root=runtime,
+        platform_name=platform_id,
+    )
     if listenkit_path is None and vault.exists():
         listenkit_connection = resolve_listenkit_connection(
             vault,
             platform_name=platform_id,
-            home=home_path,
-            environ=environment,
         )
         if listenkit_connection.accepted:
             listenkit_path = listenkit_connection.artifacts["listenkit_root"]
@@ -123,11 +125,6 @@ def inspect_onboarding(
             )
         )
     if listenkit_path is None:
-        listenkit_recommendation = recommended_listenkit_root(
-            platform_name=platform_id,
-            home=home_path,
-            environ=environment,
-        )
         warnings.append(
             Finding(
                 code="listenkit_not_found",
@@ -166,7 +163,7 @@ def inspect_onboarding(
             "language": language,
             "platform": platform_id,
             "recommended_runtime_root": recommendations["runtime_root"],
-            "recommended_listenkit_root": recommendations["listenkit_root"],
+            "recommended_listenkit_root": listenkit_recommendation,
             "recommended_vault_root": recommendations["vault_root"],
             "vault_root": str(vault),
         },
@@ -197,9 +194,8 @@ def recommended_locations(
         data_home = Path(environment.get("XDG_DATA_HOME", str(home_path / ".local" / "share")))
         runtime = data_home / "lingotrace" / "runtime"
     listenkit = recommended_listenkit_root(
+        runtime_root=runtime,
         platform_name=platform_id,
-        home=home,
-        environ=environment,
     )
     return {"vault_root": str(vault), "runtime_root": str(runtime), "listenkit_root": listenkit}
 

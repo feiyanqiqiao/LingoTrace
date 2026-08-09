@@ -53,13 +53,13 @@ Obsidian 桌面客户端与 ListenKit 可以延期安装，但 Agent 必须说�
 
 | 平台 | 学习 Vault | 普通用户运行时 | ListenKit 程序 |
 | --- | --- | --- | --- |
-| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/dependencies/ListenKit` |
-| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\dependencies\ListenKit` |
-| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/dependencies/ListenKit` |
+| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/ListenKit` |
+| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\ListenKit` |
+| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit` |
 
 日语 Vault 使用 `LingoTrace-Japanese`。Vault 与运行时不能相同，也不能互相嵌套。Vault 可以由用户自己的同步工具同步；平台绝对路径继续按 `.lingotrace/runtime-connections/<platform>.json` 分开保存。
 
-ListenKit 建议位置同样允许用户覆盖。实际安装位置按 `.lingotrace/listenkit-connections/<platform>.json` 保存；找不到时必须让用户选择重新安装或指定已有目录。完整契约见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
+ListenKit 默认建议由实际 LingoTrace 运行时动态推导：取运行时所在目录的同级 `ListenKit`，因此开发者的 `/path/to/Project/LingoTrace` 会得到 `/path/to/Project/ListenKit`。建议位置允许用户覆盖。实际安装位置按 `.lingotrace/listenkit-connections/<platform>.json` 保存；找不到时必须让用户选择重新安装或指定已有目录。完整契约见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
 
 最小学习运行时只需要仓库中的 `lingotrace/`。普通学习者默认使用 Git sparse checkout 获取该目录；不需要下载 `tests/`、`tools/`、`.github/`、贡献指南或产品设计文档。运行时保留 `.git` 元数据，以便后续 `git pull --ff-only` 更新。
 
