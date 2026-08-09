@@ -8,6 +8,11 @@ from pathlib import Path, PureWindowsPath
 from typing import Callable, Mapping
 
 from lingotrace.core.reports import CommandReport, Finding
+from lingotrace.init.listenkit_connections import (
+    is_usable_listenkit_root,
+    recommended_listenkit_root,
+    resolve_listenkit_connection,
+)
 from lingotrace.init.runtime_connections import current_platform
 
 
@@ -42,7 +47,18 @@ def inspect_onboarding(
     git_command = which("git")
     gh_command = which("gh")
     obsidian_path = _find_obsidian(platform_id, home_path, environment, which)
-    listenkit_path = _find_listenkit(runtime, listenkit, which)
+    listenkit_path = _find_listenkit(runtime, listenkit)
+    listenkit_recommendation = recommended_listenkit_root(
+        runtime_root=runtime,
+        platform_name=platform_id,
+    )
+    if listenkit_path is None and vault.exists():
+        listenkit_connection = resolve_listenkit_connection(
+            vault,
+            platform_name=platform_id,
+        )
+        if listenkit_connection.accepted:
+            listenkit_path = listenkit_connection.artifacts["listenkit_root"]
 
     if python_command is None:
         errors.append(
@@ -112,7 +128,10 @@ def inspect_onboarding(
         warnings.append(
             Finding(
                 code="listenkit_not_found",
-                message="ListenKit was not found. Text learning works, but media import and transcription need it later.",
+                message=(
+                    "ListenKit was not found. Text learning works, but media import and transcription need it later. "
+                    f"Suggested installation location: {listenkit_recommendation}. The user may choose another path."
+                ),
                 severity="warning",
             )
         )
@@ -144,6 +163,7 @@ def inspect_onboarding(
             "language": language,
             "platform": platform_id,
             "recommended_runtime_root": recommendations["runtime_root"],
+            "recommended_listenkit_root": listenkit_recommendation,
             "recommended_vault_root": recommendations["vault_root"],
             "vault_root": str(vault),
         },
@@ -173,7 +193,11 @@ def recommended_locations(
     else:
         data_home = Path(environment.get("XDG_DATA_HOME", str(home_path / ".local" / "share")))
         runtime = data_home / "lingotrace" / "runtime"
-    return {"vault_root": str(vault), "runtime_root": str(runtime)}
+    listenkit = recommended_listenkit_root(
+        runtime_root=runtime,
+        platform_name=platform_id,
+    )
+    return {"vault_root": str(vault), "runtime_root": str(runtime), "listenkit_root": listenkit}
 
 
 def platform_python_version() -> str:
@@ -212,14 +236,10 @@ def _find_obsidian(
 def _find_listenkit(
     runtime: Path,
     requested: Path | None,
-    which: Callable[[str], str | None],
 ) -> str | None:
-    executable = which("listenkit")
-    if executable:
-        return str(executable)
     candidates = [path for path in (requested, runtime.parent / "ListenKit") if path is not None]
     for candidate in candidates:
-        if (candidate / "README.md").is_file() and (candidate / "cli" / "generate-markdown.sh").is_file():
+        if is_usable_listenkit_root(candidate):
             return str(candidate)
     return None
 

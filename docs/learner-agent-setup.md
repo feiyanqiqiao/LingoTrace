@@ -31,13 +31,13 @@
 
 给出以下建议位置，同时允许用户指定其他绝对路径：
 
-| 平台 | Vault | LingoTrace 运行时 |
-| --- | --- | --- |
-| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` |
-| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` |
-| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` |
+| 平台 | Vault | LingoTrace 运行时 | ListenKit 程序 |
+| --- | --- | --- | --- |
+| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/ListenKit` |
+| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\ListenKit` |
+| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit` |
 
-日语把目录名改为 `LingoTrace-Japanese`。显示解析后的绝对路径并让用户确认。Vault 和运行时必须分开，且不能互相嵌套。
+日语把目录名改为 `LingoTrace-Japanese`。显示解析后的绝对路径并让用户确认。Vault 和运行时必须分开，且不能互相嵌套。ListenKit 默认建议始终是实际 LingoTrace 运行时所在目录的同级 `ListenKit`；如果用户为运行时选择了其他位置，应随之重新计算，而不是继续使用表中的示例。ListenKit 建议目录不是强制值，用户可以选择其他绝对路径。
 
 ## 第 2 步：只读预检
 
@@ -100,6 +100,8 @@ python3 -m lingotrace.init doctor \
 - `warnings` 是可以延期的能力；
 - `dependencies` 记录发现的 Python、Git、GitHub CLI、Obsidian、ListenKit 和运行时。
 
+如果 `dependencies.listenkit` 已经返回有效程序根目录，向用户确认是否使用该目录；确认后在第 6 步通过 `--listenkit-root` 保存连接。不要因为一次临时探测成功就跳过连接登记。
+
 不要因为 Obsidian、GitHub CLI 或 ListenKit 缺失而谎称整个初始化失败。GitHub CLI 只对开发协作有用，学习者不需要它。
 
 ## 第 5 步：可选安装 Obsidian 与 ListenKit
@@ -120,6 +122,21 @@ ListenKit 负责媒体获取、ASR 和切片。未发现时，询问用户是否
 
 LingoTrace 与 ListenKit 应使用独立运行环境，不要把彼此的 Python 依赖混装。
 
+安装前必须再次显示第 1 步确认的 ListenKit 目录；如果用户尚未确认，则显示 `doctor` 返回的 `recommended_listenkit_root` 并允许自选。安装后验证根目录存在 `README.md` 和 `cli/generate-markdown.sh`。如果 Vault 已经初始化，再先预览、后应用：
+
+```bash
+python3 -m lingotrace.init connect-listenkit \
+  --vault <absolute-vault-path> \
+  --listenkit-root <absolute-listenkit-path>
+
+python3 -m lingotrace.init connect-listenkit \
+  --vault <absolute-vault-path> \
+  --listenkit-root <absolute-listenkit-path> \
+  --apply
+```
+
+如果 Vault 尚未初始化，不要提前向空 Vault 写连接；在第 6 步把已验证路径通过 `--listenkit-root` 一并写入。以后媒体任务前运行 `resolve-listenkit`。如果连接不存在或路径失效，必须让用户选择“重新安装”或“指定已经安装的目录”，不得猜测；详细契约见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
+
 ## 第 6 步：预览并初始化 Vault
 
 先执行预览，不加 `--apply`：
@@ -130,6 +147,8 @@ python3 -m lingotrace.init vault \
   --vault <absolute-vault-path> \
   --runtime-root <absolute-runtime-path>
 ```
+
+如果 ListenKit 已经安装并通过验证，在命令末尾增加 `--listenkit-root <absolute-listenkit-path>`；延期安装时不要增加该参数，也不要生成虚假连接。
 
 向用户概括将创建的 Vault 配置、模板、视图和当前平台运行时连接。如果报告无错误，再取得写入确认并增加 `--apply`。初始化器不得覆盖已存在的文件；出现 `target_conflict` 时停止，询问用户是选择新目录还是对现有 Vault 做专门迁移分析。
 
@@ -148,6 +167,8 @@ python3 -m lingotrace.init resolve-runtime --vault <absolute-vault-path>
 - `agent_skill` 指向目标语种 Skill；
 - Vault 根存在 `AGENTS.md`、`.lingotrace/vault-context.json`、`.lingotrace/paths.json`；
 - `views/total-training.base` 与模板目录存在。
+
+如果已经安装 ListenKit，还要执行 `python3 -m lingotrace.init resolve-listenkit --vault <absolute-vault-path>`，并确认报告返回实际的 `listenkit_root`。如果用户选择延期安装，不创建虚假的连接记录。
 
 最后告诉用户：
 

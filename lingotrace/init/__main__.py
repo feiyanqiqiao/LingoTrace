@@ -7,6 +7,7 @@ from pathlib import Path
 from lingotrace.init.doctor import inspect_onboarding
 from lingotrace.init.english_vault import initialize_english_vault, plan_english_vault_initialization
 from lingotrace.init.japanese_vault import initialize_japanese_vault, plan_japanese_vault_initialization
+from lingotrace.init.listenkit_connections import register_listenkit_connection, resolve_listenkit_connection
 from lingotrace.init.runtime_connections import register_runtime_connection, resolve_runtime_connection
 from lingotrace.init.runtime_updates import apply_runtime_update, check_runtime_update
 
@@ -19,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     initialize.add_argument("--language", choices=("english", "japanese"), required=True)
     initialize.add_argument("--vault", type=Path, required=True)
     initialize.add_argument("--runtime-root", type=Path)
+    initialize.add_argument("--listenkit-root", type=Path)
     initialize.add_argument("--apply", action="store_true")
 
     connect = subparsers.add_parser("connect-runtime", help="Append a runtime path for the current platform.")
@@ -28,6 +30,18 @@ def parse_args() -> argparse.Namespace:
 
     resolve = subparsers.add_parser("resolve-runtime", help="Resolve a usable runtime for the current platform.")
     resolve.add_argument("--vault", type=Path, required=True)
+
+    connect_listenkit = subparsers.add_parser(
+        "connect-listenkit", help="Append a ListenKit installation path for the current platform."
+    )
+    connect_listenkit.add_argument("--vault", type=Path, required=True)
+    connect_listenkit.add_argument("--listenkit-root", type=Path, required=True)
+    connect_listenkit.add_argument("--apply", action="store_true")
+
+    resolve_listenkit = subparsers.add_parser(
+        "resolve-listenkit", help="Resolve a usable ListenKit installation for the current platform."
+    )
+    resolve_listenkit.add_argument("--vault", type=Path, required=True)
 
     doctor = subparsers.add_parser("doctor", help="Inspect learner onboarding prerequisites without changing them.")
     doctor.add_argument("--language", choices=("english", "japanese"), required=True)
@@ -55,7 +69,11 @@ def main() -> int:
             function = initialize_english_vault if args.apply else plan_english_vault_initialization
         else:
             function = initialize_japanese_vault if args.apply else plan_japanese_vault_initialization
-        report = function(args.vault, runtime_root=args.runtime_root)
+        report = function(
+            args.vault,
+            runtime_root=args.runtime_root,
+            listenkit_root=args.listenkit_root,
+        )
     elif args.command == "connect-runtime":
         report = register_runtime_connection(
             args.vault,
@@ -64,6 +82,14 @@ def main() -> int:
         )
     elif args.command == "resolve-runtime":
         report = resolve_runtime_connection(args.vault)
+    elif args.command == "connect-listenkit":
+        report = register_listenkit_connection(
+            args.vault,
+            args.listenkit_root,
+            mode="apply" if args.apply else "preview",
+        )
+    elif args.command == "resolve-listenkit":
+        report = resolve_listenkit_connection(args.vault)
     elif args.command == "doctor":
         report = inspect_onboarding(
             language=args.language,

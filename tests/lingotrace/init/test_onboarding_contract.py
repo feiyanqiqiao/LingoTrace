@@ -33,6 +33,26 @@ class OnboardingDocumentationContractTests(unittest.TestCase):
         self.assertIn("check-update --vault <vault-root>", guide)
         self.assertIn("用户可以忽略、继续学习", guide)
         self.assertIn("apply-update --vault <vault-root>", guide)
+        self.assertIn("recommended_listenkit_root", guide)
+        self.assertIn("connect-listenkit", guide)
+        self.assertIn("重新安装", guide)
+        self.assertIn("指定已经安装的目录", guide)
+
+    def test_listenkit_connection_contract_covers_location_choice_and_recovery(self) -> None:
+        design = (REPO_ROOT / "docs" / "listenkit-installation-and-connections.md").read_text(
+            encoding="utf-8"
+        )
+        for required in (
+            "LingoTrace 运行时所在目录的同级 `ListenKit`",
+            "/Users/name/Documents/Project/ListenKit",
+            "%LOCALAPPDATA%\\LingoTrace\\ListenKit",
+            "${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit",
+            ".lingotrace/listenkit-connections/<platform>.json",
+            "resolve-listenkit",
+            "重新安装 ListenKit",
+            "指定已经安装的 ListenKit",
+        ):
+            self.assertIn(required, design)
 
     def test_developer_protocol_defines_fork_branch_pr_and_ci_lifecycle(self) -> None:
         guide = (REPO_ROOT / "docs" / "developer-agent-setup.md").read_text(encoding="utf-8")
@@ -72,6 +92,15 @@ class OnboardingDocumentationContractTests(unittest.TestCase):
                 "must not block the original learning request",
             ):
                 self.assertIn(required, skill)
+
+    def test_both_language_skills_resolve_listenkit_before_media_work(self) -> None:
+        for language in ("english", "japanese"):
+            skill = (
+                REPO_ROOT / "lingotrace" / "packs" / language / "agent_skills" / "SKILL.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn("resolve-listenkit --vault <current-vault>", skill)
+            self.assertIn("reinstall", skill)
+            self.assertIn("register an existing checkout", skill)
 
 
 if __name__ == "__main__":

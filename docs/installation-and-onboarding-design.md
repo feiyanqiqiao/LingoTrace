@@ -23,7 +23,7 @@ Agent 必须从上游 `main` 读取最新引导，而不是依赖模型记忆。
 
 1. 说明将检查和可能改变的内容；
 2. 询问学习语种，目前支持 `english` 和 `japanese`；
-3. 给出 Vault 与运行时的跨平台建议位置，并让用户确认或指定；
+3. 给出 Vault、运行时与 ListenKit 的跨平台建议位置，并让用户确认或指定；
 4. 检测 Python、Git、Obsidian 桌面客户端、LingoTrace 运行时和 ListenKit；
 5. 对任何软件安装、下载或系统级变更先征得用户同意；
 6. 安装最小 LingoTrace 运行时；
@@ -51,13 +51,15 @@ Obsidian 桌面客户端与 ListenKit 可以延期安装，但 Agent 必须说�
 
 推荐位置如下；用户可以选择其他绝对路径。
 
-| 平台 | 学习 Vault | 普通用户运行时 |
-| --- | --- | --- |
-| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` |
-| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` |
-| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` |
+| 平台 | 学习 Vault | 普通用户运行时 | ListenKit 程序 |
+| --- | --- | --- | --- |
+| macOS | `~/Documents/Obsidian/LingoTrace-English` | `~/Library/Application Support/LingoTrace/runtime` | `~/Library/Application Support/LingoTrace/ListenKit` |
+| Windows | `%USERPROFILE%\Documents\Obsidian\LingoTrace-English` | `%LOCALAPPDATA%\LingoTrace\runtime` | `%LOCALAPPDATA%\LingoTrace\ListenKit` |
+| Linux | `~/Documents/Obsidian/LingoTrace-English` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/runtime` | `${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit` |
 
 日语 Vault 使用 `LingoTrace-Japanese`。Vault 与运行时不能相同，也不能互相嵌套。Vault 可以由用户自己的同步工具同步；平台绝对路径继续按 `.lingotrace/runtime-connections/<platform>.json` 分开保存。
+
+ListenKit 默认建议由实际 LingoTrace 运行时动态推导：取运行时所在目录的同级 `ListenKit`，因此开发者的 `/path/to/Project/LingoTrace` 会得到 `/path/to/Project/ListenKit`。建议位置允许用户覆盖。实际安装位置按 `.lingotrace/listenkit-connections/<platform>.json` 保存；找不到时必须让用户选择重新安装或指定已有目录。完整契约见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
 
 最小学习运行时只需要仓库中的 `lingotrace/`。普通学习者默认使用 Git sparse checkout 获取该目录；不需要下载 `tests/`、`tools/`、`.github/`、贡献指南或产品设计文档。运行时保留 `.git` 元数据，以便后续 `git pull --ff-only` 更新。
 
@@ -104,6 +106,8 @@ python3 -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
 ## 6. 验收标准
 
 - macOS、Windows 和 Linux 均能生成稳定的推荐路径并检测常见 Obsidian 桌面安装位置。
+- macOS、Windows 和 Linux 均能生成 ListenKit 程序建议目录；用户可覆盖，确认后的路径按平台保存。
+- ListenKit 路径失效时返回“重新安装”与“指定已有目录”两种恢复选项，不影响无关文本学习。
 - 诊断不会安装软件或写文件；缺少 Obsidian、Git 或 ListenKit 时给出可延期警告。
 - 缺少 Python、运行时无效、Vault 路径非绝对或 Vault/运行时互相嵌套时阻止继续。
 - 普通用户安装文档不会要求 fork、理解 PR 或运行开发测试。

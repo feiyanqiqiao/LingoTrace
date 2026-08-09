@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from lingotrace.init.doctor import inspect_onboarding, recommended_locations
+from lingotrace.init.listenkit_connections import register_listenkit_connection
 
 
 class OnboardingDoctorTests(unittest.TestCase):
@@ -33,6 +34,7 @@ class OnboardingDoctorTests(unittest.TestCase):
         dependencies = json.loads(report.artifacts["dependencies"])
         self.assertEqual("found", dependencies["python"]["status"])
         self.assertEqual("missing_optional", dependencies["obsidian_desktop"]["status"])
+        self.assertEqual(str(runtime.parent / "ListenKit"), report.artifacts["recommended_listenkit_root"])
 
     def test_missing_python_and_invalid_runtime_are_required_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,6 +99,32 @@ class OnboardingDoctorTests(unittest.TestCase):
         self.assertEqual("found", dependencies["listenkit"]["status"])
         self.assertNotIn("listenkit_not_found", {finding.code for finding in report.warnings})
 
+    def test_doctor_uses_vault_saved_listenkit_connection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = root / "runtime"
+            vault = root / "vault"
+            listenkit = root / "custom" / "ListenKit"
+            (runtime / "lingotrace").mkdir(parents=True)
+            (runtime / "lingotrace" / "__init__.py").write_text("", encoding="utf-8")
+            (listenkit / "cli").mkdir(parents=True)
+            (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            register_listenkit_connection(vault, listenkit, mode="apply")
+
+            report = inspect_onboarding(
+                language="english",
+                vault_root=vault,
+                runtime_root=runtime,
+                home=root / "home",
+                environ={},
+                which=lambda name: "/usr/bin/python3" if name == "python3" else None,
+            )
+
+        dependencies = json.loads(report.artifacts["dependencies"])
+        self.assertEqual(str(listenkit), dependencies["listenkit"]["path"])
+        self.assertNotIn("listenkit_not_found", {finding.code for finding in report.warnings})
+
     def test_recommended_locations_are_platform_specific(self) -> None:
         macos = recommended_locations("english", platform_name="macos", home="/Users/example", environ={})
         windows = recommended_locations(
@@ -111,9 +139,21 @@ class OnboardingDoctorTests(unittest.TestCase):
             "/Users/example/Library/Application Support/LingoTrace/runtime",
             macos["runtime_root"],
         )
+        self.assertEqual(
+            "/Users/example/Library/Application Support/LingoTrace/ListenKit",
+            macos["listenkit_root"],
+        )
         self.assertEqual(r"C:\Users\Example\AppData\Local\LingoTrace\runtime", windows["runtime_root"])
+        self.assertEqual(
+            r"C:\Users\Example\AppData\Local\LingoTrace\ListenKit",
+            windows["listenkit_root"],
+        )
         self.assertEqual(r"C:\Users\Example\Documents\Obsidian\LingoTrace-Japanese", windows["vault_root"])
         self.assertEqual("/home/example/.local/share/lingotrace/runtime", linux["runtime_root"])
+        self.assertEqual(
+            "/home/example/.local/share/lingotrace/ListenKit",
+            linux["listenkit_root"],
+        )
 
 
 if __name__ == "__main__":

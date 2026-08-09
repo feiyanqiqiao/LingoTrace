@@ -5,6 +5,20 @@
 
 ---
 
+## [20260809-103712]
+### 新增 (Added)
+- 新增 `connect-listenkit` 与 `resolve-listenkit`：将用户确认的 ListenKit 程序目录按 macOS、Windows、Linux 分文件保存到私人 Vault，同平台可保留多个候选，换设备或移动目录后不会覆盖其他平台记录。
+- 新增跨平台 ListenKit 程序建议目录：默认取当前已解析的 LingoTrace 运行时所在目录的同级 `ListenKit`，因此开发仓库 `/path/to/Project/LingoTrace` 对应 `/path/to/Project/ListenKit`，普通运行时 `.../LingoTrace/runtime` 对应 `.../LingoTrace/ListenKit`；建议值始终允许用户改为其他绝对路径。
+- 新增 ListenKit 失联恢复协议：当前平台没有连接或所有候选失效时，结构化返回“重新安装”和“指定已有目录”两种选择，并提供建议安装位置。
+
+### 变更 (Changed)
+- Vault 初始化新增可选 `--listenkit-root`，可在 ListenKit 已验证且 Vault 尚未初始化时原子写入首个连接；`doctor` 会读取 Vault 已保存的连接并报告 `recommended_listenkit_root`。
+- 新 Vault Agent 入口与 English/Japanese Agent Skill 在媒体任务前先解析 ListenKit 连接，禁止猜测目录；重新安装仍须读取上游最新说明并取得用户同意，ListenKit 缺失不阻止文本学习。
+- README、学习者安装协议、入门、双用户旅程、Vault 连接指南和工具文档补充默认目录、自选位置、安装后登记与失联恢复，并新增长期维护的 ListenKit 连接设计文档。
+
+### 测试 (Tests)
+- 新增跨平台建议目录、连接追加、失效候选回退、跨平台隔离、无连接与全失效恢复选项、无效目录、Vault 路径隔离、CLI 端到端、doctor 已保存连接和 Vault 初始化登记测试；通过 LingoTrace 239 项、官方听力 100 项、架构基线 42 项和 Vault 结构 18 项测试。
+
 ## [20260808-195049]
 ### 新增 (Added)
 - 新增 `python -m lingotrace.init check-update`：在每天首次学习前从正式上游获取 `main`，按 macOS、Windows、Linux 独立状态去重，返回待更新数量与受限长度的结构化提交说明，供 Agent 合并成一至三点中文人话摘要。

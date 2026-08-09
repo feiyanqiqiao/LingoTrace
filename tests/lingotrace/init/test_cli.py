@@ -116,6 +116,47 @@ class InitializationCliTests(unittest.TestCase):
             self.assertEqual(0, resolved.returncode, resolved.stderr)
             self.assertEqual(str(REPO_ROOT), json.loads(resolved.stdout)["artifacts"]["runtime_root"])
 
+    def test_connect_and_resolve_listenkit_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vault = root / "vault"
+            listenkit = root / "ListenKit"
+            (listenkit / "cli").mkdir(parents=True)
+            (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+
+            preview = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "lingotrace.init",
+                    "connect-listenkit",
+                    "--vault",
+                    str(vault),
+                    "--listenkit-root",
+                    str(listenkit),
+                ]
+            )
+            self.assertEqual(0, preview.returncode, preview.stderr)
+            self.assertFalse(vault.exists())
+
+            applied = _run([*preview.args, "--apply"])
+            self.assertEqual(0, applied.returncode, applied.stderr)
+
+            resolved = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "lingotrace.init",
+                    "resolve-listenkit",
+                    "--vault",
+                    str(vault),
+                ]
+            )
+
+        self.assertEqual(0, resolved.returncode, resolved.stderr)
+        self.assertEqual(str(listenkit), json.loads(resolved.stdout)["artifacts"]["listenkit_root"])
+
 
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)

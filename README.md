@@ -14,7 +14,7 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 
 > 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
 
-Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。Obsidian 与 ListenKit 可以延期，但 LingoTrace 运行时、Python 和第一个 Vault 必须完成。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
+Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。安装 ListenKit 时会给出跨平台建议目录并允许自选，确认后把实际位置按平台保存。Obsidian 与 ListenKit 可以延期，但 LingoTrace 运行时、Python 和第一个 Vault 必须完成。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
 
 如果你想 fork 并增加语种或功能，把 [开发者初始化协议](docs/developer-agent-setup.md)交给 Agent。它会带你完成 GitHub 账号与 `gh` 检查、fork、remotes、topic branch、测试、推送、上游 PR 和 CI 检查；开发者的实际学习 Vault 仍复用上面的学习者流程。
 
@@ -25,6 +25,8 @@ Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客�
 LingoTrace 的主要使用方式是：用户用自然语言提出学习任务，由 Codex 或兼容的 AI agent 读取当前 Vault 所选语言包的 Agent Skill，并把任务保存到对应的日语或英语学习库。
 
 日常学习时，应把私人 Vault 作为 Agent 工作区；LingoTrace 公共仓库作为 Vault 外部运行时。初始化器会生成 Vault 根 `AGENTS.md` 和当前操作系统的运行时连接，使 Agent 能从 Vault 工作区发现语言包。Windows、macOS 和 Linux 分别保存连接，不会相互覆盖。
+
+ListenKit 的程序位置也按 Windows、macOS 和 Linux 分别保存在 Vault 中。需要音视频能力时，Agent 先解析已确认的位置；路径失效时会让用户选择重新安装或指定已有目录，不会猜测，也不会阻止无关的文字学习。
 
 每天第一次开始学习时，Agent 会顺手检查一次正式上游有没有更新。有更新时，它会用中文概括一至三点并问你是否现在更新；你可以不理会，继续当天学习。正式上游运行时只有在你明确同意后才安全快进；如果连接的是你自己的 fork，Agent 不会代替你 pull 或合并，只会提醒你到开发仓库自行同步。
 
@@ -69,6 +71,7 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 - 🧑‍🎓 **[学习者 Agent 安装协议](docs/learner-agent-setup.md)**：从 GitHub Raw 读取的一句话安装入口。
 - 🧑‍💻 **[开发者 Agent 初始化协议](docs/developer-agent-setup.md)**：fork、分支、上游同步、PR 与 CI 的逐步流程。
 - 🔄 **[每日首次学习的运行时更新设计](docs/daily-runtime-update-design.md)**：每天一次检查、人话摘要、忽略选项与 fork 安全边界。
+- 🎧 **[ListenKit 安装位置与跨平台连接](docs/listenkit-installation-and-connections.md)**：默认建议、自选目录、按平台保存和失联恢复。
 - 🏗️ **[产品与能力说明](docs/lingotrace_product_document.md)**：说明当前产品定位、学习闭环、能力和数据边界。
 - 👥 **[早期用户画像与准入门槛](docs/lingotrace_user_persona.md)**：目标受众分析、不适合人群说明，以及面向早期极客测试者的“一分钟自查问卷”。
 - 🌐 **[多语言架构](docs/lingotrace_multilingual_architecture_plan.md)**：当前正式架构来源，定义单语言 Vault、外部运行时、语言包和跨平台连接。

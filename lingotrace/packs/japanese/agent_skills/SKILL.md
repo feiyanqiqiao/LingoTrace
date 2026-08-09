@@ -93,20 +93,21 @@ Treat listening chunk extraction and speaking-card promotion as two separate use
 For requests such as "请把 23.mp3 做成精听稿", the agent should provide the full daily experience:
 
 1. Check that the audio or URL is available.
-2. Check the listening chain and slice tooling before intensive listening work.
-3. Generate or reuse the transcript and slice evidence with dual-ASR validation enabled by default for every listening note, including ordinary extensive listening. Do not pass `--single-asr` unless the user explicitly requests a single engine; a runtime fallback caused by an unavailable secondary engine must be reported.
-4. If the generator returns `status: llm_merge_required`, complete the ASR merge automatically in the same user task:
+2. From the resolved LingoTrace runtime, run `python -m lingotrace.init resolve-listenkit --vault <current-vault>`. Use only the returned `listenkit_root`. If resolution fails, do not guess a path: ask whether to reinstall at the reported suggested location (or another user-selected absolute path) or register an existing checkout. Read ListenKit's current official install instructions and obtain consent before reinstalling; validate and save the confirmed path with `connect-listenkit` before continuing.
+3. Check the resolved ListenKit listening chain and slice tooling before intensive listening work.
+4. Generate or reuse the transcript and slice evidence with dual-ASR validation enabled by default for every listening note, including ordinary extensive listening. Do not pass `--single-asr` unless the user explicitly requests a single engine; a runtime fallback caused by an unavailable secondary engine must be reported.
+5. If the generator returns `status: llm_merge_required`, complete the ASR merge automatically in the same user task:
    - read the absolute, stable temporary `llm_merge_request_path`; it remains available after preview cleanup and contains both ASR candidates, neighboring context, risk categories, and `reviewed_transcript_template`;
    - use the current agent model's Japanese-language judgment, whether the caller is Codex, Gemini, or another compatible agent; do not call a provider-specific API from the listening script;
    - copy the template to a temporary file outside the Vault, preserve `audio_sha256`, `merge_request_id`, `segment_id`, `start`, and `end`, and fill `selected_text`, `decision`, `confidence`, and concise `rationale_zh` for every segment;
    - record `reviewer.kind: llm`, `reviewer.provider: agent-runtime`, the actual model name, and `completed_at`; set `review_status: accepted` only when every segment is resolved with high or medium confidence;
    - rerun the original command with both `--reviewed-transcript <temporary-file>` and `--merge-request <llm_merge_request_path>` so the core guard validates and applies the exact pending request; do not edit the Vault's pending consensus artifact directly.
-5. If any name, number, homophone, particle, ending, or slice-boundary decision remains low-confidence, keep it unresolved, block the final note, and tell the user exactly which segment still needs confirmation.
-6. Build a listening note body with real audio slice references for intensive notes.
-7. Curate `0-5` productive `## 常用语块` items using model judgment. Judge them by replaceability and cross-scene communicative value, not literal length. Each item records `语块`, `类型`, `素材原句`, `替换练习`, and `交际作用`; the source sentence is only a listening anchor. Keep `daily_use_sentences` for compatibility, but store only the Japanese chunk patterns there.
-8. Save the note to the user's Japanese learning library through `listening_notes`, then stop. Never promote freshly extracted chunks to speaking cards in the same task.
-9. Tell the user whether the two ASRs agreed, how many differences the model merged, which model performed the merge, whether any uncertainty remains, and the created note and slice count.
-10. When creating or updating a slice manifest manually, always check the `slice_profile` configuration in the manifest. If it specifies `"number_markers": "included"`, align the start time (`start`) of each slice to begin exactly before the announcer's spoken section number (e.g., "1", "2", "3") in the audio, rather than cutting directly to the dialogue text. If automatic timing alignment fails, reference existing adjacent `.slices.json` files in the same folder to verify the offset style.
+6. If any name, number, homophone, particle, ending, or slice-boundary decision remains low-confidence, keep it unresolved, block the final note, and tell the user exactly which segment still needs confirmation.
+7. Build a listening note body with real audio slice references for intensive notes.
+8. Curate `0-5` productive `## 常用语块` items using model judgment. Judge them by replaceability and cross-scene communicative value, not literal length. Each item records `语块`, `类型`, `素材原句`, `替换练习`, and `交际作用`; the source sentence is only a listening anchor. Keep `daily_use_sentences` for compatibility, but store only the Japanese chunk patterns there.
+9. Save the note to the user's Japanese learning library through `listening_notes`, then stop. Never promote freshly extracted chunks to speaking cards in the same task.
+10. Tell the user whether the two ASRs agreed, how many differences the model merged, which model performed the merge, whether any uncertainty remains, and the created note and slice count.
+11. When creating or updating a slice manifest manually, always check the `slice_profile` configuration in the manifest. If it specifies `"number_markers": "included"`, align the start time (`start`) of each slice to begin exactly before the announcer's spoken section number (e.g., "1", "2", "3") in the audio, rather than cutting directly to the dialogue text. If automatic timing alignment fails, reference existing adjacent `.slices.json` files in the same folder to verify the offset style.
 
 Do not ask the user to prepare an internal artifact manually. If the transcript, slice manifest, or audio tool is missing, explain the concrete missing input or tool and stop before changing files.
 
