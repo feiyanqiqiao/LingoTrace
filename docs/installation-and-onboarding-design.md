@@ -59,7 +59,7 @@ Obsidian 桌面客户端与 ListenKit 可以延期安装，但 Agent 必须说�
 
 日语 Vault 使用 `LingoTrace-Japanese`。Vault 与运行时不能相同，也不能互相嵌套。Vault 可以由用户自己的同步工具同步；平台绝对路径继续按 `.lingotrace/runtime-connections/<platform>.json` 分开保存。
 
-ListenKit 默认建议由实际 LingoTrace 运行时动态推导：取运行时所在目录的同级 `ListenKit`，因此开发者的 `/path/to/Project/LingoTrace` 会得到 `/path/to/Project/ListenKit`。建议位置允许用户覆盖。实际安装位置按 `.lingotrace/listenkit-connections/<platform>.json` 保存；找不到时必须让用户选择重新安装或指定已有目录。完整契约见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
+ListenKit 默认建议由实际 LingoTrace 运行时动态推导：取运行时所在目录的同级 `ListenKit`，因此开发者的 `/path/to/Project/LingoTrace` 会得到 `/path/to/Project/ListenKit`。建议位置允许用户覆盖。实际安装位置默认保存在当前系统的用户应用数据目录，供所有语种 Vault 共享；Vault 内只保留显式覆盖和旧连接兼容。找不到时必须让用户选择重新安装或指定已有目录。完整契约见 [ListenKit 安装位置与设备级连接](listenkit-installation-and-connections.md)。
 
 最小学习运行时只需要仓库中的 `lingotrace/`。普通学习者默认使用 Git sparse checkout 获取该目录；不需要下载 `tests/`、`tools/`、`.github/`、贡献指南或产品设计文档。运行时保留 `.git` 元数据，以便后续 `git pull --ff-only` 更新。
 
@@ -106,7 +106,7 @@ python3 -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
 ## 6. 验收标准
 
 - macOS、Windows 和 Linux 均能生成稳定的推荐路径并检测常见 Obsidian 桌面安装位置。
-- macOS、Windows 和 Linux 均能生成 ListenKit 程序建议目录；用户可覆盖，确认后的路径按平台保存。
+- macOS、Windows 和 Linux 均能生成 ListenKit 程序建议目录；用户可覆盖，确认后的路径保存为设备级默认并跨语种共享。
 - ListenKit 路径失效时返回“重新安装”与“指定已有目录”两种恢复选项，不影响无关文本学习。
 - 诊断不会安装软件或写文件；缺少 Obsidian、Git 或 ListenKit 时给出可延期警告。
 - 缺少 Python、运行时无效、Vault 路径非绝对或 Vault/运行时互相嵌套时阻止继续。

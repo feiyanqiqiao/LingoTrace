@@ -5,6 +5,18 @@
 
 ---
 
+## [20260809-180513]
+### 新增 (Added)
+- 新增跨语种共享的设备级 ListenKit 连接：Windows 保存到 `%LOCALAPPDATA%\LingoTrace\connections\listenkit.json`，macOS 保存到 `~/Library/Application Support/LingoTrace/connections/listenkit.json`，Linux 保存到 `${XDG_DATA_HOME:-~/.local/share}/lingotrace/connections/listenkit.json`；支持 `LINGOTRACE_DATA_HOME` 为测试和便携部署改写数据根目录。
+- `resolve-listenkit` 按“本次显式路径、Vault 可选覆盖、设备默认、已验证的运行时同级目录”解析，并报告 `connection_scope`；`connect-listenkit --scope vault --vault <path>` 仅用于确实需要不同 checkout 的 Vault。
+
+### 变更 (Changed)
+- `connect-listenkit` 默认登记设备连接且不再要求 Vault；Vault 初始化移除 `--listenkit-root`，新建英语、日语或未来语种 Vault 不再重复写入相同的 ListenKit 路径。
+- 现有 `.lingotrace/listenkit-connections/<platform>.json` 保持兼容并作为高优先级 Vault 覆盖，不自动删除或改写私人配置；诊断、生成的 Vault Agent 指令、English/Japanese Agent Skill 和安装文档统一采用设备级默认连接。
+
+### 测试 (Tests)
+- 新增设备连接跨 Vault 共享、解析优先级、旧 Vault 覆盖兼容、失效覆盖回退、运行时同级兜底、CLI 设备登记与覆盖参数验证；修正 Windows 下既有 POSIX 路径断言。通过 LingoTrace 244 项、官方听力 100 项、架构基线 42 项和 Vault 结构 18 项测试。
+
 ## [20260809-103712]
 ### 新增 (Added)
 - 新增 `connect-listenkit` 与 `resolve-listenkit`：将用户确认的 ListenKit 程序目录按 macOS、Windows、Linux 分文件保存到私人 Vault，同平台可保留多个候选，换设备或移动目录后不会覆盖其他平台记录。

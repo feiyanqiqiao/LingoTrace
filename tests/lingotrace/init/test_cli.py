@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -120,6 +121,7 @@ class InitializationCliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             vault = root / "vault"
+            data_home = root / "device-data"
             listenkit = root / "ListenKit"
             (listenkit / "cli").mkdir(parents=True)
             (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
@@ -131,16 +133,19 @@ class InitializationCliTests(unittest.TestCase):
                     "-m",
                     "lingotrace.init",
                     "connect-listenkit",
-                    "--vault",
-                    str(vault),
                     "--listenkit-root",
                     str(listenkit),
-                ]
+                ],
+                extra_env={"LINGOTRACE_DATA_HOME": str(data_home)},
             )
             self.assertEqual(0, preview.returncode, preview.stderr)
             self.assertFalse(vault.exists())
+            self.assertFalse(data_home.exists())
 
-            applied = _run([*preview.args, "--apply"])
+            applied = _run(
+                [*preview.args, "--apply"],
+                extra_env={"LINGOTRACE_DATA_HOME": str(data_home)},
+            )
             self.assertEqual(0, applied.returncode, applied.stderr)
 
             resolved = _run(
@@ -151,15 +156,57 @@ class InitializationCliTests(unittest.TestCase):
                     "resolve-listenkit",
                     "--vault",
                     str(vault),
-                ]
+                ],
+                extra_env={"LINGOTRACE_DATA_HOME": str(data_home)},
             )
 
         self.assertEqual(0, resolved.returncode, resolved.stderr)
-        self.assertEqual(str(listenkit), json.loads(resolved.stdout)["artifacts"]["listenkit_root"])
+        payload = json.loads(resolved.stdout)
+        self.assertEqual(str(listenkit), payload["artifacts"]["listenkit_root"])
+        self.assertEqual("device", payload["artifacts"]["connection_scope"])
+
+    def test_vault_override_requires_a_vault_argument(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            listenkit = Path(tmp) / "ListenKit"
+            (listenkit / "cli").mkdir(parents=True)
+            (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            result = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "lingotrace.init",
+                    "connect-listenkit",
+                    "--scope",
+                    "vault",
+                    "--listenkit-root",
+                    str(listenkit),
+                ]
+            )
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual(
+            "vault_root_required_for_listenkit_override",
+            json.loads(result.stdout)["errors"][0]["code"],
+        )
 
 
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, cwd=REPO_ROOT, text=True, capture_output=True, check=False)
+def _run(
+    command: list[str],
+    *,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    environment = dict(os.environ)
+    if extra_env:
+        environment.update(extra_env)
+    return subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+        env=environment,
+    )
 
 
 if __name__ == "__main__":

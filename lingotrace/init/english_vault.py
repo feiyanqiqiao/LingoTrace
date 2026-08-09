@@ -15,7 +15,6 @@ def plan_english_vault_initialization(
     target_root: str | Path,
     *,
     runtime_root: str | Path | None = None,
-    listenkit_root: str | Path | None = None,
     platform_name: str | None = None,
 ) -> CommandReport:
     return plan_vault_initialization(
@@ -24,7 +23,6 @@ def plan_english_vault_initialization(
         paths_path=PATHS_PATH,
         command="init-english-vault",
         runtime_root=runtime_root,
-        listenkit_root=listenkit_root,
         platform_name=platform_name,
     )
 
@@ -33,13 +31,11 @@ def initialize_english_vault(
     target_root: str | Path,
     *,
     runtime_root: str | Path | None = None,
-    listenkit_root: str | Path | None = None,
     platform_name: str | None = None,
 ) -> CommandReport:
     plan = plan_english_vault_initialization(
         target_root,
         runtime_root=runtime_root,
-        listenkit_root=listenkit_root,
         platform_name=platform_name,
     )
     return apply_vault_initialization(target_root, plan)

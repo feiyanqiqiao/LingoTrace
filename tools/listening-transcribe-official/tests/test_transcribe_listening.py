@@ -1808,7 +1808,7 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertEqual(export_result.report["slices"][0]["path"], "attach/20_S01.m4a")
         self.assertEqual(export_result.report["slice_profile"]["grouping"], "sentence")
         command = run_mock.call_args.args[0]
-        self.assertIn("/tmp/export.py", command)
+        self.assertIn(str(Path("/tmp/export.py")), command)
         self.assertIn("--manifest", command)
         self.assertIn(str(manifest_path), command)
         self.assertIn("--padding-seconds", command)
@@ -2168,9 +2168,9 @@ class TranscribeListeningTests(unittest.TestCase):
 
         command = run_mock.call_args.args[0]
         env = run_mock.call_args.kwargs["env"]
-        self.assertIn("ListenKit/cli/generate-markdown.sh", command[1])
+        self.assertTrue(Path(command[1]).as_posix().endswith("ListenKit/cli/generate-markdown.sh"))
         self.assertIn("--input", command)
-        self.assertIn("/tmp/audio.mp3", command)
+        self.assertIn(str(Path("/tmp/audio.mp3")), command)
         self.assertIn("--language", command)
         self.assertIn("Japanese", command)
         self.assertNotIn("--engine", command)
@@ -2277,7 +2277,7 @@ class TranscribeListeningTests(unittest.TestCase):
                     payload = MODULE.invoke_listenkit(Path("/tmp/audio.mp3"), "ja-JP", "apple")
 
         command = run_mock.call_args.args[0]
-        self.assertEqual(command[1], "/tmp/listenkit/cli/generate-markdown.sh")
+        self.assertEqual(Path(command[1]), Path("/tmp/listenkit/cli/generate-markdown.sh"))
         self.assertIn("--engine", command)
         self.assertIn("apple", command)
         self.assertNotIn("--auto-init", command)

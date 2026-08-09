@@ -4,6 +4,7 @@ from .english_vault import initialize_english_vault, plan_english_vault_initiali
 from .doctor import inspect_onboarding, recommended_locations
 from .japanese_vault import initialize_japanese_vault, plan_japanese_vault_initialization
 from .listenkit_connections import (
+    device_listenkit_connection_path,
     recommended_listenkit_root,
     register_listenkit_connection,
     resolve_listenkit_connection,
@@ -17,6 +18,7 @@ __all__ = [
     "inspect_onboarding",
     "apply_runtime_update",
     "check_runtime_update",
+    "device_listenkit_connection_path",
     "plan_english_vault_initialization",
     "plan_japanese_vault_initialization",
     "recommended_listenkit_root",

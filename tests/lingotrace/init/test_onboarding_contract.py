@@ -47,7 +47,10 @@ class OnboardingDocumentationContractTests(unittest.TestCase):
             "/Users/name/Documents/Project/ListenKit",
             "%LOCALAPPDATA%\\LingoTrace\\ListenKit",
             "${XDG_DATA_HOME:-~/.local/share}/lingotrace/ListenKit",
-            ".lingotrace/listenkit-connections/<platform>.json",
+            "%LOCALAPPDATA%\\LingoTrace\\connections\\listenkit.json",
+            "${XDG_DATA_HOME:-~/.local/share}/lingotrace/connections/listenkit.json",
+            "英语、日语和未来语言 Vault 默认共享",
+            "--scope vault",
             "resolve-listenkit",
             "重新安装 ListenKit",
             "指定已经安装的 ListenKit",
@@ -101,6 +104,8 @@ class OnboardingDocumentationContractTests(unittest.TestCase):
             self.assertIn("resolve-listenkit --vault <current-vault>", skill)
             self.assertIn("reinstall", skill)
             self.assertIn("register an existing checkout", skill)
+            self.assertIn("shared device default", skill)
+            self.assertIn("--scope vault", skill)
 
 
 if __name__ == "__main__":

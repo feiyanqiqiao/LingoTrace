@@ -55,6 +55,8 @@ your-workspace/
 
 初始化器会在 Vault 根生成 `AGENTS.md`，并在 `.lingotrace/runtime-connections/` 中保存当前平台的运行时连接。macOS、Windows 和 Linux 各自使用独立文件；Agent 找不到本机运行时时会询问用户并追加新路径，不覆盖其他平台或同平台的已有候选。命令和文件格式见 [Vault 初始化与跨平台运行时连接](vault-initialization-and-runtime-connections.md)。
 
+ListenKit 是设备级依赖，不随每个语言 Vault 重复初始化。确认后的程序目录保存在当前系统的 LingoTrace 用户应用数据目录，所有语种 Vault 共享；Vault 内连接文件只用于明确的特殊版本覆盖。媒体任务前由已解析的 LingoTrace 运行时执行 `resolve-listenkit --vault <current-vault>`。
+
 每天第一次学习请求前，Agent 还会运行一次上游更新检查。当天状态按平台保存在 `.lingotrace/runtime-update-checks/`，所以不会在每条请求前重复联网。有更新时应合并成一至三点中文说明并询问是否更新，同时明确可以忽略；网络失败、拒绝更新或个人 fork 都不能阻止学习任务。技术契约见 [每日首次学习的运行时更新设计](daily-runtime-update-design.md)。
 
 ## 3. 日常怎么使用
@@ -138,6 +140,8 @@ Agent 会先查重，再决定是否新建。涉及合并、移动、覆盖或�
 ## 5. 听力链与 ListenKit
 
 如果你要处理音频或视频，推荐把 ListenKit 放在 LingoTrace 旁边。ListenKit 负责音视频导入、转写和切片，LingoTrace 负责把结果整理成学习笔记和复习材料。
+
+首次确认 ListenKit 目录后，用 `connect-listenkit --listenkit-root <path> --apply` 保存设备级默认连接。英语、日语和未来语种 Vault 都会使用它；只有某个 Vault 明确需要不同 checkout 时才使用 `--scope vault --vault <path>` 保存覆盖。
 
 当你说“请把这段音频做成精听稿”时，agent 应该完成完整体验：
 

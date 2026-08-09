@@ -100,7 +100,7 @@ python3 -m lingotrace.init doctor \
 - `warnings` 是可以延期的能力；
 - `dependencies` 记录发现的 Python、Git、GitHub CLI、Obsidian、ListenKit 和运行时。
 
-如果 `dependencies.listenkit` 已经返回有效程序根目录，向用户确认是否使用该目录；确认后在第 6 步通过 `--listenkit-root` 保存连接。不要因为一次临时探测成功就跳过连接登记。
+如果 `dependencies.listenkit` 已经返回有效程序根目录，向用户确认是否使用该目录；确认后在第 5 步把它登记为设备级默认连接。不要把同一路径重复写入每个语言 Vault。
 
 不要因为 Obsidian、GitHub CLI 或 ListenKit 缺失而谎称整个初始化失败。GitHub CLI 只对开发协作有用，学习者不需要它。
 
@@ -122,20 +122,18 @@ ListenKit 负责媒体获取、ASR 和切片。未发现时，询问用户是否
 
 LingoTrace 与 ListenKit 应使用独立运行环境，不要把彼此的 Python 依赖混装。
 
-安装前必须再次显示第 1 步确认的 ListenKit 目录；如果用户尚未确认，则显示 `doctor` 返回的 `recommended_listenkit_root` 并允许自选。安装后验证根目录存在 `README.md` 和 `cli/generate-markdown.sh`。如果 Vault 已经初始化，再先预览、后应用：
+安装前必须再次显示第 1 步确认的 ListenKit 目录；如果用户尚未确认，则显示 `doctor` 返回的 `recommended_listenkit_root` 并允许自选。安装后验证根目录存在 `README.md` 和 `cli/generate-markdown.sh`，再先预览、后登记设备级默认连接：
 
 ```bash
 python3 -m lingotrace.init connect-listenkit \
-  --vault <absolute-vault-path> \
   --listenkit-root <absolute-listenkit-path>
 
 python3 -m lingotrace.init connect-listenkit \
-  --vault <absolute-vault-path> \
   --listenkit-root <absolute-listenkit-path> \
   --apply
 ```
 
-如果 Vault 尚未初始化，不要提前向空 Vault 写连接；在第 6 步把已验证路径通过 `--listenkit-root` 一并写入。以后媒体任务前运行 `resolve-listenkit`。如果连接不存在或路径失效，必须让用户选择“重新安装”或“指定已经安装的目录”，不得猜测；详细契约见 [ListenKit 安装位置与跨平台连接](listenkit-installation-and-connections.md)。
+设备连接不依赖 Vault，因此可以在第 6 步初始化 Vault 之前完成。以后任意语种 Vault 的媒体任务前都运行 `resolve-listenkit --vault <current-vault>`。只有某个 Vault 明确需要不同 checkout 时，才增加 `--scope vault --vault <absolute-vault-path>` 保存覆盖。如果连接不存在或路径失效，必须让用户选择“重新安装”或“指定已经安装的目录”，不得猜测；详细契约见 [ListenKit 安装位置与设备级连接](listenkit-installation-and-connections.md)。
 
 ## 第 6 步：预览并初始化 Vault
 
@@ -147,8 +145,6 @@ python3 -m lingotrace.init vault \
   --vault <absolute-vault-path> \
   --runtime-root <absolute-runtime-path>
 ```
-
-如果 ListenKit 已经安装并通过验证，在命令末尾增加 `--listenkit-root <absolute-listenkit-path>`；延期安装时不要增加该参数，也不要生成虚假连接。
 
 向用户概括将创建的 Vault 配置、模板、视图和当前平台运行时连接。如果报告无错误，再取得写入确认并增加 `--apply`。初始化器不得覆盖已存在的文件；出现 `target_conflict` 时停止，询问用户是选择新目录还是对现有 Vault 做专门迁移分析。
 
