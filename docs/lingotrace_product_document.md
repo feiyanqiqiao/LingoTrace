@@ -61,7 +61,7 @@ preview -> apply -> second preview
 
 ## 4. 数据与运行边界
 
-公共仓库保存程序、语言包、模板和测试。私人 Vault 保存配置、笔记、媒体和复习状态。日常学习以 Vault 为工作区，运行时通过 `.lingotrace/runtime-connections/` 从 Vault 外部加载。
+公共仓库保存程序、语言包、模板和测试。私人 Vault 保存语言上下文、资料路径、笔记、媒体和复习状态；设备用户应用数据目录保存跨语种共享的 ListenKit 连接。日常学习以 Vault 为工作区，运行时通过 `.lingotrace/runtime-connections/` 从 Vault 外部加载。
 
 同一个运行时可以服务多个 Vault，但一次任务只能写一个 Vault。所有写入必须通过 Vault 上下文、能力检查、路径角色和 core 写入保护。
 

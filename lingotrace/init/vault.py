@@ -5,11 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from lingotrace.core.reports import CommandReport, Finding
-from lingotrace.init.listenkit_connections import (
-    default_listenkit_connection,
-    listenkit_connection_relative_path,
-    register_listenkit_connection,
-)
 from lingotrace.init.runtime_connections import (
     current_platform,
     default_runtime_connection,
@@ -28,7 +23,6 @@ def plan_vault_initialization(
     paths_path: Path,
     command: str,
     runtime_root: str | Path | None = None,
-    listenkit_root: str | Path | None = None,
     platform_name: str | None = None,
 ) -> CommandReport:
     root = Path(target_root)
@@ -37,8 +31,7 @@ def plan_vault_initialization(
     runtime = Path(runtime_root) if runtime_root is not None else PROJECT_ROOT
     platform_id = current_platform(platform_name)
 
-    listenkit = Path(listenkit_root) if listenkit_root is not None else None
-    planned_writes = _planned_writes(manifest, path_config, runtime, platform_id, listenkit)
+    planned_writes = _planned_writes(manifest, path_config, runtime, platform_id)
     blocked_files = _blocked_files(root, planned_writes)
     errors = [
         Finding(
@@ -55,15 +48,6 @@ def plan_vault_initialization(
         mode="preview",
     )
     errors.extend(connection_preview.errors)
-    if listenkit is not None:
-        listenkit_preview = register_listenkit_connection(
-            root,
-            listenkit,
-            platform_name=platform_id,
-            mode="preview",
-        )
-        errors.extend(listenkit_preview.errors)
-
     warnings: list[Finding] = []
     if root.exists() and any(root.iterdir()) and not errors:
         warnings.append(
@@ -86,7 +70,6 @@ def plan_vault_initialization(
         artifacts={
             "platform": platform_id,
             "runtime_root": str(runtime),
-            **({"listenkit_root": str(listenkit)} if listenkit is not None else {}),
         },
     )
 
@@ -159,7 +142,6 @@ def _planned_writes(
     path_config: dict[str, Any],
     runtime_root: Path,
     platform_id: str,
-    listenkit_root: Path | None,
 ) -> list[dict[str, Any]]:
     default_path_roles = path_config["default_path_roles"]
     language_name = manifest["target_language"]
@@ -196,17 +178,6 @@ def _planned_writes(
             "content": default_runtime_connection(runtime_root, platform_id),
         },
     ]
-
-    if listenkit_root is not None:
-        planned.append(
-            {
-                "path": listenkit_connection_relative_path(platform_id),
-                "action": "write_json",
-                "artifact_class": "vault-local-listenkit-connection",
-                "reason": f"initial ListenKit candidate for {platform_id}",
-                "content": default_listenkit_connection(listenkit_root, platform_id),
-            }
-        )
 
     for role, relative_path in default_path_roles.items():
         planned.append(
@@ -275,7 +246,7 @@ Before every write-capable learning task:
 7. Only after the user clearly agrees, use `python -m lingotrace.init apply-update --vault <this-vault> --runtime-root <resolved-runtime> --apply`. An official checkout may fast-forward only when its `main` worktree is clean. If the report identifies a personal fork, do not pull, merge, rebase, stash, or reset it; tell the user in plain Chinese to synchronize it themselves in the developer workspace.
 8. Read the resolved runtime's `{skill_path}` completely and follow it as the natural-language operating entry.
 9. Bind every operation to this Vault root. Route writes through the LingoTrace core and selected language-pack capability; do not edit learning files directly.
-10. Obsidian Desktop and ListenKit are optional onboarding dependencies. Before media import or transcription, run the resolved LingoTrace runtime's `python -m lingotrace.init resolve-listenkit --vault <this-vault>` entry. If no usable ListenKit path exists, explain the affected capability and ask the user to choose between reinstalling ListenKit or selecting an existing ListenKit directory. For reinstall, show the report's suggested location, allow another absolute path, read ListenKit's current official installation instructions, and obtain consent before downloading or installing. After validating the chosen checkout, preview and then apply `connect-listenkit --vault <this-vault> --listenkit-root <confirmed-listenkit> --apply`. Never overwrite other platform connection files. Do not block unrelated text-learning tasks.
+10. Obsidian Desktop and ListenKit are optional onboarding dependencies. Before media import or transcription, run the resolved LingoTrace runtime's `python -m lingotrace.init resolve-listenkit --vault <this-vault>` entry. Resolution checks an explicit path, this Vault's optional override, the shared device connection, and then a valid sibling default. If no usable ListenKit path exists, explain the affected capability and ask the user to choose between reinstalling ListenKit or selecting an existing ListenKit directory. For reinstall, show the report's suggested location, allow another absolute path, read ListenKit's current official installation instructions, and obtain consent before downloading or installing. After validating the chosen checkout, preview and then apply `connect-listenkit --listenkit-root <confirmed-listenkit> --apply` to save the shared device default. Use `--scope vault --vault <this-vault>` only when this Vault intentionally needs a different checkout. Do not block unrelated text-learning tasks.
 
 Users should be able to ask in ordinary study language. Do not require internal function names, workflow payloads, or write-mode terminology.
 """

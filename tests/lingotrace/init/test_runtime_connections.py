@@ -92,7 +92,11 @@ class RuntimeConnectionTests(unittest.TestCase):
 
             self.assertTrue(report.accepted, report.to_dict())
             self.assertEqual(str(usable_runtime), report.artifacts["runtime_root"])
-            self.assertTrue(report.artifacts["agent_skill"].endswith("packs/english/agent_skills/SKILL.md"))
+            self.assertTrue(
+                Path(report.artifacts["agent_skill"]).as_posix().endswith(
+                    "packs/english/agent_skills/SKILL.md"
+                )
+            )
 
     def test_missing_current_platform_connection_tells_agent_to_ask_and_preserve_other_platforms(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

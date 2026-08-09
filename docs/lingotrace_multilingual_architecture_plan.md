@@ -194,6 +194,8 @@ Agent 可以做语义判断、内容整理和不确定性分析；路径边界�
 
 ListenKit 负责媒体导入、ASR 和切片；LingoTrace 负责学习笔记、复习材料和状态。外部工具必须通过显式 Artifact 契约接入，不能绕过 Vault 上下文、能力检查和写入保护。
 
+ListenKit 程序位置是设备级、跨语种配置，由已解析的 LingoTrace 运行时从用户应用数据目录读取。Vault 默认不保存重复连接；只有特定 Vault 明确需要不同 checkout 时才使用 Vault 覆盖。解析顺序为本次显式路径、Vault 覆盖、设备默认、已验证的运行时同级目录。
+
 听力运行时的 Python 环境隔离见 [Listening Runtime Isolation](listening-runtime-isolation.md)。
 
 ## 12. 验证要求

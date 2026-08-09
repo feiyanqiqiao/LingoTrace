@@ -20,7 +20,6 @@ def parse_args() -> argparse.Namespace:
     initialize.add_argument("--language", choices=("english", "japanese"), required=True)
     initialize.add_argument("--vault", type=Path, required=True)
     initialize.add_argument("--runtime-root", type=Path)
-    initialize.add_argument("--listenkit-root", type=Path)
     initialize.add_argument("--apply", action="store_true")
 
     connect = subparsers.add_parser("connect-runtime", help="Append a runtime path for the current platform.")
@@ -32,16 +31,27 @@ def parse_args() -> argparse.Namespace:
     resolve.add_argument("--vault", type=Path, required=True)
 
     connect_listenkit = subparsers.add_parser(
-        "connect-listenkit", help="Append a ListenKit installation path for the current platform."
+        "connect-listenkit", help="Save a shared device ListenKit path or an explicit Vault override."
     )
-    connect_listenkit.add_argument("--vault", type=Path, required=True)
+    connect_listenkit.add_argument("--vault", type=Path, help="Required only for --scope vault.")
     connect_listenkit.add_argument("--listenkit-root", type=Path, required=True)
+    connect_listenkit.add_argument(
+        "--scope",
+        choices=("device", "vault"),
+        default="device",
+        help="Save the cross-language device default unless a Vault-specific override is required.",
+    )
     connect_listenkit.add_argument("--apply", action="store_true")
 
     resolve_listenkit = subparsers.add_parser(
         "resolve-listenkit", help="Resolve a usable ListenKit installation for the current platform."
     )
     resolve_listenkit.add_argument("--vault", type=Path, required=True)
+    resolve_listenkit.add_argument(
+        "--listenkit-root",
+        type=Path,
+        help="Validate and use this path for the current resolution only; do not save it.",
+    )
 
     doctor = subparsers.add_parser("doctor", help="Inspect learner onboarding prerequisites without changing them.")
     doctor.add_argument("--language", choices=("english", "japanese"), required=True)
@@ -72,7 +82,6 @@ def main() -> int:
         report = function(
             args.vault,
             runtime_root=args.runtime_root,
-            listenkit_root=args.listenkit_root,
         )
     elif args.command == "connect-runtime":
         report = register_runtime_connection(
@@ -86,10 +95,11 @@ def main() -> int:
         report = register_listenkit_connection(
             args.vault,
             args.listenkit_root,
+            scope=args.scope,
             mode="apply" if args.apply else "preview",
         )
     elif args.command == "resolve-listenkit":
-        report = resolve_listenkit_connection(args.vault)
+        report = resolve_listenkit_connection(args.vault, listenkit_root=args.listenkit_root)
     elif args.command == "doctor":
         report = inspect_onboarding(
             language=args.language,

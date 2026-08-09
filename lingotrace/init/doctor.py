@@ -4,7 +4,7 @@ import json
 import os
 import shutil
 import sys
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Callable, Mapping
 
 from lingotrace.core.reports import CommandReport, Finding
@@ -47,18 +47,23 @@ def inspect_onboarding(
     git_command = which("git")
     gh_command = which("gh")
     obsidian_path = _find_obsidian(platform_id, home_path, environment, which)
-    listenkit_path = _find_listenkit(runtime, listenkit)
+    listenkit_path = str(listenkit) if listenkit is not None and is_usable_listenkit_root(listenkit) else None
+    listenkit_scope = "explicit" if listenkit_path is not None else None
     listenkit_recommendation = recommended_listenkit_root(
         runtime_root=runtime,
         platform_name=platform_id,
     )
-    if listenkit_path is None and vault.exists():
+    if listenkit_path is None:
         listenkit_connection = resolve_listenkit_connection(
             vault,
+            runtime_root=runtime,
             platform_name=platform_id,
+            home=home_path,
+            environ=environment,
         )
         if listenkit_connection.accepted:
             listenkit_path = listenkit_connection.artifacts["listenkit_root"]
+            listenkit_scope = listenkit_connection.artifacts["connection_scope"]
 
     if python_command is None:
         errors.append(
@@ -139,7 +144,11 @@ def inspect_onboarding(
     dependencies = {
         "git": {"status": "found" if git_command else "missing_optional", "path": git_command},
         "github_cli": {"status": "found" if gh_command else "missing_optional", "path": gh_command},
-        "listenkit": {"status": "found" if listenkit_path else "missing_optional", "path": listenkit_path},
+        "listenkit": {
+            "status": "found" if listenkit_path else "missing_optional",
+            "path": listenkit_path,
+            "scope": listenkit_scope,
+        },
         "obsidian_desktop": {"status": "found" if obsidian_path else "missing_optional", "path": obsidian_path},
         "python": {
             "status": "found" if python_command and sys.version_info >= (3, 11) else "missing_required",
@@ -181,17 +190,22 @@ def recommended_locations(
         raise ValueError(f"unsupported_language: {language}")
     platform_id = current_platform(platform_name)
     environment = dict(os.environ if environ is None else environ)
-    home_path = Path(home) if home is not None else Path.home()
-    vault = home_path / "Documents" / "Obsidian" / f"LingoTrace-{language.title()}"
+    home_value = str(home) if home is not None else str(Path.home())
+    home_path = Path(home_value)
+    vault: Path | PurePosixPath | PureWindowsPath
     if platform_id == "macos":
-        runtime = home_path / "Library" / "Application Support" / "LingoTrace" / "runtime"
+        posix_home = PurePosixPath(home_value)
+        vault = posix_home / "Documents" / "Obsidian" / f"LingoTrace-{language.title()}"
+        runtime = posix_home / "Library" / "Application Support" / "LingoTrace" / "runtime"
     elif platform_id == "windows":
         windows_home = PureWindowsPath(environment.get("USERPROFILE", str(home))) if home is not None else PureWindowsPath(environment.get("USERPROFILE", str(home_path)))
         vault = windows_home / "Documents" / "Obsidian" / f"LingoTrace-{language.title()}"
         local_app_data = PureWindowsPath(environment.get("LOCALAPPDATA", str(windows_home / "AppData" / "Local")))
         runtime = local_app_data / "LingoTrace" / "runtime"
     else:
-        data_home = Path(environment.get("XDG_DATA_HOME", str(home_path / ".local" / "share")))
+        posix_home = PurePosixPath(home_value)
+        vault = posix_home / "Documents" / "Obsidian" / f"LingoTrace-{language.title()}"
+        data_home = PurePosixPath(environment.get("XDG_DATA_HOME", str(posix_home / ".local" / "share")))
         runtime = data_home / "lingotrace" / "runtime"
     listenkit = recommended_listenkit_root(
         runtime_root=runtime,
@@ -231,17 +245,6 @@ def _find_obsidian(
             return str(candidate)
     executable = which("obsidian")
     return str(executable) if executable else None
-
-
-def _find_listenkit(
-    runtime: Path,
-    requested: Path | None,
-) -> str | None:
-    candidates = [path for path in (requested, runtime.parent / "ListenKit") if path is not None]
-    for candidate in candidates:
-        if is_usable_listenkit_root(candidate):
-            return str(candidate)
-    return None
 
 
 def _paths_overlap(first: Path, second: Path) -> bool:

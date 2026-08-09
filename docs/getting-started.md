@@ -40,7 +40,7 @@ LingoTrace 是完全构建在 **Obsidian**（一款强大的本地笔记软件�
 
 Agent 会让你选择英语或日语，建议 Vault 和运行时位置，检测 Obsidian 桌面客户端和 ListenKit，并在任何安装、下载或写入前征求同意。你可以暂缓安装 Obsidian 或 ListenKit：前者会暂时缺少完整的桌面阅读与看板体验，后者会暂时不能做音视频导入和转写；文本学习仍然可用。
 
-安装 ListenKit 时，Agent 会先给出当前系统的建议目录，也允许你指定其他绝对路径。确认后的目录会按操作系统保存在 Vault 中。以后如果目录被移动、删除或在新电脑上不可用，Agent 会让你选择重新安装，或者指定已经安装好的 ListenKit，不会凭目录名猜测。
+安装 ListenKit 时，Agent 会先给出当前系统的建议目录，也允许你指定其他绝对路径。确认后的目录会保存在当前设备的 LingoTrace 应用数据目录，英语、日语和未来语种 Vault 共同使用。只有某个 Vault 明确需要不同版本时才保存单独覆盖。以后如果目录被移动或删除，Agent 会让你选择重新安装，或者指定已经安装好的 ListenKit，不会凭任意目录名猜测。
 
 完成后，在 Codex 中打开 `LingoTrace-English` 或 `LingoTrace-Japanese` 作为日常项目工作区。程序运行时放在 Vault 外部，只用于更新和提供能力。
 

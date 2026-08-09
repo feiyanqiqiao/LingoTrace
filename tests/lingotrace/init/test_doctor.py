@@ -99,30 +99,32 @@ class OnboardingDoctorTests(unittest.TestCase):
         self.assertEqual("found", dependencies["listenkit"]["status"])
         self.assertNotIn("listenkit_not_found", {finding.code for finding in report.warnings})
 
-    def test_doctor_uses_vault_saved_listenkit_connection(self) -> None:
+    def test_doctor_uses_device_saved_listenkit_connection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             runtime = root / "runtime"
             vault = root / "vault"
+            data_home = root / "device-data"
             listenkit = root / "custom" / "ListenKit"
             (runtime / "lingotrace").mkdir(parents=True)
             (runtime / "lingotrace" / "__init__.py").write_text("", encoding="utf-8")
             (listenkit / "cli").mkdir(parents=True)
             (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
             (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
-            register_listenkit_connection(vault, listenkit, mode="apply")
+            register_listenkit_connection(None, listenkit, data_home=data_home, mode="apply")
 
             report = inspect_onboarding(
                 language="english",
                 vault_root=vault,
                 runtime_root=runtime,
                 home=root / "home",
-                environ={},
+                environ={"LINGOTRACE_DATA_HOME": str(data_home)},
                 which=lambda name: "/usr/bin/python3" if name == "python3" else None,
             )
 
         dependencies = json.loads(report.artifacts["dependencies"])
         self.assertEqual(str(listenkit), dependencies["listenkit"]["path"])
+        self.assertEqual("device", dependencies["listenkit"]["scope"])
         self.assertNotIn("listenkit_not_found", {finding.code for finding in report.warnings})
 
     def test_recommended_locations_are_platform_specific(self) -> None:
