@@ -35,13 +35,19 @@ class ListenKitConnectionTests(unittest.TestCase):
             vault = base / "vault"
             _make_listenkit(root)
 
-            windows = resolve_listenkit_connection(
+            resolved = resolve_listenkit_connection(
                 vault,
                 listenkit_root=root,
-                platform_name="windows",
+                platform_name=current_platform(),
             )
-        self.assertTrue(windows.accepted, windows.to_dict())
-        self.assertTrue(windows.artifacts["generate_markdown"].endswith("generate-markdown.ps1"))
+        expected = "generate-markdown.ps1" if current_platform() == "windows" else "generate-markdown.sh"
+        self.assertTrue(resolved.accepted, resolved.to_dict())
+        self.assertTrue(resolved.artifacts["generate_markdown"].endswith(expected))
+        self.assertTrue(
+            str(listenkit_generate_markdown_path(r"C:\ListenKit", "windows")).endswith(
+                "generate-markdown.ps1"
+            )
+        )
         self.assertTrue(
             str(listenkit_generate_markdown_path("/tmp/ListenKit", "macos")).endswith(
                 "generate-markdown.sh"
