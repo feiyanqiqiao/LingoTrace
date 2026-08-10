@@ -5,6 +5,13 @@
 
 ---
 
+## [20260810-220602]
+### 清理 (Removed)
+- 完整删除 `docs/agent-compatibility-report/` 下 10 份原始 Agent 兼容性报告、整改方案、macOS 交接和 5 份回应文档；经验证的跨平台实现、公共测试、用户安装说明和 `CHANGELOG.md` 历史记录继续保留。
+
+### 测试 (Tests)
+- 删除后通过 core 256、听力 112（1 skipped）、Vault 结构 23、架构 42，共 433 项 unittest；pytest 为 432 passed、1 skipped、25 subtests passed，compileall 与 diff 格式检查通过。
+
 ## [20260810-215618]
 ### 新增 (Added)
 - 新增公共跨平台 `init_listening_runtime.py`：验证实际 Python 3.14，在平台原生 Cache 中安全创建日语听力隔离 venv，清理子进程 `PYTHONHOME`/`PYTHONPATH`，委派固定离线词典依赖安装与健康检查，并提供 install/check/dry-run。
