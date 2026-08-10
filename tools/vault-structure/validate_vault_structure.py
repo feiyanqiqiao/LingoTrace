@@ -4,8 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
-from pathlib import Path
+import sys
+from pathlib import Path, PurePosixPath, PureWindowsPath
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 MEDIA_SUFFIXES = {".mp3", ".m4a", ".wav", ".aac", ".flac", ".ogg"}
@@ -26,13 +31,16 @@ def stat_note_file(path: Path) -> object:
 
 def note_files(root: Path) -> list[Path]:
     result: list[Path] = []
-    for base in (root / "学习系统", root / "系统配置", root / "笔记"):
+    bases = configured_content_roots(root)
+    if not bases:
+        bases = [root / "学习系统", root / "系统配置", root / "笔记"]
+    for base in bases:
         if base.exists():
             for path in base.rglob("*.md"):
                 if is_icloud_dataless_placeholder(stat_note_file(path)):
                     continue
                 result.append(path)
-    return sorted(result)
+    return sorted(set(result))
 
 
 def clean_target(raw_target: str) -> str:
@@ -92,6 +100,7 @@ def validation_baseline(
 
 def find_paths_config(root: Path) -> Path:
     candidates = (
+        root / ".lingotrace/paths.json",
         root / "系统配置/paths.json",
         root / "学习系统/系统/配置/paths.json",
         root / "学习系统/系统配置/paths.json",
@@ -104,16 +113,17 @@ def find_paths_config(root: Path) -> Path:
 
 def validate_roles(root: Path) -> list[str]:
     errors: list[str] = []
-    config = json.loads(find_paths_config(root).read_text(encoding="utf-8"))
-    roles = config.get("roles")
-    if not roles:
-        return errors
+    try:
+        config = json.loads(find_paths_config(root).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, RuntimeError) as exc:
+        return [str(exc)]
+    roles, role_errors, is_current_schema = path_roles_from_config(config)
+    errors.extend(role_errors)
     for key, value in sorted(roles.items()):
-        if not isinstance(value, str) or not value:
-            errors.append(f"role {key} must be a non-empty vault-relative path")
-            continue
         if not (root / value).exists():
             errors.append(f"role path does not exist: {key}={value}")
+    if is_current_schema:
+        return errors
     if roles.get("base_vocab_root") != config.get("base_vocab_root"):
         errors.append("base_vocab_root compatibility mirror does not match roles.base_vocab_root")
     if roles.get("daily_notes_root") != config.get("daily_notes_root"):
@@ -141,9 +151,89 @@ def validate_roles(root: Path) -> list[str]:
     return errors
 
 
+def path_roles_from_config(config: object) -> tuple[dict[str, str], list[str], bool]:
+    if not isinstance(config, dict):
+        return {}, ["paths.json must contain a JSON object"], False
+    if "path_roles" in config:
+        entries = config.get("path_roles")
+        if not isinstance(entries, list):
+            return {}, ["path_roles must be a list"], True
+        roles: dict[str, str] = {}
+        errors: list[str] = []
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                errors.append(f"path_roles[{index}] must be an object")
+                continue
+            role = entry.get("role")
+            relative_path = entry.get("relative_path")
+            if not isinstance(role, str) or not role.strip():
+                errors.append(f"path_roles[{index}].role must be a non-empty string")
+                continue
+            if role in roles:
+                errors.append(f"duplicate path role: {role}")
+                continue
+            if not isinstance(relative_path, str) or not relative_path.strip():
+                errors.append(f"path role {role} must use a non-empty relative_path")
+                continue
+            if not is_safe_vault_relative_path(relative_path):
+                errors.append(f"path role {role} must stay inside the Vault: {relative_path}")
+                continue
+            roles[role] = relative_path
+        return roles, errors, True
+
+    legacy_roles = config.get("roles")
+    if legacy_roles is None:
+        return {}, ["paths.json must contain path_roles or roles"], False
+    if not isinstance(legacy_roles, dict):
+        return {}, ["roles must be an object"], False
+    roles = {}
+    errors = []
+    for key, value in legacy_roles.items():
+        if not isinstance(key, str) or not isinstance(value, str) or not value:
+            errors.append(f"role {key} must be a non-empty vault-relative path")
+            continue
+        if not is_safe_vault_relative_path(value):
+            errors.append(f"role {key} must stay inside the Vault: {value}")
+            continue
+        roles[key] = value
+    return roles, errors, False
+
+
+def configured_path_roles(root: Path) -> dict[str, str]:
+    try:
+        config = json.loads(find_paths_config(root).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, RuntimeError):
+        return {}
+    roles, _, _ = path_roles_from_config(config)
+    return roles
+
+
+def is_safe_vault_relative_path(value: str) -> bool:
+    windows = PureWindowsPath(value)
+    posix = PurePosixPath(value)
+    return not (
+        windows.is_absolute()
+        or bool(windows.drive)
+        or posix.is_absolute()
+        or ".." in windows.parts
+        or ".." in posix.parts
+    )
+
+
+def configured_content_roots(root: Path) -> list[Path]:
+    roles = configured_path_roles(root)
+    return sorted(
+        {
+            root / relative_path
+            for relative_path in roles.values()
+            if (root / relative_path).is_dir()
+        }
+    )
+
+
 def validate_listening_layout(root: Path) -> list[str]:
     errors: list[str] = []
-    listening = root / "学习系统/听力"
+    listening = root / configured_path_roles(root).get("listening_root", "学习系统/听力")
     if not listening.exists():
         return errors
     for path in sorted(listening.rglob("*")):
@@ -157,9 +247,13 @@ def validate_listening_layout(root: Path) -> list[str]:
 
 
 def validate_untitled_bases(root: Path) -> list[str]:
+    bases = configured_content_roots(root)
+    if not bases:
+        bases = [root / "学习系统"]
+    paths = sorted({path for base in bases if base.exists() for path in base.rglob("無題のファイル*.base")})
     return [
-        f"untitled base must be removed: {path.relative_to(root)}"
-        for path in sorted((root / "学习系统").rglob("無題のファイル*.base"))
+        f"untitled base must be removed: {path.relative_to(root).as_posix()}"
+        for path in paths
     ]
 
 
@@ -170,17 +264,21 @@ def load_baseline(path: Path | None) -> set[str]:
 
 
 def run_integrations(root: Path, run_date: str) -> list[str]:
-    commands = [
-        ["zsh", "codex-skills/jp-survival-speaking-card-generator/scripts/validate-survival-speaking-cards.sh", run_date],
-    ]
-    errors: list[str] = []
-    for command in commands:
-        result = subprocess.run(command, cwd=root, check=False, text=True, capture_output=True)
-        print(result.stdout, end="")
-        if result.returncode:
-            print(result.stderr, end="")
-            errors.append(f"integration failed ({result.returncode}): {' '.join(command)}")
-    return errors
+    context_path = root / ".lingotrace" / "vault-context.json"
+    try:
+        context = json.loads(context_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"public workflow integration cannot read Vault context: {exc}"]
+    pack_id = context.get("language_pack")
+    if pack_id == "lingo-japanese":
+        from lingotrace.packs.japanese import workflows
+    elif pack_id == "lingo-english":
+        from lingotrace.packs.english import workflows
+    else:
+        return [f"public workflow integration does not support language_pack={pack_id!r}"]
+    report = workflows.review_rollover(vault_root=root, run_date=run_date, mode="preview")
+    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    return [f"review rollover integration: {finding.message}" for finding in report.errors]
 
 
 def parse_args() -> argparse.Namespace:

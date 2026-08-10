@@ -17,8 +17,14 @@ env:
 
 jobs:
   japanese-baseline:
-    name: Japanese behavior baseline
-    runs-on: ubuntu-latest
+    name: Japanese behavior baseline (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
 
     steps:
       - name: Check out repository
@@ -32,6 +38,7 @@ jobs:
           python-version: "3.14"
 
       - name: Check public file allowlist
+        if: runner.os == 'Linux'
         env:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}

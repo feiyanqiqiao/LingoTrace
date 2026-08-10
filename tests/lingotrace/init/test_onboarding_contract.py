@@ -23,8 +23,10 @@ class OnboardingDocumentationContractTests(unittest.TestCase):
     def test_learner_protocol_uses_minimal_runtime_and_safe_vault_preview(self) -> None:
         guide = (REPO_ROOT / "docs" / "learner-agent-setup.md").read_text(encoding="utf-8")
         self.assertIn("sparse-checkout set /lingotrace/", guide)
-        self.assertIn("python3 -m lingotrace.init doctor", guide)
-        self.assertIn("python3 -m lingotrace.init resolve-runtime", guide)
+        self.assertIn("<python-command> -m lingotrace.init doctor", guide)
+        self.assertIn("<python-command> -m lingotrace.init resolve-runtime", guide)
+        self.assertIn("Windows 通常是 `python`", guide)
+        self.assertIn("`cli/generate-markdown.ps1`", guide)
         preview_position = guide.index("先执行预览，不加 `--apply`")
         apply_position = guide.index("增加 `--apply`")
         self.assertLess(preview_position, apply_position)

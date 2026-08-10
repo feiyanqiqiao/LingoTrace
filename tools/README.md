@@ -40,17 +40,18 @@
 Japanese Agent Skill
   -> LingoTrace listening execution layer
   -> tools/listening-transcribe-official/transcribe_listening.py
-  -> ../ListenKit/cli/generate-markdown.sh
+  -> Windows: ../ListenKit/cli/generate-markdown.ps1 (PowerShell)
+  -> macOS/Linux: ../ListenKit/cli/generate-markdown.sh (bash)
   -> ../ListenKit/cli/export-audio-slices.py
 ```
 
 依赖：
 
 - Agent Skill：`lingotrace/packs/japanese/agent_skills/SKILL.md`
-- 通用转写能力：`../ListenKit/cli/generate-markdown.sh`
+- 通用转写能力：Windows 使用 `../ListenKit/cli/generate-markdown.ps1`，macOS/Linux 使用 `../ListenKit/cli/generate-markdown.sh`。Windows 不通过 WSL 或 Git Bash 转接。
 - 通用时间范围切片能力：`../ListenKit/cli/export-audio-slices.py`
 - 离线词典包：由 `setup_offline_dictionary.py` 安装及检查于 LingoTrace 自己的本机 Cache runtime。
-- Python runtime：LingoTrace 固定使用 `~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python`，ListenKit 固定使用 `~/Library/Caches/ListenKit/venvs/cpython-314/bin/python`。两套环境都放在本机 Cache，避免从 iCloud 路径载入原生扩展时卡住或让 symlink 被改名；Homebrew `/opt/homebrew/bin/python3.14` 只负责初始化，两者不得跨环境 import 包。
+- Python runtime：LingoTrace 与 ListenKit 使用彼此独立的本机 runtime，不得跨环境 import 包。macOS 已验证路径见 `docs/listening-runtime-isolation.md`；Windows 由当前 LingoTrace Python 与 ListenKit 的 PowerShell 入口分别解析，不硬编码用户名、Python 3.14 安装目录或 Store alias。
 
 #### 精听学习语块
 
@@ -99,18 +100,18 @@ Japanese Agent Skill
 - 不要把 runtime 或外部静态词典缓存提交到 Git。
 - 不要把本地候选直接当作人工确认结果。
 
-常用命令：
+常用命令（用本机已验证可用的 Python launcher 或隔离环境解释器替换 `<python-command>`）：
 
 ```bash
-~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python tools/listening-transcribe-official/setup_offline_dictionary.py --python ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python --install
-~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python tools/listening-transcribe-official/setup_offline_dictionary.py --python ~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python --check
+<python-command> tools/listening-transcribe-official/setup_offline_dictionary.py --python <python-command> --install
+<python-command> tools/listening-transcribe-official/setup_offline_dictionary.py --python <python-command> --check
 ```
 
 依赖：
 
-- Homebrew Python 3.14 作为初始化器。
+- Python 3.14 是完整听力链的已验证版本；launcher 必须以实际执行结果确认，不能只按命令名判断。
 - LingoTrace 直接使用本机 Cache 中的 Python 包；直接依赖只由 `requirements-listening.txt` 固定。
-- Vault 外部缓存目录：默认为 `~/Library/Caches/jp-listening-dicts`，只保留跨版本静态资料，例如根目录 `accent_map.json`。
+- Vault 外部缓存目录：macOS 默认为 `~/Library/Caches/jp-listening-dicts`，Windows 默认为 `%LOCALAPPDATA%\LingoTrace\Caches\jp-listening-dicts`，Linux 遵循 XDG cache；只保留跨版本静态资料，例如根目录 `accent_map.json`。
 - 可用 `JP_LISTENING_DICT_DIR` 覆盖默认位置。
 
 完整环境边界与升级规则见 `docs/listening-runtime-isolation.md`。
@@ -120,7 +121,7 @@ Japanese Agent Skill
 执行测试：
 
 ```bash
-~/Library/Caches/LingoTrace/venvs/cpython-314/bin/python -m unittest discover -s tools/listening-transcribe-official/tests -p 'test_*.py'
+<python-command> -m unittest discover -s tools/listening-transcribe-official/tests -p 'test_*.py'
 ```
 
 ## Git Workflow Checks
@@ -179,8 +180,8 @@ bash tools/git/check-public-staged-files.sh --range origin/main...HEAD
 迁移工具默认只预览。确认清单后，才加上 `--apply`：
 
 ```bash
-python3 tools/vault-structure/migrate_vault_layout.py --phase content
-python3 tools/vault-structure/migrate_vault_layout.py --phase content --apply
+<python-command> tools/vault-structure/migrate_vault_layout.py --phase content
+<python-command> tools/vault-structure/migrate_vault_layout.py --phase content --apply
 ```
 
 可用阶段：
@@ -221,7 +222,7 @@ python3 tools/vault-structure/migrate_vault_layout.py --phase content --apply
 完整结构验证：
 
 ```bash
-python3 tools/vault-structure/validate_vault_structure.py \
+<python-command> tools/vault-structure/validate_vault_structure.py \
   --baseline tmp/directory-refactor-baseline.json \
   --enforce-listening-layout \
   --run-integrations
@@ -230,23 +231,23 @@ python3 tools/vault-structure/validate_vault_structure.py \
 更新坏链基线：
 
 ```bash
-python3 tools/vault-structure/validate_vault_structure.py \
+<python-command> tools/vault-structure/validate_vault_structure.py \
   --write-baseline tmp/directory-refactor-baseline.json
 ```
 
 依赖：
 
 - Python
-- `系统配置/paths.json`
-- 生活口语卡验证器
-- 次日 rollover wrapper
+- 当前 Vault 的 `.lingotrace/paths.json`（旧 Vault 仍兼容历史路径配置）
+- 公共 LingoTrace runtime 与当前语言包
+- `review_rollover` 只读预览；不依赖私有脚本、`zsh` 或特定 Agent 目录
 
 ### 测试
 
 执行测试：
 
 ```bash
-python3 -m unittest discover -s tools/vault-structure/tests -p 'test_*.py'
+<python-command> -m unittest discover -s tools/vault-structure/tests -p 'test_*.py'
 ```
 
 ## Maintenance Rules

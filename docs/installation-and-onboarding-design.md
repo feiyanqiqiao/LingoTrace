@@ -82,7 +82,7 @@ Agent 可以在征得一次明确同意后执行一组已经解释过的同类�
 运行时安装后，Agent 使用统一诊断入口：
 
 ```bash
-python3 -m lingotrace.init doctor \
+<python-command> -m lingotrace.init doctor \
   --language english \
   --vault /absolute/path/to/LingoTrace-English \
   --runtime-root /absolute/path/to/runtime
@@ -91,9 +91,11 @@ python3 -m lingotrace.init doctor \
 诊断输出 JSON，区分必要错误和可延期警告，并给出当前平台、依赖发现结果及建议路径。初始化继续使用：
 
 ```bash
-python3 -m lingotrace.init vault --language english --vault /absolute/path/to/Vault --apply
-python3 -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
+<python-command> -m lingotrace.init vault --language english --vault /absolute/path/to/Vault --apply
+<python-command> -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
 ```
+
+`<python-command>` 必须是预检中实际执行成功且版本至少为 3.11 的 launcher：Windows 通常为 `python`，macOS/Linux 通常为 `python3`。诊断必须报告正在运行的 `sys.executable` 与版本，不能用另一个 PATH 候选冒充当前解释器。
 
 文档入口分为：
 

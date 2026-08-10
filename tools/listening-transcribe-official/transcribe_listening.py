@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -16,6 +17,14 @@ from urllib.parse import parse_qs, urlparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from lingotrace.core.json_output import configure_utf8_stdio, emit_json
+from lingotrace.init.executables import find_executable
 
 COMMON_SECTION_PLACEHOLDER = (
     "二阶段待编辑：请基于完整脚本，用大模型或人工判断，挑选 0-5 个真正可替换、可迁移的常用语块；宁缺勿滥。\n\n"
@@ -267,14 +276,14 @@ class OfflineAccentDictionary(StaticAccentDictionary):
         return self._tagger
 
     def runtime_details(self) -> str:
-        vault_root = Path(__file__).resolve().parents[2]
-        init_script = vault_root / "codex-skills/jp-listening-script-generator/scripts/init-listening-runtime.sh"
+        setup_script = Path(__file__).with_name("setup_offline_dictionary.py")
         return (
             f"Python: {sys.executable}\n"
             f"Version: {sys.version.split()[0]}\n"
             f"ABI tag: {sys.implementation.cache_tag}\n"
             f"Virtual environment: {sys.prefix}\n"
-            f"Repair: `{init_script}`"
+            f"Repair: create a Python 3.14 virtual environment outside synchronized folders, then run "
+            f"`{setup_script} --python <venv-python> --install`."
         )
 
     def validate_runtime(self) -> list[str]:
@@ -351,7 +360,15 @@ def default_dictionary_cache_dir() -> Path:
     override = os.environ.get("JP_LISTENING_DICT_DIR")
     if override:
         return Path(override).expanduser()
-    return Path.home() / "Library" / "Caches" / "jp-listening-dicts"
+    platform_id = current_platform_id()
+    if platform_id == "windows":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        root = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
+        return root / "LingoTrace" / "Caches" / "jp-listening-dicts"
+    if platform_id == "macos":
+        return Path.home() / "Library" / "Caches" / "jp-listening-dicts"
+    root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    return root / "lingotrace" / "jp-listening-dicts"
 
 
 def load_static_accent_entries(cache_dir: Path) -> dict[str, str]:
@@ -394,10 +411,10 @@ def parse_args() -> argparse.Namespace:
         help="ASR locale. The default reads the active LingoTrace language pack (ja-JP or en-US).",
     )
     parser.add_argument("--title")
-    parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper"], default="auto")
+    parser.add_argument("--engine", choices=["auto", "apple", "faster-whisper", "mlx"], default="auto")
     parser.add_argument(
         "--compare-engine",
-        choices=["auto", "apple", "faster-whisper"],
+        choices=["auto", "apple", "faster-whisper", "mlx"],
         default="auto",
         help="Secondary ASR route; auto enables dual-ASR validation by default.",
     )
@@ -422,6 +439,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--confirm-overwrite", action="store_true")
     parser.add_argument("--scan-dir")
+    parser.add_argument(
+        "--report-json",
+        type=Path,
+        help="Also atomically write the UTF-8 result or error report to this path.",
+    )
     return parser.parse_args()
 
 
@@ -439,6 +461,15 @@ def listenkit_root() -> Path:
     return lingotrace_root().parent / "ListenKit"
 
 
+def current_platform_id(platform_name: str | None = None) -> str:
+    raw = (platform_name or platform.system()).strip().lower()
+    if raw in {"windows", "win32", "win"}:
+        return "windows"
+    if raw in {"darwin", "mac", "macos"}:
+        return "macos"
+    return "linux"
+
+
 def configure_project_roots(*, lingotrace: str | None = None, listenkit: str | None = None) -> None:
     if lingotrace:
         root = Path(lingotrace).expanduser().resolve()
@@ -448,27 +479,53 @@ def configure_project_roots(*, lingotrace: str | None = None, listenkit: str | N
         os.environ["LINGOTRACE_ROOT"] = str(root)
     if listenkit:
         root = Path(listenkit).expanduser().resolve()
-        if not (root / "cli" / "generate-markdown.sh").is_file():
-            raise RuntimeError(f"ListenKit root does not contain cli/generate-markdown.sh: {root}")
+        entrypoint = listenkit_generate_markdown_script_path(root=root)
+        if not entrypoint.is_file():
+            raise RuntimeError(f"ListenKit root does not contain the current platform entrypoint: {entrypoint}")
         os.environ["LISTENKIT_ROOT"] = str(root)
 
 
-def listenkit_generate_markdown_script_path() -> Path:
-    return listenkit_root() / "cli" / "generate-markdown.sh"
+def listenkit_generate_markdown_script_path(
+    *,
+    root: Path | None = None,
+    platform_name: str | None = None,
+) -> Path:
+    suffix = "ps1" if current_platform_id(platform_name) == "windows" else "sh"
+    return (root or listenkit_root()) / "cli" / f"generate-markdown.{suffix}"
 
 
 def listenkit_export_audio_slices_script_path() -> Path:
     return listenkit_root() / "cli" / "export-audio-slices.py"
 
 
-def require_executable_file(path: Path, description: str) -> None:
-    if not path.is_file() or not os.access(path, os.X_OK):
+def require_executable_file(path: Path, description: str, *, platform_name: str | None = None) -> None:
+    if not path.is_file():
+        raise RuntimeError(f"{description} is missing: {path}")
+    if current_platform_id(platform_name) != "windows" and not os.access(path, os.X_OK):
         raise RuntimeError(f"{description} is missing or not executable: {path}")
 
 
-def require_command(name: str) -> None:
-    if shutil.which(name) is None:
+def find_command(name: str, *, platform_name: str | None = None) -> str | None:
+    return find_executable(name, platform_name=current_platform_id(platform_name))
+
+
+def require_command(name: str, *, platform_name: str | None = None) -> str:
+    command = find_command(name, platform_name=platform_name)
+    if command is None:
         raise RuntimeError(f"Missing required command for listening audio workflow: {name}")
+    return command
+
+
+def listenkit_generate_markdown_command_prefix(platform_name: str | None = None) -> list[str]:
+    platform_id = current_platform_id(platform_name)
+    script = listenkit_generate_markdown_script_path(platform_name=platform_id)
+    if platform_id == "windows":
+        powershell = find_command("pwsh", platform_name=platform_id) or require_command(
+            "powershell", platform_name=platform_id
+        )
+        return [powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script)]
+    bash = require_command("bash", platform_name=platform_id)
+    return [bash, str(script)]
 
 
 def preflight_source_audio(audio_path: Path) -> None:
@@ -477,7 +534,10 @@ def preflight_source_audio(audio_path: Path) -> None:
 
 
 def preflight_listenkit_generate_tooling() -> None:
-    require_executable_file(listenkit_generate_markdown_script_path(), "ListenKit generate-markdown CLI")
+    platform_id = current_platform_id()
+    script = listenkit_generate_markdown_script_path(platform_name=platform_id)
+    require_executable_file(script, "ListenKit generate-markdown CLI", platform_name=platform_id)
+    listenkit_generate_markdown_command_prefix(platform_id)
 
 
 def preflight_intensive_slice_tooling() -> None:
@@ -632,8 +692,8 @@ def invoke_listenkit(
     artifact_label: str | None = None,
     audio_format: str = "m4a",
 ) -> dict:
-    script_path = listenkit_generate_markdown_script_path()
     preflight_listenkit_generate_tooling()
+    command_prefix = listenkit_generate_markdown_command_prefix()
     env = os.environ.copy()
     if env_overrides:
         env.update(env_overrides)
@@ -643,8 +703,7 @@ def invoke_listenkit(
             output_stem = source.stem if isinstance(source, Path) else infer_stem_from_url(source)
         output_path = Path(tmpdir) / f"{output_stem}.md"
         command = [
-            "/bin/bash",
-            str(script_path),
+            *command_prefix,
             f"--{source_kind}",
             str(source),
             "--language",
@@ -665,6 +724,8 @@ def invoke_listenkit(
             stderr=subprocess.PIPE,
             text=True,
             env=env,
+            encoding="utf-8",
+            errors="replace",
         )
         if result.returncode != 0:
             stderr = result.stderr.strip() or result.stdout.strip() or "ListenKit transcript generation failed."
@@ -706,12 +767,16 @@ def invoke_listenkit(
 
 
 def run_ffmpeg(args: list[str]) -> None:
+    if args and Path(args[0]).name.lower() in {"ffmpeg", "ffmpeg.exe"}:
+        args = [require_command("ffmpeg"), *args[1:]]
     result = subprocess.run(
         args,
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip() or "ffmpeg failed."
@@ -1887,7 +1952,32 @@ def compare_candidate_if_requested(
 ) -> ASRComparisonResult | None:
     primary_engine = str(primary.payload.get("engine", ""))
     if compare_engine == "auto":
-        compare_engine = "faster-whisper" if primary_engine == "apple" else "apple"
+        compare_engine = automatic_compare_engine(primary_engine)
+        if compare_engine is None:
+            report = {
+                "schema_version": 2,
+                "kind": "asr_comparison",
+                "status": "single_engine_platform",
+                "platform": current_platform_id(),
+                "primary": {
+                    "route": primary.route_label,
+                    "engine": str(primary.payload.get("engine", primary.route_label)),
+                    "segment_count": len(primary.segments),
+                    "locale": str(primary.payload.get("locale", locale)),
+                },
+                "secondary": None,
+                "limitation": "No second independent ASR engine is supported on this platform.",
+                "disagreement_count": 0,
+                "unresolved_count": 0,
+                "disagreements": [],
+                "consensus_segments": [],
+            }
+            report_path = None
+            if persist_artifacts:
+                report_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.asr-comparison.json"
+                report_path.parent.mkdir(parents=True, exist_ok=True)
+                report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            return ASRComparisonResult(primary, report, report_path, None)
     if not compare_engine or compare_engine == primary_engine:
         return None
     try:
@@ -1938,6 +2028,13 @@ def compare_candidate_if_requested(
     else:
         merge_request_path = None
     return ASRComparisonResult(primary, report, report_path, consensus_path, merge_request_path)
+
+
+def automatic_compare_engine(primary_engine: str, platform_name: str | None = None) -> str | None:
+    platform_id = current_platform_id(platform_name)
+    if platform_id in {"windows", "linux"}:
+        return None if primary_engine == "faster-whisper" else "faster-whisper"
+    return "faster-whisper" if primary_engine == "apple" else "apple"
 
 
 def infer_title(audio_stem: str, forced_title: str | None, sentences: list[str]) -> str:
@@ -3203,6 +3300,11 @@ def process_one(
                         f"第二 ASR（{secondary.get('engine', 'unknown')}）不可用，本次降级为单 ASR；"
                         f"限制与错误已记录在 artifacts/{comparison_path.name}。"
                     )
+                elif comparison_payload.get("status") == "single_engine_platform":
+                    comparison_runtime_issue = (
+                        "当前平台没有第二个受支持的独立 ASR 引擎，本次使用单 ASR；"
+                        f"平台限制已记录在 artifacts/{comparison_path.name}。"
+                    )
             consensus_path = material_dir_for_audio(audio_path) / "artifacts" / f"{audio_path.stem}.reviewed-transcript.json"
             if consensus_path.is_file():
                 try:
@@ -3566,6 +3668,9 @@ def _bundle_from_stage(
             if comparison.get("status") == "secondary_unavailable":
                 asr_validation_status = "secondary_unavailable"
                 break
+            if comparison.get("status") == "single_engine_platform":
+                asr_validation_status = "single_engine_platform"
+                break
             if comparison.get("status") == "complete" and int(comparison.get("disagreement_count", 0)) == 0:
                 asr_validation_status = "agreed"
     return PreparedListeningBundle(
@@ -3832,32 +3937,43 @@ def listening_status_and_notification(bundle: PreparedListeningBundle) -> tuple[
         return "complete", "双 ASR 转写一致，无需模型合并；听力笔记已通过写入校验。"
     if bundle.asr_validation_status == "secondary_unavailable":
         return "complete", "第二 ASR 不可用，本次已受控降级为单 ASR；限制已记录在比较工件中。"
+    if bundle.asr_validation_status == "single_engine_platform":
+        return "complete", "当前平台没有第二个受支持的独立 ASR 引擎，本次使用单 ASR；平台限制已记录。"
     return "complete", "听力笔记已通过转写与写入校验。"
 
 
+def emit_cli_failure(message: str, report_json: Path | None = None) -> int:
+    if report_json is None:
+        print(message, file=sys.stderr)
+    else:
+        emit_json(
+            {"status": "error", "accepted": False, "exit_code": 1, "error": message},
+            report_json=report_json,
+            stream=sys.stderr,
+        )
+    return 1
+
+
 def main() -> int:
+    configure_utf8_stdio()
     args = parse_args()
     if args.apply and args.dry_run:
-        print("Use either --apply or --dry-run, not both.", file=sys.stderr)
-        return 1
+        return emit_cli_failure("Use either --apply or --dry-run, not both.", args.report_json)
     source_count = sum(1 for value in [args.audio_path, args.url, args.scan_dir] if value)
     if source_count == 0:
-        print("Provide one of <audio_path>, --url, or --scan-dir.", file=sys.stderr)
-        return 1
+        return emit_cli_failure("Provide one of <audio_path>, --url, or --scan-dir.", args.report_json)
     if source_count > 1:
-        print("Use only one of <audio_path>, --url, or --scan-dir.", file=sys.stderr)
-        return 1
+        return emit_cli_failure("Use only one of <audio_path>, --url, or --scan-dir.", args.report_json)
 
     if args.scan_dir:
-        print("Batch scan mode is not supported in the current single-item workflow.", file=sys.stderr)
-        return 1
+        return emit_cli_failure(
+            "Batch scan mode is not supported in the current single-item workflow.", args.report_json
+        )
 
     if args.url and not args.output_dir:
-        print("--output-dir is required when using --url.", file=sys.stderr)
-        return 1
+        return emit_cli_failure("--output-dir is required when using --url.", args.report_json)
     if args.merge_request and not args.reviewed_transcript:
-        print("--merge-request requires --reviewed-transcript.", file=sys.stderr)
-        return 1
+        return emit_cli_failure("--merge-request requires --reviewed-transcript.", args.report_json)
 
     try:
         configure_project_roots(lingotrace=args.lingotrace_root, listenkit=args.listenkit_root)
@@ -3865,8 +3981,7 @@ def main() -> int:
         locale = resolve_target_locale(vault_root, args.locale)
         offline_dictionary = load_offline_dictionary(required=True) if is_japanese_locale(locale) else StaticAccentDictionary({})
     except (OfflineDictionaryError, RuntimeError) as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        return emit_cli_failure(str(exc), args.report_json)
     bundle: PreparedListeningBundle | None = None
     try:
         note_path = resolve_vault_relative_path(vault_root, args.note_path) if args.note_path else None
@@ -3943,7 +4058,10 @@ def main() -> int:
             "preview": preview,
             "apply": applied,
         }
-        print(json.dumps(output, ensure_ascii=False, indent=2))
+        try:
+            emit_json(output, report_json=args.report_json)
+        except OSError as exc:
+            return emit_cli_failure(f"Unable to write JSON report: {exc}")
         if not preview.get("accepted", False):
             return 1
         if applied is not None and not applied.get("accepted", False):
@@ -3952,8 +4070,7 @@ def main() -> int:
             return 2
         return 0
     except (OfflineDictionaryError, RuntimeError, OSError, ValueError) as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
+        return emit_cli_failure(str(exc), args.report_json)
     finally:
         if bundle is not None:
             bundle.cleanup()

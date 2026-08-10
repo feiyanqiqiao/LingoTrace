@@ -12,6 +12,8 @@ from lingotrace.init.listenkit_connections import (
     recommended_listenkit_root,
     register_listenkit_connection,
     resolve_listenkit_connection,
+    is_usable_listenkit_root,
+    listenkit_generate_markdown_path,
 )
 from lingotrace.init.runtime_connections import current_platform
 
@@ -25,6 +27,36 @@ class ListenKitConnectionTests(unittest.TestCase):
                 platform_name="macos",
             ),
         )
+
+    def test_resolution_returns_the_current_platform_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            root = base / "ListenKit"
+            vault = base / "vault"
+            _make_listenkit(root)
+
+            windows = resolve_listenkit_connection(
+                vault,
+                listenkit_root=root,
+                platform_name="windows",
+            )
+        self.assertTrue(windows.accepted, windows.to_dict())
+        self.assertTrue(windows.artifacts["generate_markdown"].endswith("generate-markdown.ps1"))
+        self.assertTrue(
+            str(listenkit_generate_markdown_path("/tmp/ListenKit", "macos")).endswith(
+                "generate-markdown.sh"
+            )
+        )
+
+    def test_windows_root_requires_the_powershell_entrypoint(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "cli").mkdir(parents=True)
+            (root / "README.md").write_text("# ListenKit\n", encoding="utf-8")
+            (root / "cli" / "generate-markdown.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+            self.assertFalse(is_usable_listenkit_root(root, platform_name="windows"))
+            self.assertTrue(is_usable_listenkit_root(root, platform_name="macos"))
         self.assertEqual(
             r"C:\Users\Example\AppData\Local\LingoTrace\ListenKit",
             recommended_listenkit_root(
@@ -222,6 +254,7 @@ def _make_listenkit(root: Path) -> None:
     (root / "cli").mkdir(parents=True)
     (root / "README.md").write_text("# ListenKit\n", encoding="utf-8")
     (root / "cli" / "generate-markdown.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (root / "cli" / "generate-markdown.ps1").write_text("exit 0\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

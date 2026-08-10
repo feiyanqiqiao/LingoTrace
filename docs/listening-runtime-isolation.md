@@ -1,8 +1,10 @@
 # Listening Runtime Isolation
 
-> This document describes the currently verified macOS Python/ASR isolation setup. Vault-to-LingoTrace runtime discovery itself is cross-platform and is documented in [Vault initialization and runtime connections](vault-initialization-and-runtime-connections.md); registering a Windows or Linux runtime path does not by itself install or validate platform-specific listening dependencies.
+> This document records the verified macOS and Windows Python/ASR isolation setup. Vault-to-LingoTrace runtime discovery itself is cross-platform and is documented in [Vault initialization and runtime connections](vault-initialization-and-runtime-connections.md); registering a runtime path does not by itself install or validate platform-specific listening dependencies.
 
 LingoTrace and ListenKit use separate Python 3.14 virtual environments. Homebrew Python 3.14 is only the bootstrap interpreter; normal transcription runs never install or upgrade packages.
+
+On Windows, LingoTrace calls ListenKit through `cli/generate-markdown.ps1` with `pwsh` or Windows PowerShell. It never routes through `/bin/bash`, WSL, or Git Bash. Child Python processes have inherited `PYTHONHOME` and `PYTHONPATH` removed, but a host that corrupts those variables before Python starts must still select or repair its interpreter before LingoTrace code can run.
 
 ## Ownership
 
@@ -41,6 +43,8 @@ ListenKit follows the same storage rule for its larger native ASR stack. Its run
 
 The external dictionary-data cache contains only static cross-version data such as `~/Library/Caches/jp-listening-dicts/accent_map.json`. Python packages belong in the dedicated LingoTrace runtime, not under the dictionary-data cache.
 
+The Windows dictionary-data cache defaults to `%LOCALAPPDATA%\LingoTrace\Caches\jp-listening-dicts`; Linux follows `XDG_CACHE_HOME`. `JP_LISTENING_DICT_DIR` remains the explicit override on every platform.
+
 ## Health Check
 
 Run the read-only dictionary check from the LingoTrace repository:
@@ -77,3 +81,10 @@ On June 13, 2026:
 - ListenKit moved its Python 3.14 runtime out of iCloud to `~/Library/Caches/ListenKit/venvs/cpython-314` in PR #4.
 - The new runtime passed the bounded import check and remained isolated from LingoTrace's `fugashi` dependency.
 - `Unit3/attach/23.mp3` again produced schema v1 with 28 non-empty, fully timestamped segments.
+
+On August 10, 2026, on Windows 11:
+
+- LingoTrace ran under CPython 3.14.4 with GBK/CP936 as the inherited console encoding and emitted valid UTF-8 JSON through both stdout and `--report-json`.
+- ListenKit's native PowerShell doctor found `faster-whisper==1.2.1`, ffmpeg/ffprobe, an NVIDIA GTX 1660 SUPER CUDA route, and a ready `small` model.
+- A synthesized English WAV in a temporary initialized Vault whose path contained spaces completed a native `generate-markdown.ps1` transcription and LingoTrace guarded dry-run.
+- Inputs outside the Vault and outside configured `listening_root` were independently rejected before transcription.

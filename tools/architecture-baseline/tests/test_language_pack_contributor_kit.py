@@ -261,8 +261,9 @@ class LanguagePackContributorKitTests(unittest.TestCase):
             "rationale_zh",
             "same user task",
             "Do not stop at the first `llm_merge_required`",
-            "dual-ASR validation enabled by default for every listening note",
-            "Do not pass `--single-asr` unless the user explicitly requests",
+            "independent dual-ASR validation enabled by default where the current platform provides a supported second engine",
+            "return `single_engine_platform` instead of running the same engine twice",
+            "Do not pass `--single-asr` unless the user explicitly requests it",
             "absolute, stable temporary `llm_merge_request_path`",
             "`--merge-request <llm_merge_request_path>`",
         ):

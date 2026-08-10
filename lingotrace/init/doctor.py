@@ -13,6 +13,7 @@ from lingotrace.init.listenkit_connections import (
     recommended_listenkit_root,
     resolve_listenkit_connection,
 )
+from lingotrace.init.executables import find_executable
 from lingotrace.init.runtime_connections import current_platform
 
 
@@ -29,6 +30,8 @@ def inspect_onboarding(
     home: str | Path | None = None,
     environ: Mapping[str, str] | None = None,
     which: Callable[[str], str | None] = shutil.which,
+    running_python: str | None = sys.executable,
+    running_python_version: tuple[int, int, int] = sys.version_info[:3],
 ) -> CommandReport:
     if language not in SUPPORTED_LANGUAGES:
         raise ValueError(f"unsupported_language: {language}")
@@ -43,11 +46,15 @@ def inspect_onboarding(
     errors: list[Finding] = []
     warnings: list[Finding] = []
 
-    python_command = which("python3") or which("python")
-    git_command = which("git")
-    gh_command = which("gh")
+    python_command = running_python
+    git_command = find_executable("git", platform_name=platform_id, environ=environment, which=which)
+    gh_command = find_executable("gh", platform_name=platform_id, environ=environment, which=which)
     obsidian_path = _find_obsidian(platform_id, home_path, environment, which)
-    listenkit_path = str(listenkit) if listenkit is not None and is_usable_listenkit_root(listenkit) else None
+    listenkit_path = (
+        str(listenkit)
+        if listenkit is not None and is_usable_listenkit_root(listenkit, platform_name=platform_id)
+        else None
+    )
     listenkit_scope = "explicit" if listenkit_path is not None else None
     listenkit_recommendation = recommended_listenkit_root(
         runtime_root=runtime,
@@ -72,7 +79,7 @@ def inspect_onboarding(
                 message="A Python launcher is required to run the LingoTrace initializer.",
             )
         )
-    elif sys.version_info < (3, 11):
+    elif running_python_version < (3, 11, 0):
         errors.append(
             Finding(
                 code="python_version_unsupported",
@@ -151,9 +158,9 @@ def inspect_onboarding(
         },
         "obsidian_desktop": {"status": "found" if obsidian_path else "missing_optional", "path": obsidian_path},
         "python": {
-            "status": "found" if python_command and sys.version_info >= (3, 11) else "missing_required",
+            "status": "found" if python_command and running_python_version >= (3, 11, 0) else "missing_required",
             "path": python_command,
-            "version": platform_python_version(),
+            "version": platform_python_version(running_python_version),
         },
         "runtime": {
             "status": "found" if (runtime / "lingotrace" / "__init__.py").is_file() else "missing_required",
@@ -214,8 +221,8 @@ def recommended_locations(
     return {"vault_root": str(vault), "runtime_root": str(runtime), "listenkit_root": listenkit}
 
 
-def platform_python_version() -> str:
-    return ".".join(str(part) for part in sys.version_info[:3])
+def platform_python_version(version: tuple[int, int, int] = sys.version_info[:3]) -> str:
+    return ".".join(str(part) for part in version)
 
 
 def _find_obsidian(
@@ -232,6 +239,8 @@ def _find_obsidian(
         for variable in ("LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)"):
             if environ.get(variable):
                 candidates.append(Path(environ[variable]) / "Obsidian" / "Obsidian.exe")
+        if environ.get("LOCALAPPDATA"):
+            candidates.insert(0, Path(environ["LOCALAPPDATA"]) / "Programs" / "Obsidian" / "Obsidian.exe")
     else:
         candidates = [
             Path("/opt/Obsidian/obsidian"),

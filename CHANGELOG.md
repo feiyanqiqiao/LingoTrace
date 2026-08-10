@@ -5,6 +5,28 @@
 
 ---
 
+## [20260810-210121]
+### 新增 (Added)
+- 新增 Antigravity、Claude Code、QwenWork、TraeWork 与 WorkBuddy 在 macOS、Windows 上出具的 10 份 Agent 兼容性报告，记录跨平台运行、听力链路、解释器、编码、工具发现与通用 Agent 调用契约的实测证据和建议。
+- 新增 Agent 无关的 `python -m lingotrace.agent`，以一个 UTF-8 JSON CLI 安全调用英日语言包五项公开能力；默认 preview，支持显式 apply、字段 allowlist、Vault 语言解析和原子 `--report-json`。
+- 新增整改方案、Windows 实证结果、macOS Codex 续作交接和五份逐 Agent 回应；CI 基线增加 `windows-latest` 矩阵。
+
+### 修复 (Fixed)
+- ListenKit 连接和听力编排改为平台感知：Windows 原生调用 PowerShell `generate-markdown.ps1`，macOS/Linux 保持 bash `.sh`；修复 `/bin/bash` 硬编码、Windows 执行位假阳性、GBK 子进程解码和平台缓存目录。
+- doctor 改为报告真实运行中的 Python，补充 Windows 每用户 Obsidian 与稳定工具候选；Git、init 与听力 CLI 的结构化输出统一使用 UTF-8。
+- Windows/Linux 没有独立第二 ASR 时显式报告 `single_engine_platform`，不再尝试 Apple 引擎或重复同一引擎伪装双重验证；同步接受 ListenKit 的 `mlx` 路由。
+- Vault 结构校验器优先读取现行 `.lingotrace/paths.json`，按配置角色限定扫描，并用公共 `review_rollover` preview 取代失效的私有 `codex-skills`/`zsh` 集成。
+
+### 变更 (Changed)
+- 学习者引导、运行时/ListenKit/每日更新说明、工具文档与英日 Agent Skill 统一采用经实测的 `<python-command>`、平台入口和受保护 CLI 契约，不再硬编码 `python3` 或 macOS Cache 路径作为全平台事实。
+
+### 清理 (Removed)
+- 删除空的 `tests/lingotrace/__init__.py`，避免测试目录遮蔽真正的 `lingotrace` 包并改善 pytest 收集行为。
+
+### 测试 (Tests)
+- Windows 11 / CPython 3.14.4 通过 LingoTrace 256 项、官方听力 105 项、Vault 结构 23 项和架构基线 42 项测试，共 426 项；compileall 与 diff 格式检查通过。
+- 真实 Windows ListenKit PowerShell doctor 与临时英文 WAV 端到端 dry-run 通过，覆盖含空格路径、GBK/CP936、faster-whisper、ffmpeg、CUDA 和路径守卫；macOS Apple/MLX/TCC/pytest 实机项保留在同分支交接清单中继续验证。
+
 ## [20260809-180513]
 ### 新增 (Added)
 - 新增跨语种共享的设备级 ListenKit 连接：Windows 保存到 `%LOCALAPPDATA%\LingoTrace\connections\listenkit.json`，macOS 保存到 `~/Library/Application Support/LingoTrace/connections/listenkit.json`，Linux 保存到 `${XDG_DATA_HOME:-~/.local/share}/lingotrace/connections/listenkit.json`；支持 `LINGOTRACE_DATA_HOME` 为测试和便携部署改写数据根目录。

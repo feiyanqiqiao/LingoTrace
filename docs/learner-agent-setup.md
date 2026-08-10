@@ -52,7 +52,7 @@
 常见 Obsidian 桌面位置包括：
 
 - macOS：`/Applications/Obsidian.app`、`~/Applications/Obsidian.app`；
-- Windows：`%LOCALAPPDATA%\Obsidian\Obsidian.exe`、Program Files 下的 Obsidian；
+- Windows：`%LOCALAPPDATA%\Programs\Obsidian\Obsidian.exe`、`%LOCALAPPDATA%\Obsidian\Obsidian.exe`、Program Files 下的 Obsidian；
 - Linux：PATH 中的 `obsidian`、AppImage、Snap 或 Flatpak 安装位置。
 
 如果缺少 Python 或 Git，解释它们分别用于运行初始化器和获取/更新正式运行时，然后在用户同意后按当前平台的可信包管理方式安装。不要在本文硬编码未经验证的第三方下载站；优先使用 Python、Git、Obsidian 官方发布渠道或系统自带包管理器。
@@ -79,16 +79,18 @@ git -C <runtime-root> checkout main
 
 如果 Git 无法使用但 Python 可用，可以在获得同意后从上游 `main` 下载官方源码归档作为降级方案；必须验证归档中存在 `lingotrace/__init__.py`，并告知用户以后不能用 Git 增量更新。
 
-初始化完成后，每天第一次学习请求前执行 `python3 -m lingotrace.init check-update --vault <vault-root> --runtime-root <runtime-root>`。当天已经检查时命令不会再次联网。有更新时根据结构化 commit 信息，用一至三点中文概括新增、修复或维护内容，询问是否现在更新，并明确用户可以忽略、继续学习。
+先选定一个实际可用、版本至少为 3.11 的 Python launcher，并在本次安装中始终用 `<python-command>` 代替它。Windows 通常是 `python`（或经验证可用的 `py -3`），macOS/Linux 通常是 `python3`；必须以 `<python-command> -c "import sys; print(sys.executable); print(sys.version)"` 的实际输出为准。不要因为 PATH 中存在 Windows Store 的 `python3.exe` 别名就认定它可用，也不要硬编码某个用户目录或 Python 3.14 安装路径。
 
-只有用户清楚地说“更新”或同等明确表达后，才执行 `python3 -m lingotrace.init apply-update --vault <vault-root> --runtime-root <runtime-root> --apply`。正式 sparse checkout 只有在 `main` 干净且可以快进时才会更新；识别为个人 fork 时不得自动 pull、merge、rebase、stash 或 reset，应请用户在开发仓库自行同步。检查失败或用户不更新都不阻止学习。
+初始化完成后，每天第一次学习请求前执行 `<python-command> -m lingotrace.init check-update --vault <vault-root> --runtime-root <runtime-root>`。当天已经检查时命令不会再次联网。有更新时根据结构化 commit 信息，用一至三点中文概括新增、修复或维护内容，询问是否现在更新，并明确用户可以忽略、继续学习。
+
+只有用户清楚地说“更新”或同等明确表达后，才执行 `<python-command> -m lingotrace.init apply-update --vault <vault-root> --runtime-root <runtime-root> --apply`。正式 sparse checkout 只有在 `main` 干净且可以快进时才会更新；识别为个人 fork 时不得自动 pull、merge、rebase、stash 或 reset，应请用户在开发仓库自行同步。检查失败或用户不更新都不阻止学习。
 
 ## 第 4 步：运行统一诊断
 
-从运行时根目录执行，Windows 可按本机实际 launcher 使用 `py -3` 或 `python`：
+从运行时根目录执行，并沿用第 3 步已经验证的 launcher：
 
 ```bash
-python3 -m lingotrace.init doctor \
+<python-command> -m lingotrace.init doctor \
   --language <english-or-japanese> \
   --vault <absolute-vault-path> \
   --runtime-root <absolute-runtime-path>
@@ -122,13 +124,13 @@ ListenKit 负责媒体获取、ASR 和切片。未发现时，询问用户是否
 
 LingoTrace 与 ListenKit 应使用独立运行环境，不要把彼此的 Python 依赖混装。
 
-安装前必须再次显示第 1 步确认的 ListenKit 目录；如果用户尚未确认，则显示 `doctor` 返回的 `recommended_listenkit_root` 并允许自选。安装后验证根目录存在 `README.md` 和 `cli/generate-markdown.sh`，再先预览、后登记设备级默认连接：
+安装前必须再次显示第 1 步确认的 ListenKit 目录；如果用户尚未确认，则显示 `doctor` 返回的 `recommended_listenkit_root` 并允许自选。安装后验证根目录存在 `README.md`，并验证当前平台入口：Windows 是 `cli/generate-markdown.ps1`，macOS/Linux 是 `cli/generate-markdown.sh`。再先预览、后登记设备级默认连接：
 
 ```bash
-python3 -m lingotrace.init connect-listenkit \
+<python-command> -m lingotrace.init connect-listenkit \
   --listenkit-root <absolute-listenkit-path>
 
-python3 -m lingotrace.init connect-listenkit \
+<python-command> -m lingotrace.init connect-listenkit \
   --listenkit-root <absolute-listenkit-path> \
   --apply
 ```
@@ -140,7 +142,7 @@ python3 -m lingotrace.init connect-listenkit \
 先执行预览，不加 `--apply`：
 
 ```bash
-python3 -m lingotrace.init vault \
+<python-command> -m lingotrace.init vault \
   --language <english-or-japanese> \
   --vault <absolute-vault-path> \
   --runtime-root <absolute-runtime-path>
@@ -153,7 +155,7 @@ python3 -m lingotrace.init vault \
 执行：
 
 ```bash
-python3 -m lingotrace.init resolve-runtime --vault <absolute-vault-path>
+<python-command> -m lingotrace.init resolve-runtime --vault <absolute-vault-path>
 ```
 
 只有同时满足以下条件才宣布完成：
@@ -164,7 +166,7 @@ python3 -m lingotrace.init resolve-runtime --vault <absolute-vault-path>
 - Vault 根存在 `AGENTS.md`、`.lingotrace/vault-context.json`、`.lingotrace/paths.json`；
 - `views/total-training.base` 与模板目录存在。
 
-如果已经安装 ListenKit，还要执行 `python3 -m lingotrace.init resolve-listenkit --vault <absolute-vault-path>`，并确认报告返回实际的 `listenkit_root`。如果用户选择延期安装，不创建虚假的连接记录。
+如果已经安装 ListenKit，还要执行 `<python-command> -m lingotrace.init resolve-listenkit --vault <absolute-vault-path>`，并确认报告返回实际的 `listenkit_root` 与当前平台入口。Windows 不得通过 `/bin/bash`、WSL launcher 或 Git Bash 运行 `.sh` 入口。如果用户选择延期安装，不创建虚假的连接记录。
 
 最后告诉用户：
 

@@ -4,12 +4,14 @@ LingoTrace 的公共运行时与私人 Obsidian Vault 必须分开保存。日�
 
 普通学习者不需要先执行本文命令。请把 [学习者安装协议](learner-agent-setup.md)的一句话入口交给 Agent，由它完成运行时安装、依赖检查、预览、确认和验证。本文保留初始化器与跨平台连接的技术细节。
 
+下文的 `<python-command>` 指预检中实际运行成功且版本至少为 3.11 的 launcher。Windows 通常是 `python`，macOS/Linux 通常是 `python3`；不要根据命令名猜测版本。
+
 ## 1. 初始化一个新 Vault
 
 运行时安装后，可以先运行只读诊断：
 
 ```bash
-python3 -m lingotrace.init doctor \
+<python-command> -m lingotrace.init doctor \
   --language english \
   --vault /absolute/path/to/LingoTrace-English \
   --runtime-root /absolute/path/to/runtime
@@ -20,7 +22,7 @@ python3 -m lingotrace.init doctor \
 在 LingoTrace 仓库根目录运行。首次执行不加 `--apply`，只预览计划：
 
 ```bash
-python3 -m lingotrace.init vault \
+<python-command> -m lingotrace.init vault \
   --language english \
   --vault /absolute/path/to/LingoTrace-English
 ```
@@ -28,7 +30,7 @@ python3 -m lingotrace.init vault \
 Windows 可以使用同一个模块入口，例如：
 
 ```powershell
-py -m lingotrace.init vault `
+python -m lingotrace.init vault `
   --language english `
   --vault "D:\Obsidian\LingoTrace-English"
 ```
@@ -104,7 +106,7 @@ Agent 按以下顺序处理：
 用户确认新路径后，也可以显式注册：
 
 ```bash
-python3 -m lingotrace.init connect-runtime \
+<python-command> -m lingotrace.init connect-runtime \
   --vault /absolute/path/to/LingoTrace-English \
   --runtime-root /absolute/path/to/LingoTrace \
   --apply
@@ -113,7 +115,7 @@ python3 -m lingotrace.init connect-runtime \
 检查当前设备能否解析运行时：
 
 ```bash
-python3 -m lingotrace.init resolve-runtime \
+<python-command> -m lingotrace.init resolve-runtime \
   --vault /absolute/path/to/LingoTrace-English
 ```
 

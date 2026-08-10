@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +19,24 @@ def default_cache_dir() -> Path:
     override = os.environ.get("JP_LISTENING_DICT_DIR")
     if override:
         return Path(override).expanduser()
-    return Path.home() / "Library" / "Caches" / "jp-listening-dicts"
+    platform_name = platform.system().lower()
+    if platform_name == "windows":
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        root = Path(local_app_data) if local_app_data else Path.home() / "AppData" / "Local"
+        return root / "LingoTrace" / "Caches" / "jp-listening-dicts"
+    if platform_name == "darwin":
+        return Path.home() / "Library" / "Caches" / "jp-listening-dicts"
+    root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    return root / "lingotrace" / "jp-listening-dicts"
+
+
+def clean_python_subprocess_environment() -> dict[str, str]:
+    environment = dict(os.environ)
+    environment.pop("PYTHONHOME", None)
+    environment.pop("PYTHONPATH", None)
+    environment["PYTHONUTF8"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
+    return environment
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,6 +87,9 @@ def python_runtime_info(python_executable: str) -> dict[str, object]:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=15,
+            encoding="utf-8",
+            errors="replace",
+            env=clean_python_subprocess_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RuntimeError(f"Unable to inspect Python runtime {python_executable}: {exc}") from exc
@@ -116,6 +137,9 @@ print(json.dumps({
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=15,
+            encoding="utf-8",
+            errors="replace",
+            env=clean_python_subprocess_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return False, f"Python dictionary health check failed: {exc}"
@@ -200,7 +224,9 @@ def main() -> int:
     if runtime_python_version(runtime) != EXPECTED_PYTHON or not runtime.get("in_venv"):
         print(
             "Refusing to install outside a Python 3.14 virtual environment. "
-            "Run codex-skills/jp-listening-script-generator/scripts/init-listening-runtime.sh.",
+            "Create a Python 3.14 virtual environment outside synchronized folders, then rerun this public "
+            "setup_offline_dictionary.py with --python <venv-python> --install. "
+            "See docs/listening-runtime-isolation.md.",
             file=sys.stderr,
         )
         return 1
@@ -216,7 +242,7 @@ def main() -> int:
     if args.dry_run:
         print(" ".join(command))
         return 0
-    result = subprocess.run(command, check=False)
+    result = subprocess.run(command, check=False, env=clean_python_subprocess_environment())
     if result.returncode != 0:
         return result.returncode
     ok, messages = check_runtime(cache_dir, args.python)

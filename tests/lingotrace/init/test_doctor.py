@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -47,6 +48,7 @@ class OnboardingDoctorTests(unittest.TestCase):
                 home=root / "home",
                 environ={},
                 which=lambda _name: None,
+                running_python=None,
             )
 
         self.assertFalse(report.accepted)
@@ -54,6 +56,54 @@ class OnboardingDoctorTests(unittest.TestCase):
             {"python_required", "runtime_root_invalid"},
             {finding.code for finding in report.errors},
         )
+
+    def test_doctor_reports_the_interpreter_that_is_actually_running_it(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = root / "runtime"
+            (runtime / "lingotrace").mkdir(parents=True)
+            (runtime / "lingotrace" / "__init__.py").write_text("", encoding="utf-8")
+
+            report = inspect_onboarding(
+                language="english",
+                vault_root=root / "vault",
+                runtime_root=runtime,
+                platform_name="windows",
+                home=root / "home",
+                environ={},
+                which=lambda name: r"C:\WindowsApps\python3.exe" if name == "python3" else None,
+                running_python=sys.executable,
+                running_python_version=sys.version_info[:3],
+            )
+
+        dependencies = json.loads(report.artifacts["dependencies"])
+        self.assertEqual(sys.executable, dependencies["python"]["path"])
+        self.assertEqual(".".join(str(part) for part in sys.version_info[:3]), dependencies["python"]["version"])
+
+    def test_windows_obsidian_per_user_programs_install_is_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = root / "runtime"
+            local_app_data = root / "LocalAppData"
+            obsidian = local_app_data / "Programs" / "Obsidian" / "Obsidian.exe"
+            (runtime / "lingotrace").mkdir(parents=True)
+            (runtime / "lingotrace" / "__init__.py").write_text("", encoding="utf-8")
+            obsidian.parent.mkdir(parents=True)
+            obsidian.write_bytes(b"exe")
+
+            report = inspect_onboarding(
+                language="english",
+                vault_root=root / "vault",
+                runtime_root=runtime,
+                platform_name="windows",
+                home=root / "home",
+                environ={"LOCALAPPDATA": str(local_app_data)},
+                which=lambda _name: None,
+            )
+
+        dependencies = json.loads(report.artifacts["dependencies"])
+        self.assertEqual(str(obsidian), dependencies["obsidian_desktop"]["path"])
+        self.assertNotIn("obsidian_desktop_not_found", {finding.code for finding in report.warnings})
 
     def test_vault_and_runtime_must_not_contain_each_other(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -111,6 +161,7 @@ class OnboardingDoctorTests(unittest.TestCase):
             (listenkit / "cli").mkdir(parents=True)
             (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
             (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.ps1").write_text("exit 0\n", encoding="utf-8")
             register_listenkit_connection(None, listenkit, data_home=data_home, mode="apply")
 
             report = inspect_onboarding(
