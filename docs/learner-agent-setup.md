@@ -43,7 +43,7 @@
 
 识别当前操作系统，检查：
 
-- Python 3.11 或更高版本；Python 3.14 是当前完整听力链的已验证版本；
+- Python 3.11 或更高版本，用于核心 runtime 和 Vault 初始化；日语听力的本地词典扩展另用独立的 Python 3.14 runtime；
 - Git；
 - Obsidian **桌面客户端**，不要把 Obsidian CLI 当成桌面客户端；
 - 用户选择的运行时和 Vault 路径是否已经存在；
@@ -59,12 +59,12 @@
 
 ## 第 3 步：安装最小正式运行时
 
-运行时目标不存在或为空时，在用户同意后使用 Git sparse checkout，只取 `lingotrace/`：
+运行时目标不存在或为空时，在用户同意后使用 Git sparse checkout，只取核心包和公开听力适配器：
 
 ```bash
 git clone --filter=blob:none --no-checkout https://github.com/feiyanqiqiao/LingoTrace.git <runtime-root>
 git -C <runtime-root> sparse-checkout init --no-cone
-git -C <runtime-root> sparse-checkout set /lingotrace/
+git -C <runtime-root> sparse-checkout set /lingotrace/ /tools/listening-transcribe-official/
 git -C <runtime-root> checkout main
 ```
 
@@ -77,7 +77,7 @@ git -C <runtime-root> checkout main
 3. 干净时才能执行 `git pull --ff-only origin main`；
 4. 有本地改动、分支不明或 remote 异常时停止并说明，不覆盖。
 
-如果 Git 无法使用但 Python 可用，可以在获得同意后从上游 `main` 下载官方源码归档作为降级方案；必须验证归档中存在 `lingotrace/__init__.py`，并告知用户以后不能用 Git 增量更新。
+如果 Git 无法使用但 Python 可用，可以在获得同意后从上游 `main` 下载官方源码归档作为降级方案；必须验证归档中存在 `lingotrace/__init__.py` 和 `tools/listening-transcribe-official/transcribe_listening.py`，并告知用户以后不能用 Git 增量更新。
 
 先选定一个实际可用、版本至少为 3.11 的 Python launcher，并在本次安装中始终用 `<python-command>` 代替它。Windows 通常是 `python`（或经验证可用的 `py -3`），macOS/Linux 通常是 `python3`；必须以 `<python-command> -c "import sys; print(sys.executable); print(sys.version)"` 的实际输出为准。不要因为 PATH 中存在 Windows Store 的 `python3.exe` 别名就认定它可用，也不要硬编码某个用户目录或 Python 3.14 安装路径。
 
@@ -123,6 +123,20 @@ ListenKit 负责媒体获取、ASR 和切片。未发现时，询问用户是否
 - 暂不安装：继续文本学习能力，明确首次请求音视频导入或转写时 Agent 应再次提示。
 
 LingoTrace 与 ListenKit 应使用独立运行环境，不要把彼此的 Python 依赖混装。
+
+如果用户选择日语并要启用听力功能，Agent 应先确认有一个实际可运行的 Python 3.14 launcher，然后说明将在当前用户的本机 Cache 中创建独立 venv 并安装固定版本的离线词典包。只有用户同意后才执行：
+
+```bash
+<python3.14> <runtime-root>/tools/listening-transcribe-official/init_listening_runtime.py \
+  --bootstrap-python <python3.14> \
+  --install
+```
+
+安装后用同一公开入口执行 `--check`。该 runtime 默认位于 macOS `~/Library/Caches/LingoTrace/venvs/cpython-314`、Windows `%LOCALAPPDATA%\LingoTrace\venvs\cpython-314` 或 Linux XDG cache；不得放入 Vault、iCloud Drive 或 OneDrive。英语听力不依赖该日语词典 runtime。
+
+### macOS 文件访问权限
+
+当 Agent 宿主首次访问 `Documents` 中的 Vault 时，macOS 可能请求“文件与文件夹”权限。先请用户在“系统设置 → 隐私与安全性”中只授予宿主所需的最小目录权限，然后重试只读诊断。“完全磁盘访问权限”不是通用前置条件；只有在最小权限仍明确被 TCC 拒绝、且用户理解影响并同意时，才把它作为故障排查选项。iCloud 文件尚未下载是另一类问题，应先确认素材已在本机完整可读。
 
 安装前必须再次显示第 1 步确认的 ListenKit 目录；如果用户尚未确认，则显示 `doctor` 返回的 `recommended_listenkit_root` 并允许自选。安装后验证根目录存在 `README.md`，并验证当前平台入口：Windows 是 `cli/generate-markdown.ps1`，macOS/Linux 是 `cli/generate-markdown.sh`。再先预览、后登记设备级默认连接：
 

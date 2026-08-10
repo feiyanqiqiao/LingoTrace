@@ -5,6 +5,24 @@
 
 ---
 
+## [20260810-215618]
+### 新增 (Added)
+- 新增公共跨平台 `init_listening_runtime.py`：验证实际 Python 3.14，在平台原生 Cache 中安全创建日语听力隔离 venv，清理子进程 `PYTHONHOME`/`PYTHONPATH`，委派固定离线词典依赖安装与健康检查，并提供 install/check/dry-run。
+- 兼容性整改方案补充 GitHub/local 真值、macOS 逐项证据矩阵、学习者 sparse runtime 新缺口、实施范围、验收边界和最终结果；五个 Agent 回应与 macOS 交接更新为实测结论。
+
+### 修复 (Fixed)
+- 学习者 sparse checkout 同时分发 `lingotrace/` 与 `tools/listening-transcribe-official/`，避免默认启用听力能力的新 Vault 找不到公共生成器。
+- 听力 runtime 失败指引不再引用私有或不存在的 shell wrapper，统一指向公共初始化器；同步目录和未知非空目标会在创建环境前被拒绝。
+
+### 变更 (Changed)
+- 英日 Agent Skill 统一调用 runtime 内的公共听力生成器并保留 preview/apply 与 `--report-json`；日语 Skill 通过公共 Python 3.14 隔离 runtime 加载词典，Agent 不复制业务逻辑或直接编辑 Vault。
+- 安装与隔离文档明确 core Python >=3.11、日语听力 Python 3.14、用户安装同意、最小 macOS Files and Folders 权限、iCloud/OneDrive 边界及条件式本机构建工具要求。
+- GitHub Actions 行为基线在既有 Ubuntu/Windows matrix 中加入 `macos-latest`。
+
+### 测试 (Tests)
+- macOS arm64 / CPython 3.14.4 通过 core 256、听力 112（1 skipped）、Vault 结构 23、架构 42，共 433 项 unittest；pytest 为 432 passed、1 skipped、25 subtests passed。
+- 默认 macOS Cache venv 真实安装 `fugashi==1.5.2` 与 `unidic-lite==1.0.8` 并重复健康检查通过；含空格/CJK 的日语合成音频完成 MLX/Apple 双 ASR、稳定 merge request、模型审阅重跑和 core accepted preview，dry-run 后 Vault 零新增文件；另以全新临时 clone 验证 sparse runtime 同时包含 core、公共生成器和初始化器，并排除根测试目录。
+
 ## [20260810-210121]
 ### 新增 (Added)
 - 新增 Antigravity、Claude Code、QwenWork、TraeWork 与 WorkBuddy 在 macOS、Windows 上出具的 10 份 Agent 兼容性报告，记录跨平台运行、听力链路、解释器、编码、工具发现与通用 Agent 调用契约的实测证据和建议。

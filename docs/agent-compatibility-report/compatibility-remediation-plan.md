@@ -57,7 +57,7 @@ macOS 专项不在 Windows 主机上冒充完成。所有需要 Apple Silicon、
 | W-15 | `--run-integrations` 调用不存在的私有 `codex-skills` + `zsh` | B | 公共工具不得调用私有脚本；改为公共、Python 内部可执行的校验或明确移除失效入口 |
 | W-16 | `tests/lingotrace/__init__.py` 遮蔽真实包 | macOS A，当前工作树已保存删除；Windows 无 pytest 可复测 | 保留删除；以 macOS 交接复测 pytest，以 unittest 404 项保证当前基线 |
 | W-17 | LingoTrace `--engine` 不接受 ListenKit 已支持的 `mlx` | B | 对齐 `auto/faster-whisper/mlx/apple`；平台是否可用由 ListenKit 给出结构化失败 |
-| W-18 | 公开错误信息指向不存在的私有 `codex-skills` 自举脚本 | B | 错误信息改为公开工具与文档；Windows 提供可执行的本机 runtime 指引，macOS 自举脚本交接继续完善 |
+| W-18 | 公开错误信息指向不存在的私有 `codex-skills` 自举脚本 | B | 错误信息改为公共跨平台 `init_listening_runtime.py` 与隔离文档；不再依赖私有 wrapper |
 | W-19 | CI 没有 Windows 行为腿 | B | 增加 Windows Python 3.14 基线 job，执行不依赖 Unix shell 的四组测试与编译检查 |
 
 ## 4. 不准确或不采纳的报告建议
@@ -295,3 +295,99 @@ macOS Codex 必须在同分支完成：
 - 系统合成英文 WAV 在带空格的临时 Vault 内完成 PowerShell → ListenKit → LingoTrace guarded dry-run，最终 `status: complete`；临时目录随后清理。
 - 同一实验先后将音频放到 Vault 外、再放到 Vault 内但 `listening_root` 外，两次都在转录前被路径守卫拒绝。这两次失败属于安全契约的正向验证，不是未解决故障。
 - Python compileall 与 `git diff --check` 通过。公开 staged allowlist、提交和远端 CI 在最终 Git 收口步骤执行。
+
+## 11. macOS 二次证据审计与实施方案
+
+### 11.1 GitHub 与本地真值
+
+2026-08-10 的 macOS 接手先直接查询 GitHub，而不是相信本地分支缓存：
+
+- `origin/codex/windows-agent-compatibility` 的 GitHub head 为 `652d97792206ffacb76a154c181861a55c5c006f`；
+- 分支包含 `12bcfc5`（跨平台兼容层）和 `652d977`（按宿主平台选择 ListenKit 测试路径）；
+- GitHub 当时没有该分支的 Pull Request，也没有分支级 Actions 运行；workflow 只在 PR 或 `main` push 触发；
+- `origin/main` 与 canonical `upstream/main` 都是 `8c118fd`，canonical main 没有在 Windows 交接后移动；
+- 本地最初是云同步造成的混合 index/worktree，且 Git 对象不完整。先强制从 GitHub 重取对象，把混合状态保存为可恢复 stash，再将现有分支快进到 `652d977`；没有用混合工作树覆盖 GitHub。
+
+相邻 ListenKit 本地 checkout 的 POSIX 脚本曾被跨设备同步为 CRLF，但 `origin/codex/agent-compatibility-hardening` 的干净 GitHub 克隆是 LF。LingoTrace 的 macOS 集成测试使用该临时干净克隆，不修改相邻仓库，也不把本地 CRLF 污染误判为 LingoTrace 或 GitHub 缺陷。
+
+### 11.2 报告结论复核矩阵
+
+| ID | 报告结论 | macOS 证据 | 最终判断与措施 |
+| --- | --- | --- | --- |
+| M-01 | 核心 runtime、英日语言包和 init CLI 在 macOS 健康 | A：最终 433 项 unittest 通过；`resolve-runtime`、`resolve-listenkit`、`doctor` 在真实英语 Vault 均 accepted | 已证实；保持现有公共契约 |
+| M-02 | 删除 `tests/lingotrace/__init__.py` 可修复 pytest 包遮蔽 | A：最终 `python3 -m pytest -q` 为 432 passed、1 skipped、25 subtests passed | 已证实；保留删除。报告同时建议删除 `tests/__init__.py`，但该文件不受 Git 跟踪，不制造额外删除 |
+| M-03 | macOS `resolve-listenkit` 应返回 `.sh` | A：真实报告返回 `cli/generate-markdown.sh`；完整转写成功 | 已证实；Windows `.ps1` 分支没有破坏 macOS |
+| M-04 | `/bin/bash` 硬编码脆弱 | B+A：Windows 分支已改为发现 Bash；本机解析 `/bin/bash` 3.2.57，当前 ListenKit 脚本真实可运行 | 已修复；不要求 Bash 4，不把 Homebrew 路径硬编码为所有用户默认 |
+| M-05 | Apple Speech 在 macOS 必然失败，默认双 ASR 等价单 ASR | A：真实 MLX 主引擎 + Apple 副引擎、Apple 主引擎 + MLX 副引擎均成功且 agreed | 报告在当前版本已过期/错误；保留两个独立引擎，回应文档记录当前实证 |
+| M-06 | `--engine mlx` 契约缺失 | A：Windows 实现已增加；macOS 真实反向组合证实 `--compare-engine mlx` 成功透传 | 已修复并实证 |
+| M-07 | 全新 Mac 的 LingoTrace 日语听力词典 runtime 无公开自举入口 | A+B：本机预期 Cache venv 实际不存在；现有文档从一个尚不存在的 venv Python 开始，iCloud 错误仍指向不存在的 `init-listening-runtime.sh` | 已证实；新增公共跨平台 Python 自举器，创建平台 Cache venv、安装 pinned requirements、运行健康检查，不依赖私有 `codex-skills` |
+| M-08 | core Python >=3.11 与听力 Python 3.14 是矛盾 | A+B：默认 Python 3.14.4、系统 Python 3.9.6 并存；core 与原生词典扩展的边界不同 | 不是代码矛盾，是双层契约；文档明确 core >=3.11、完整日语听力隔离 runtime 当前固定 3.14 |
+| M-09 | macOS 需要完全磁盘访问 | C：当前 Codex 可访问真实 Vault，无 TCC 阻塞；不同宿主首次访问 `Documents` 可能触发 Files and Folders 授权 | 报告措辞过强；文档先说明最小 Files and Folders 授权，Full Disk Access 只作为用户明确接受的故障排查选项 |
+| M-10 | `agent_skills/SKILL.md` 未跟踪、公共发布缺入口 | B：英日两个 `lingotrace/packs/*/agent_skills/SKILL.md` 均受 Git 跟踪且真实解析成功 | 报告错误；不新增顶层重复入口 |
+| M-11 | `validate_vault_structure.py` 不支持现行 `.lingotrace/paths.json` | A：Windows 实现后，对临时标准英语 Vault及 `--run-integrations` 实跑通过 | 已修复并实证；保留 legacy schema 兼容 |
+| M-12 | 五个 capability 无公共 CLI | A：新增 CLI 测试通过；英日 Skill 已引用 provider-neutral 入口 | 已修复；各 Agent 不应复制项目业务逻辑 |
+| M-13 | TraeWork 的 `PYTHONHOME` 可由 LingoTrace 模块启动后清除 | B：`Failed to import encodings` 发生在模块加载前 | 报告建议不可实现；子进程环境已清理，宿主首个 Python 进程仍需 Agent/用户选择干净 launcher |
+| M-14 | macOS CI 缺失 | B：Windows 分支矩阵只有 Ubuntu 与 Windows | 已证实；在同一 matrix 增加 `macos-latest`，让纯公共基线持续回归 |
+| M-15 | JSON 文件输出、路径空格/CJK 与 dry-run 未证实 | A：成功和失败报告均为 UTF-8 JSON；临时 Vault、音频与报告路径同时覆盖空格和中文；dry-run 后 Vault 只保留输入音频 | 已证实；把命令、exit code 和边界写入交接与回应 |
+| M-16 | 学习者 sparse runtime 可直接执行听力 Skill | B：安装协议只取 `/lingotrace/`，但 Skill 所需生成器位于 `/tools/listening-transcribe-official/`；默认 Vault 又启用 `listening_notes` | 已证实为新机阻断级缺口；sparse 分发同时包含 core 与公开听力适配器，不把业务逻辑复制到各 Agent |
+
+### 11.3 macOS 剩余实现范围
+
+本阶段只实现以下仍有真实缺口的公共能力：
+
+1. 新增 `tools/listening-transcribe-official/init_listening_runtime.py`：
+   - 用实际运行验证选择 Python 3.14 bootstrap；
+   - 默认 runtime 为 macOS `~/Library/Caches/LingoTrace/venvs/cpython-314`、Windows `%LOCALAPPDATA%\\LingoTrace\\venvs\\cpython-314`、Linux XDG cache；
+   - 在创建 venv 前拒绝同步目录和不安全目标，不删除或重建未知现有环境；
+   - 清理传给子 Python 的 `PYTHONHOME`/`PYTHONPATH`，固定 UTF-8；
+   - 创建 venv 后调用公开 `setup_offline_dictionary.py --install`，再执行同一健康检查；
+   - 提供 `--check`、`--dry-run`、`--runtime-dir` 与 `--bootstrap-python`，使 Agent 不需要写自己的 shell wrapper。
+2. 更新 `setup_offline_dictionary.py` 和听力错误消息，所有修复指引只指向公共自举器与公共文档；删除测试中未使用的私有 wrapper 路径常量。
+3. 更新安装、隔离和学习者文档：明确双层 Python 契约、可复制的自举/检查命令、Xcode Command Line Tools 条件、最小 TCC 授权与 iCloud 边界；修正 sparse checkout，同时分发 `lingotrace/` 和公开听力适配器。
+4. GitHub Actions matrix 加入 `macos-latest`，不复制 macOS 专属 workflow。
+5. 为公共自举器增加隔离单测，覆盖三平台默认路径、3.14 拒绝、已有环境复用、创建命令、安装/检查委派、iCloud 拒绝和污染环境清理。
+6. 完成后更新五份 Agent 回应、macOS 交接、本文实施结果与 `CHANGELOG.md`。
+
+### 11.4 macOS 验收边界
+
+必须全部满足：
+
+1. 四组 unittest 与 pytest 通过；compileall、`git diff --check`、公开 allowlist 通过。
+2. 真实 `resolve-runtime`、`resolve-listenkit`、`doctor` 的 stdout 和 `--report-json` 均是 UTF-8。
+3. 沙箱外 ListenKit doctor 显示 MLX/Metal ready；沙箱内无 Metal 只能记为宿主限制，不能覆盖物理机证据。
+4. 一段无私人内容的临时音频完成：
+   - auto/auto：MLX 与 Apple 独立比较；
+   - Apple 主引擎 + MLX 副引擎：证实显式 MLX 比较透传；
+   - 空格/CJK 路径；
+   - core preview accepted，真实 Vault零写入。
+5. Vault 外输入在转写前退出 1，并同时写出结构化 error report。
+6. 公共自举器在临时 Cache runtime 完成真实创建、依赖安装与健康检查；随后默认/显式检查均可重复通过。若依赖下载受网络限制，必须保留自动测试并明确外部阻塞，不能宣称物理安装完成。
+7. 本阶段不修改私人 Vault、不提交音频/模型/venv、不修改相邻 ListenKit 源码。
+
+### 11.5 交付顺序
+
+1. 先提交公共自举器、测试、CI 与文档修正。
+2. 运行自动测试和真实 macOS 自举/E2E。
+3. 仅在结果确定后更新 `CHANGELOG.md`、本方案、macOS 交接和五份回应。
+4. 审查 `origin/main...HEAD` 仅含公共 allowlist 文件；从最新 canonical main 更新分支。
+5. 推送同一分支，创建 draft PR，等待 Ubuntu/Windows/macOS matrix 全绿；再补充最终验证矩阵并标记 ready。
+
+### 11.6 macOS 实施结果
+
+代码与文档范围已经按 11.3 完成，并额外修复 M-16 的 sparse runtime 分发缺口。公共初始化器先在隔离单测中覆盖三平台路径、错误版本、创建/复用、污染环境和同步目录拒绝；随后在真实默认 macOS Cache 路径创建 Python 3.14.4 venv，安装 `fugashi==1.5.2`、`unidic-lite==1.0.8`，样例返回 `公園⓪ / 散歩⓪ / し⓪`，重复 `--check` 仍通过。
+
+提交快照还被重新克隆到全新临时目录，并逐条执行学习者协议中的 non-cone sparse checkout。结果同时存在 `lingotrace/__init__.py`、公共 `transcribe_listening.py` 和 `init_listening_runtime.py`，根 `tests/lingotrace` 未检出，工作树干净；因此 M-16 不是只靠文档字符串测试宣称修复。
+
+最终自动测试：
+
+| 测试组 | 结果 |
+| --- | --- |
+| `tests/lingotrace` | 256 passed |
+| `tools/listening-transcribe-official/tests` | 112 passed，1 skipped |
+| `tools/vault-structure/tests` | 23 passed |
+| `tools/architecture-baseline/tests` | 42 passed |
+| pytest 全仓 | 432 passed，1 skipped，25 subtests passed |
+
+真实日语 E2E 使用 `say -v Kyoko` 生成无私人内容音频，再转换为位于临时日语 Vault `listening_root` 内的 WAV。MLX 与 Apple 对同一句只产生逗号差异，第一次运行返回稳定 merge request 和 exit 2；按 Skill 契约生成临时 reviewed transcript 后重跑，得到 `status: complete`、`asr_validation_status: merged`、`merge_model: gpt-5`、preview accepted 和 exit 0。报告、Vault 与音频路径均包含空格/CJK；最终 Vault 未出现任何 dry-run 工件或笔记。
+
+这组结果纠正了“macOS Apple ASR 必然失败”“双 ASR 实际只是单引擎”和“Agent Skill 未公开”等报告结论，也确认首次 Speech/TCC 授权仍属于宿主用户边界。项目提供最小权限和失败诊断，不静默扩大权限。

@@ -24,9 +24,6 @@ SETUP_MODULE = importlib.util.module_from_spec(SETUP_SPEC)
 assert SETUP_SPEC.loader is not None
 sys.modules[SETUP_SPEC.name] = SETUP_MODULE
 SETUP_SPEC.loader.exec_module(SETUP_MODULE)
-WRAPPER_PATH = Path(__file__).resolve().parents[3] / "codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh"
-INIT_RUNTIME_PATH = WRAPPER_PATH.with_name("init-listening-runtime.sh")
-CHECK_CHAIN_PATH = WRAPPER_PATH.with_name("check-listening-chain.sh")
 REQUIREMENTS_PATH = Path(__file__).resolve().parents[1] / "requirements-listening.txt"
 JAPANESE_WORKFLOWS_PATH = Path(__file__).resolve().parents[3] / "lingotrace/packs/japanese/workflows.py"
 

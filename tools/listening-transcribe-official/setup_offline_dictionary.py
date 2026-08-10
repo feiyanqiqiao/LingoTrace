@@ -185,7 +185,7 @@ def check_runtime(cache_dir: Path, python_executable: str) -> tuple[bool, list[s
     if "/Library/Mobile Documents/" in str(runtime.get("prefix", "")):
         return False, messages + [
             "LingoTrace native packages cannot run from an iCloud-backed virtual environment. "
-            "Run init-listening-runtime.sh to create the local Cache runtime."
+            "Run the public init_listening_runtime.py with a verified Python 3.14 launcher."
         ]
 
     accent_map = static_accent_map_path(cache_dir)
@@ -233,7 +233,7 @@ def main() -> int:
     if "/Library/Mobile Documents/" in str(runtime.get("prefix", "")):
         print(
             "Refusing to install native packages into an iCloud-backed virtual environment. "
-            "Run init-listening-runtime.sh to create the local Cache runtime.",
+            "Run the public init_listening_runtime.py with a verified Python 3.14 launcher.",
             file=sys.stderr,
         )
         return 1

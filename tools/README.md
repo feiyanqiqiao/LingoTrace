@@ -50,8 +50,8 @@ Japanese Agent Skill
 - Agent Skill：`lingotrace/packs/japanese/agent_skills/SKILL.md`
 - 通用转写能力：Windows 使用 `../ListenKit/cli/generate-markdown.ps1`，macOS/Linux 使用 `../ListenKit/cli/generate-markdown.sh`。Windows 不通过 WSL 或 Git Bash 转接。
 - 通用时间范围切片能力：`../ListenKit/cli/export-audio-slices.py`
-- 离线词典包：由 `setup_offline_dictionary.py` 安装及检查于 LingoTrace 自己的本机 Cache runtime。
-- Python runtime：LingoTrace 与 ListenKit 使用彼此独立的本机 runtime，不得跨环境 import 包。macOS 已验证路径见 `docs/listening-runtime-isolation.md`；Windows 由当前 LingoTrace Python 与 ListenKit 的 PowerShell 入口分别解析，不硬编码用户名、Python 3.14 安装目录或 Store alias。
+- 离线词典包：由 `init_listening_runtime.py` 在 LingoTrace 自己的本机 Cache runtime 中初始化及检查；`setup_offline_dictionary.py` 是已有 runtime 内的底层安装器。
+- Python runtime：LingoTrace core 使用 Python 3.11+；日语听力扩展固定使用独立 Python 3.14 Cache venv，ListenKit 仍使用自己的 runtime。两项目不得跨环境 import 包，不硬编码用户名、Python 安装目录或 Store alias。
 
 #### 精听学习语块
 
@@ -80,6 +80,24 @@ Japanese Agent Skill
 
 重跑既有笔记时，工具会保留已手工修订的 `## 常用语块`。旧笔记的 `## 可直接背的常用句` 也会连同原标题原样保留，除非用户明确要求迁移或重置。
 
+### `init_listening_runtime.py`
+
+这是全新设备和修复既有环境时的公共跨平台入口。它验证实际 Python 3.14、选择平台原生 Cache 路径、拒绝 iCloud/OneDrive 与未知非空目标、创建 venv、清理传给子 Python 的 `PYTHONHOME`/`PYTHONPATH`，再委派固定依赖安装和健康检查。它不会由转写命令静默触发。
+
+在用户同意创建环境和下载依赖后执行：
+
+```bash
+<python3.14> tools/listening-transcribe-official/init_listening_runtime.py \
+  --bootstrap-python <python3.14> \
+  --install
+
+<python3.14> tools/listening-transcribe-official/init_listening_runtime.py \
+  --bootstrap-python <python3.14> \
+  --check
+```
+
+可先用 `--dry-run` 查看计划；只有明确的高级诊断需要才使用 `--runtime-dir` 覆盖默认 Cache 路径。
+
 ### `setup_offline_dictionary.py`
 
 用途：
@@ -100,16 +118,16 @@ Japanese Agent Skill
 - 不要把 runtime 或外部静态词典缓存提交到 Git。
 - 不要把本地候选直接当作人工确认结果。
 
-常用命令（用本机已验证可用的 Python launcher 或隔离环境解释器替换 `<python-command>`）：
+底层诊断命令（`<listening-python>` 必须是已经由公共初始化器创建的隔离解释器）：
 
 ```bash
-<python-command> tools/listening-transcribe-official/setup_offline_dictionary.py --python <python-command> --install
-<python-command> tools/listening-transcribe-official/setup_offline_dictionary.py --python <python-command> --check
+<listening-python> tools/listening-transcribe-official/setup_offline_dictionary.py --python <listening-python> --install
+<listening-python> tools/listening-transcribe-official/setup_offline_dictionary.py --python <listening-python> --check
 ```
 
 依赖：
 
-- Python 3.14 是完整听力链的已验证版本；launcher 必须以实际执行结果确认，不能只按命令名判断。
+- Python 3.14 是日语听力隔离 runtime 的固定版本；bootstrap 和 runtime 都必须以实际执行结果确认，不能只按命令名判断。
 - LingoTrace 直接使用本机 Cache 中的 Python 包；直接依赖只由 `requirements-listening.txt` 固定。
 - Vault 外部缓存目录：macOS 默认为 `~/Library/Caches/jp-listening-dicts`，Windows 默认为 `%LOCALAPPDATA%\LingoTrace\Caches\jp-listening-dicts`，Linux 遵循 XDG cache；只保留跨版本静态资料，例如根目录 `accent_map.json`。
 - 可用 `JP_LISTENING_DICT_DIR` 覆盖默认位置。

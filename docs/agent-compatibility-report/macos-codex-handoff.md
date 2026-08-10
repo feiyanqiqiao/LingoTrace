@@ -1,8 +1,14 @@
-# macOS Codex 兼容性续作交接
+# macOS Codex 兼容性完成与后续交接
+
+## 0. 完成状态
+
+macOS 工作已于 2026-08-10 完成。本文件保留 Windows 到 macOS 的原始验收边界，并补充可供后续 review/CI 使用的最终证据。所有项目改动都继续位于 Windows 创建的同一分支 `codex/windows-agent-compatibility`；没有创建第二条 macOS 分支。
+
+GitHub 真值核对结果：接手时远端分支 head 为 `652d97792206ffacb76a154c181861a55c5c006f`，`origin/main` 与 canonical `upstream/main` 都是 `8c118fd`。本地云同步造成的混合状态没有覆盖远端；它被保存为可恢复 stash，Git 对象重新从 GitHub 获取，现有分支再快进到远端 head。
 
 ## 1. 接手目标
 
-请在同一分支 `codex/windows-agent-compatibility` 上继续，不要另起不相关分支。Windows 端已经完成实现和验证；你的任务是用真实 macOS 环境验证跨平台行为、修正仅能在 macOS 复现的问题，并把本分支推进到可合并状态。
+本工作在同一分支 `codex/windows-agent-compatibility` 上完成。Windows 端实现被保留，macOS 端使用真实环境验证跨平台行为，并只针对有证据的公共产品缺口继续修正。
 
 先完整阅读：
 
@@ -27,18 +33,15 @@
 
 Windows 11 / CPython 3.14.4 已通过 426 项 unittest。真实链路还验证了：GBK 控制台、含空格路径、每用户 Obsidian、ListenKit PowerShell doctor、faster-whisper 1.2.1、ffmpeg/ffprobe、CUDA GTX 1660 SUPER、临时英文 WAV 转录和受保护 dry-run。Vault 外及 `listening_root` 外输入均被正确拒绝。
 
-## 3. macOS 必做验证
+## 3. macOS 验证结果
 
-1. 确认分支和工作树，只提交公开文件；先检查上游 `main` 是否移动。
-2. 用真实 launcher 输出 `sys.executable`、`sys.version`、stdout encoding；不要假定 `python3` 一定指向目标解释器。
-3. 运行四组 unittest 和 `python3 -m pytest -q`（若 pytest 未安装，记录事实；不要为了过测试污染正式 runtime）。确认删除测试包 `__init__.py` 后收集正常。
-4. 在真实已初始化 Vault 上运行 `doctor --report-json`、`resolve-runtime`、`resolve-listenkit`，确认返回 `cli/generate-markdown.sh`，且 Windows `.ps1` 选择未破坏 macOS。
-5. 运行 ListenKit 自身 doctor，再用一段位于配置 `listening_root` 内的真实或临时音频做完整 dry-run。路径至少覆盖空格；若可行再覆盖中文或日文字符。
-6. 验证默认 Apple ASR 与 faster-whisper 是两个独立候选：一致时完成，不一致时产生稳定 merge request；不得用同一引擎跑两次冒充双 ASR。
-7. 显式验证 `--engine mlx` / `--compare-engine mlx` 的透传与错误报告。只有本机 ListenKit 真正支持时才宣称 MLX 可用。
-8. 复核 `~/Library/Caches/LingoTrace/...` 与 `~/Library/Caches/jp-listening-dicts` 历史路径保持不变，并验证 TCC/iCloud/原生扩展问题没有被 Windows 分支回归。
-9. 用 `--report-json` 验证错误和成功报告都是 UTF-8、原子写入且 exit code 正确。
-10. 更新本目录五份 Agent 回应中的“macOS 待验证”段落，记录命令、版本、结果和任何修复。
+1. 环境：macOS 27.0 arm64；默认 `python3` 为 CPython 3.14.4，stdout UTF-8；`/usr/bin/python3` 为 3.9.6；Bash 3.2.57；ffmpeg/ffprobe 8.1。
+2. 自动测试：core 256、listening 112（1 skipped）、Vault structure 23、architecture 42，共 433 项 unittest 通过；pytest 为 432 passed、1 skipped、25 subtests passed。
+3. 真实 Vault：`resolve-runtime`、`resolve-listenkit`、`doctor` 都 accepted；ListenKit 入口为 `cli/generate-markdown.sh`；成功/失败 `--report-json` 都能作为 UTF-8 JSON 读取。
+4. ListenKit：沙箱外 doctor 报告 `mlx_runtime=ready`、`mlx_metal=ready`、`mlx==0.32.0`、`mlx-whisper==0.4.3`；沙箱内无 Metal 是宿主隔离限制，不是硬件结论。
+5. 英语音频：含空格/CJK 路径下，MLX 主 + Apple 副和 Apple 主 + MLX 副都实际成功并 agreed，证实 `--compare-engine mlx` 真实透传。
+6. 日语音频：公共 Python 3.14 Cache venv 加载 `fugashi==1.5.2`/`unidic-lite==1.0.8`；MLX/Apple 对一处标点产生稳定 merge request（exit 2），模型审阅后重跑为 `complete`/`merged`（exit 0）。
+7. 写入边界：上述听力验证全部使用 dry-run；临时 Vault 的 listening 目录最终只有输入音频。Vault 外输入在转写前 exit 1，并生成结构化错误报告。
 
 ## 4. 不应采用的修复
 
@@ -49,10 +52,14 @@ Windows 11 / CPython 3.14.4 已通过 426 项 unittest。真实链路还验证�
 - 不要为了报告好看，把同一 faster-whisper 结果标成双 ASR。
 - 不要恢复公开工具对私有 Vault、私有 `codex-skills` 或 `.claude/settings.local.json` 的依赖。
 
-## 5. 完成条件
+## 5. 已完成的公共修复
 
-- macOS 的四组 unittest、可用时的 pytest、真实 ListenKit doctor 和至少一次真实听力 dry-run均有证据；
-- 发现的问题已用跨平台公共实现修复，而不是 Agent 专用补丁；
-- `CHANGELOG.md`、本交接文档和各 Agent 回应已更新为最终事实；
-- `git diff --check`、Python compileall 和 `bash tools/git/check-public-staged-files.sh` 通过；
-- 分支已同步最新 canonical `main`，CI 全绿，draft PR 正文包含 Windows 与 macOS 的最终验证矩阵，然后才标记 ready。
+- 新增 `init_listening_runtime.py`，跨平台创建/检查独立 Python 3.14 日语听力 runtime；拒绝同步目录和未知非空目标，清理子进程 Python 污染，委派固定依赖安装与健康检查。
+- 修复学习者 sparse checkout：同时分发 `lingotrace/` 和 `tools/listening-transcribe-official/`。此前默认 Vault 虽启用听力 capability，新机 runtime 却没有实际生成器。
+- 英日 Skill 统一调用 runtime 内的公共生成器；日语 Skill 使用公共隔离 runtime，不要求 Agent 编写 wrapper 或直接编辑 Vault。
+- 文档区分 core Python >=3.11 与日语听力 Python 3.14，给出用户同意边界、最小 macOS TCC 授权、iCloud/OneDrive 边界和可复制命令。
+- CI 在现有 matrix 中增加 `macos-latest`；五份 Agent 回应已更新为最终证据。
+
+## 6. PR 前最终门槛
+
+提交前仍按仓库流程执行 compileall、`git diff --check`、staged public allowlist，更新 `CHANGELOG.md`，同步 canonical main，并推送同一分支。创建 draft PR 后等待 Ubuntu/Windows/macOS matrix 全绿，更新 PR 正文的 Windows/macOS 验证矩阵，再标记 ready。任何首次 Speech/TCC 授权仍是用户/宿主边界，不能由 CI 代替。

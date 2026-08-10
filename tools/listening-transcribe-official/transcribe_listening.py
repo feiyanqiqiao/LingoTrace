@@ -276,14 +276,14 @@ class OfflineAccentDictionary(StaticAccentDictionary):
         return self._tagger
 
     def runtime_details(self) -> str:
-        setup_script = Path(__file__).with_name("setup_offline_dictionary.py")
+        initializer = Path(__file__).with_name("init_listening_runtime.py")
         return (
             f"Python: {sys.executable}\n"
             f"Version: {sys.version.split()[0]}\n"
             f"ABI tag: {sys.implementation.cache_tag}\n"
             f"Virtual environment: {sys.prefix}\n"
-            f"Repair: create a Python 3.14 virtual environment outside synchronized folders, then run "
-            f"`{setup_script} --python <venv-python> --install`."
+            f"Repair: run a verified Python 3.14 launcher as "
+            f"`<python3.14> {initializer} --bootstrap-python <python3.14> --install`."
         )
 
     def validate_runtime(self) -> list[str]:
