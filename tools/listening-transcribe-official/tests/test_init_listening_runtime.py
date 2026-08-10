@@ -142,13 +142,14 @@ class InitListeningRuntimeTests(unittest.TestCase):
             run_mock.assert_not_called()
 
     def test_rejects_synchronized_and_unknown_nonempty_targets(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "outside iCloud/OneDrive"):
-            MODULE.initialize_or_check_runtime(
-                bootstrap_python="/opt/python3.14",
-                runtime_dir=Path("/Users/test/Library/Mobile Documents/LingoTrace/runtime"),
-                platform_name="macos",
-                action="install",
-            )
+        with mock.patch.object(MODULE, "is_synchronized_runtime_path", return_value=True):
+            with self.assertRaisesRegex(RuntimeError, "outside iCloud/OneDrive"):
+                MODULE.initialize_or_check_runtime(
+                    bootstrap_python="/opt/python3.14",
+                    runtime_dir=Path("/synchronized/LingoTrace/runtime"),
+                    platform_name="macos",
+                    action="install",
+                )
         self.assertTrue(
             MODULE.is_synchronized_runtime_path(
                 Path("C:/Users/test/OneDrive/LingoTrace/runtime"),
