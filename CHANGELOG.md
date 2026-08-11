@@ -5,6 +5,13 @@
 
 ---
 
+## [20260811-094946]
+### 新增 (Added)
+- 新增仓库级 `.gitattributes`：普通文本统一使用 LF，Windows `.bat` 与 `.cmd` 脚本保留 CRLF；同步将该公共元数据加入 `.gitignore` 反向 allowlist 和 staged public-file allowlist。
+
+### 测试 (Tests)
+- `git check-attr` 验证普通文本为 LF、`.bat`/`.cmd` 为 CRLF；通过 core 256、听力 112（1 skipped）、Vault 结构 23、架构 42，共 433 项 unittest，pytest 为 432 passed、1 skipped、25 subtests passed；compileall 与 diff 格式检查通过。
+
 ## [20260810-220602]
 ### 清理 (Removed)
 - 完整删除 `docs/agent-compatibility-report/` 下 10 份原始 Agent 兼容性报告、整改方案、macOS 交接和 5 份回应文档；经验证的跨平台实现、公共测试、用户安装说明和 `CHANGELOG.md` 历史记录继续保留。

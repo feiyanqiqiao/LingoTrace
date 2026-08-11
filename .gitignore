@@ -2,6 +2,7 @@
 *
 
 # Public repository metadata.
+!.gitattributes
 !.gitignore
 !AGENTS.md
 !README.md

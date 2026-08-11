@@ -1,0 +1,6 @@
+# Normalize text line endings across Windows, macOS, and Linux.
+* text=auto eol=lf
+
+# Keep native Windows command scripts compatible.
+*.bat text eol=crlf
+*.cmd text eol=crlf
