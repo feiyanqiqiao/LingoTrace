@@ -142,7 +142,7 @@ def register_listenkit_connection(
             )
         )
     if platform_id == current_platform():
-        findings.extend(_listenkit_root_findings(Path(listenkit_value)))
+        findings.extend(_listenkit_root_findings(Path(listenkit_value), platform_id))
         if vault is not None and _paths_overlap(vault, Path(listenkit_value)):
             findings.append(
                 Finding(
@@ -252,7 +252,7 @@ def resolve_listenkit_connection(
                 )
             )
         if platform_id == current_platform():
-            findings.extend(_listenkit_root_findings(Path(explicit_value)))
+            findings.extend(_listenkit_root_findings(Path(explicit_value), platform_id))
             if _paths_overlap(vault, Path(explicit_value)):
                 findings.append(
                     Finding(
@@ -269,7 +269,7 @@ def resolve_listenkit_connection(
                 errors=findings,
                 artifacts=_recovery_artifacts(recommendation, str(device_connection_path)),
             )
-        return _resolved_report(explicit_value, "explicit", None)
+        return _resolved_report(explicit_value, "explicit", None, platform_name=platform_id)
 
     read_files: list[str] = []
     stale_candidates: list[str] = []
@@ -294,12 +294,24 @@ def resolve_listenkit_connection(
             )
         for entry in content["connections"]:
             candidate = Path(entry["listenkit_root"])
-            if is_usable_listenkit_root(candidate):
-                return _resolved_report(str(candidate), scope, report_path, read_files=read_files)
+            if is_usable_listenkit_root(candidate, platform_name=platform_id):
+                return _resolved_report(
+                    str(candidate),
+                    scope,
+                    report_path,
+                    platform_name=platform_id,
+                    read_files=read_files,
+                )
             stale_candidates.append(str(candidate))
 
-    if recommendation is not None and is_usable_listenkit_root(Path(recommendation)):
-        return _resolved_report(recommendation, "recommended", None, read_files=read_files)
+    if recommendation is not None and is_usable_listenkit_root(Path(recommendation), platform_name=platform_id):
+        return _resolved_report(
+            recommendation,
+            "recommended",
+            None,
+            platform_name=platform_id,
+            read_files=read_files,
+        )
 
     if stale_candidates:
         message = (
@@ -325,8 +337,17 @@ def resolve_listenkit_connection(
     )
 
 
-def is_usable_listenkit_root(root: Path) -> bool:
-    return (root / "README.md").is_file() and (root / "cli" / "generate-markdown.sh").is_file()
+def listenkit_generate_markdown_relative_path(platform_name: str | None = None) -> str:
+    suffix = "ps1" if current_platform(platform_name) == "windows" else "sh"
+    return f"cli/generate-markdown.{suffix}"
+
+
+def listenkit_generate_markdown_path(root: str | Path, platform_name: str | None = None) -> Path:
+    return Path(root) / Path(listenkit_generate_markdown_relative_path(platform_name))
+
+
+def is_usable_listenkit_root(root: Path, platform_name: str | None = None) -> bool:
+    return (root / "README.md").is_file() and listenkit_generate_markdown_path(root, platform_name).is_file()
 
 
 def _resolved_report(
@@ -334,11 +355,12 @@ def _resolved_report(
     scope: str,
     connection_path: str | None,
     *,
+    platform_name: str | None = None,
     read_files: list[str] | None = None,
 ) -> CommandReport:
     artifacts = {
         "listenkit_root": listenkit_root,
-        "generate_markdown": str(Path(listenkit_root) / "cli" / "generate-markdown.sh"),
+        "generate_markdown": str(listenkit_generate_markdown_path(listenkit_root, platform_name)),
         "connection_scope": scope,
     }
     if connection_path is not None:
@@ -392,7 +414,7 @@ def _recovery_artifacts(recommendation: str | None, device_connection_path: str)
     return artifacts
 
 
-def _listenkit_root_findings(root: Path) -> list[Finding]:
+def _listenkit_root_findings(root: Path, platform_name: str | None = None) -> list[Finding]:
     if not root.exists():
         return [
             Finding(
@@ -401,12 +423,13 @@ def _listenkit_root_findings(root: Path) -> list[Finding]:
                 path=str(root),
             )
         ]
-    if not is_usable_listenkit_root(root):
+    if not is_usable_listenkit_root(root, platform_name=platform_name):
+        expected = listenkit_generate_markdown_path(root, platform_name)
         return [
             Finding(
                 code="listenkit_root_invalid",
-                message="The selected directory is not a usable ListenKit checkout.",
-                path=str(root),
+                message=f"The selected directory does not contain the current platform entrypoint: {expected}.",
+                path=str(expected),
             )
         ]
     return []

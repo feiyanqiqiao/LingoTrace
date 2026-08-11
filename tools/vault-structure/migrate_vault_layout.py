@@ -86,7 +86,7 @@ tags:
 - 每天收口可直接复制 [[学习系统/系统/模板/每日学习清单模板]] 到当天笔记。
 - 日常训练直接打开 [[学习系统/系统/面板/总训练.base]]。
 - `done_today` 可以临时勾选，帮助当天训练时做手工标记。
-- 每天收口先运行 `zsh codex-skills/jp-next-day-review-updater/scripts/run-next-day-review-update.sh --date YYYY-MM-DD --dry-run`；确认无误后去掉 `--dry-run`。
+- 每天收口直接向当前 Vault 的 Agent 说“今天复习结束了，帮我结算”；Agent 会通过公共 LingoTrace runtime 执行 `preview -> apply -> second preview`，无需私有脚本或特定 shell。
 
 ## 复习曲线
 

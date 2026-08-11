@@ -126,6 +126,7 @@ class InitializationCliTests(unittest.TestCase):
             (listenkit / "cli").mkdir(parents=True)
             (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
             (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.ps1").write_text("exit 0\n", encoding="utf-8")
 
             preview = _run(
                 [
@@ -164,6 +165,35 @@ class InitializationCliTests(unittest.TestCase):
         payload = json.loads(resolved.stdout)
         self.assertEqual(str(listenkit), payload["artifacts"]["listenkit_root"])
         self.assertEqual("device", payload["artifacts"]["connection_scope"])
+        expected_suffix = "generate-markdown.ps1" if os.name == "nt" else "generate-markdown.sh"
+        self.assertTrue(payload["artifacts"]["generate_markdown"].endswith(expected_suffix))
+
+    def test_report_json_is_utf8_and_matches_stdout(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            vault = root / "日语 Vault"
+            report_path = root / "报告.json"
+            result = _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "lingotrace.init",
+                    "doctor",
+                    "--language",
+                    "japanese",
+                    "--vault",
+                    str(vault),
+                    "--runtime-root",
+                    str(REPO_ROOT),
+                    "--report-json",
+                    str(report_path),
+                ],
+                extra_env={"PYTHONIOENCODING": "cp936"},
+            )
+            written_payload = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(json.loads(result.stdout), written_payload)
 
     def test_vault_override_requires_a_vault_argument(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -171,6 +201,7 @@ class InitializationCliTests(unittest.TestCase):
             (listenkit / "cli").mkdir(parents=True)
             (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
             (listenkit / "cli" / "generate-markdown.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+            (listenkit / "cli" / "generate-markdown.ps1").write_text("exit 0\n", encoding="utf-8")
             result = _run(
                 [
                     sys.executable,
@@ -203,6 +234,8 @@ def _run(
         command,
         cwd=REPO_ROOT,
         text=True,
+        encoding="utf-8",
+        errors="strict",
         capture_output=True,
         check=False,
         env=environment,

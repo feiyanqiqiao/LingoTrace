@@ -5,6 +5,53 @@
 
 ---
 
+## [20260810-220602]
+### 清理 (Removed)
+- 完整删除 `docs/agent-compatibility-report/` 下 10 份原始 Agent 兼容性报告、整改方案、macOS 交接和 5 份回应文档；经验证的跨平台实现、公共测试、用户安装说明和 `CHANGELOG.md` 历史记录继续保留。
+
+### 测试 (Tests)
+- 删除后通过 core 256、听力 112（1 skipped）、Vault 结构 23、架构 42，共 433 项 unittest；pytest 为 432 passed、1 skipped、25 subtests passed，compileall 与 diff 格式检查通过。
+
+## [20260810-215618]
+### 新增 (Added)
+- 新增公共跨平台 `init_listening_runtime.py`：验证实际 Python 3.14，在平台原生 Cache 中安全创建日语听力隔离 venv，清理子进程 `PYTHONHOME`/`PYTHONPATH`，委派固定离线词典依赖安装与健康检查，并提供 install/check/dry-run。
+- 兼容性整改方案补充 GitHub/local 真值、macOS 逐项证据矩阵、学习者 sparse runtime 新缺口、实施范围、验收边界和最终结果；五个 Agent 回应与 macOS 交接更新为实测结论。
+
+### 修复 (Fixed)
+- 学习者 sparse checkout 同时分发 `lingotrace/` 与 `tools/listening-transcribe-official/`，避免默认启用听力能力的新 Vault 找不到公共生成器。
+- 听力 runtime 失败指引不再引用私有或不存在的 shell wrapper，统一指向公共初始化器；同步目录和未知非空目标会在创建环境前被拒绝。
+
+### 变更 (Changed)
+- 英日 Agent Skill 统一调用 runtime 内的公共听力生成器并保留 preview/apply 与 `--report-json`；日语 Skill 通过公共 Python 3.14 隔离 runtime 加载词典，Agent 不复制业务逻辑或直接编辑 Vault。
+- 安装与隔离文档明确 core Python >=3.11、日语听力 Python 3.14、用户安装同意、最小 macOS Files and Folders 权限、iCloud/OneDrive 边界及条件式本机构建工具要求。
+- GitHub Actions 行为基线在既有 Ubuntu/Windows matrix 中加入 `macos-latest`。
+
+### 测试 (Tests)
+- macOS arm64 / CPython 3.14.4 通过 core 256、听力 112（1 skipped）、Vault 结构 23、架构 42，共 433 项 unittest；pytest 为 432 passed、1 skipped、25 subtests passed。
+- 默认 macOS Cache venv 真实安装 `fugashi==1.5.2` 与 `unidic-lite==1.0.8` 并重复健康检查通过；含空格/CJK 的日语合成音频完成 MLX/Apple 双 ASR、稳定 merge request、模型审阅重跑和 core accepted preview，dry-run 后 Vault 零新增文件；另以全新临时 clone 验证 sparse runtime 同时包含 core、公共生成器和初始化器，并排除根测试目录。
+
+## [20260810-210121]
+### 新增 (Added)
+- 新增 Antigravity、Claude Code、QwenWork、TraeWork 与 WorkBuddy 在 macOS、Windows 上出具的 10 份 Agent 兼容性报告，记录跨平台运行、听力链路、解释器、编码、工具发现与通用 Agent 调用契约的实测证据和建议。
+- 新增 Agent 无关的 `python -m lingotrace.agent`，以一个 UTF-8 JSON CLI 安全调用英日语言包五项公开能力；默认 preview，支持显式 apply、字段 allowlist、Vault 语言解析和原子 `--report-json`。
+- 新增整改方案、Windows 实证结果、macOS Codex 续作交接和五份逐 Agent 回应；CI 基线增加 `windows-latest` 矩阵。
+
+### 修复 (Fixed)
+- ListenKit 连接和听力编排改为平台感知：Windows 原生调用 PowerShell `generate-markdown.ps1`，macOS/Linux 保持 bash `.sh`；修复 `/bin/bash` 硬编码、Windows 执行位假阳性、GBK 子进程解码和平台缓存目录。
+- doctor 改为报告真实运行中的 Python，补充 Windows 每用户 Obsidian 与稳定工具候选；Git、init 与听力 CLI 的结构化输出统一使用 UTF-8。
+- Windows/Linux 没有独立第二 ASR 时显式报告 `single_engine_platform`，不再尝试 Apple 引擎或重复同一引擎伪装双重验证；同步接受 ListenKit 的 `mlx` 路由。
+- Vault 结构校验器优先读取现行 `.lingotrace/paths.json`，按配置角色限定扫描，并用公共 `review_rollover` preview 取代失效的私有 `codex-skills`/`zsh` 集成。
+
+### 变更 (Changed)
+- 学习者引导、运行时/ListenKit/每日更新说明、工具文档与英日 Agent Skill 统一采用经实测的 `<python-command>`、平台入口和受保护 CLI 契约，不再硬编码 `python3` 或 macOS Cache 路径作为全平台事实。
+
+### 清理 (Removed)
+- 删除空的 `tests/lingotrace/__init__.py`，避免测试目录遮蔽真正的 `lingotrace` 包并改善 pytest 收集行为。
+
+### 测试 (Tests)
+- Windows 11 / CPython 3.14.4 通过 LingoTrace 256 项、官方听力 105 项、Vault 结构 23 项和架构基线 42 项测试，共 426 项；compileall 与 diff 格式检查通过。
+- 真实 Windows ListenKit PowerShell doctor 与临时英文 WAV 端到端 dry-run 通过，覆盖含空格路径、GBK/CP936、faster-whisper、ffmpeg、CUDA 和路径守卫；macOS Apple/MLX/TCC/pytest 实机项保留在同分支交接清单中继续验证。
+
 ## [20260809-180513]
 ### 新增 (Added)
 - 新增跨语种共享的设备级 ListenKit 连接：Windows 保存到 `%LOCALAPPDATA%\LingoTrace\connections\listenkit.json`，macOS 保存到 `~/Library/Application Support/LingoTrace/connections/listenkit.json`，Linux 保存到 `${XDG_DATA_HOME:-~/.local/share}/lingotrace/connections/listenkit.json`；支持 `LINGOTRACE_DATA_HOME` 为测试和便携部署改写数据根目录。

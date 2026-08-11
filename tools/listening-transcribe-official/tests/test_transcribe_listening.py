@@ -24,9 +24,6 @@ SETUP_MODULE = importlib.util.module_from_spec(SETUP_SPEC)
 assert SETUP_SPEC.loader is not None
 sys.modules[SETUP_SPEC.name] = SETUP_MODULE
 SETUP_SPEC.loader.exec_module(SETUP_MODULE)
-WRAPPER_PATH = Path(__file__).resolve().parents[3] / "codex-skills/jp-listening-script-generator/scripts/run-listening-transcribe.sh"
-INIT_RUNTIME_PATH = WRAPPER_PATH.with_name("init-listening-runtime.sh")
-CHECK_CHAIN_PATH = WRAPPER_PATH.with_name("check-listening-chain.sh")
 REQUIREMENTS_PATH = Path(__file__).resolve().parents[1] / "requirements-listening.txt"
 JAPANESE_WORKFLOWS_PATH = Path(__file__).resolve().parents[3] / "lingotrace/packs/japanese/workflows.py"
 
@@ -1504,6 +1501,60 @@ class TranscribeListeningTests(unittest.TestCase):
         self.assertIn("双 ASR 转写一致", notification)
         self.assertIn("无需模型合并", notification)
 
+    def test_windows_auto_compare_records_honest_single_engine_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            audio = root / "lesson.wav"
+            audio.write_bytes(b"audio")
+            primary = MODULE.candidate_from_payload(
+                audio,
+                {
+                    "engine": "faster-whisper",
+                    "locale": "en-US",
+                    "full_text": "Hello.",
+                    "segments": [{"start": 0.0, "end": 1.0, "text": "Hello."}],
+                },
+                "base",
+            )
+            with mock.patch.object(MODULE, "current_platform_id", return_value="windows"):
+                with mock.patch.object(MODULE, "build_candidate") as build:
+                    result = MODULE.compare_candidate_if_requested(
+                        audio,
+                        "en-US",
+                        primary,
+                        "auto",
+                        None,
+                        "small",
+                        "int8",
+                        root / "artifacts",
+                        "lesson",
+                        True,
+                    )
+
+            self.assertIsNotNone(result)
+            assert result is not None
+            self.assertEqual("single_engine_platform", result.report["status"])
+            self.assertIsNone(result.report["secondary"])
+            build.assert_not_called()
+            assert result.report_path is not None
+            self.assertTrue(result.report_path.is_file())
+
+    def test_single_engine_platform_notification_is_explicit(self) -> None:
+        bundle = MODULE.PreparedListeningBundle(
+            vault_root=Path("/tmp/vault"),
+            note_path="listening/lesson.md",
+            files=[],
+            summary="prepared",
+            overwrite_required=False,
+            staging_root=Path("/tmp/staging"),
+            asr_validation_status="single_engine_platform",
+        )
+
+        status, notification = MODULE.listening_status_and_notification(bundle)
+
+        self.assertEqual("complete", status)
+        self.assertIn("没有第二个受支持的独立 ASR 引擎", notification)
+
     def test_structural_normalization_does_not_apply_material_specific_corrections(self) -> None:
         self.assertEqual(MODULE.normalize_structured_text("土曜の牛の日です。"), "土曜の牛の日です。")
 
@@ -1728,6 +1779,62 @@ class TranscribeListeningTests(unittest.TestCase):
             args = MODULE.parse_args()
 
         self.assertEqual(args.compare_engine, "faster-whisper")
+
+    def test_parse_args_accepts_mlx_and_report_json(self) -> None:
+        with mock.patch.object(
+            sys,
+            "argv",
+            ["transcribe-listening", "audio.mp3", "--engine", "mlx", "--report-json", "report.json"],
+        ):
+            args = MODULE.parse_args()
+
+        self.assertEqual("mlx", args.engine)
+        self.assertEqual(Path("report.json"), args.report_json)
+
+    def test_windows_command_prefix_uses_powershell_and_ps1(self) -> None:
+        with mock.patch.object(MODULE, "current_platform_id", return_value="windows"):
+            with mock.patch.object(
+                MODULE,
+                "find_command",
+                side_effect=lambda name, **_: r"C:\PowerShell\pwsh.exe" if name == "pwsh" else None,
+            ):
+                command = MODULE.listenkit_generate_markdown_command_prefix()
+
+        self.assertEqual(r"C:\PowerShell\pwsh.exe", command[0])
+        self.assertIn("-File", command)
+        self.assertTrue(command[-1].endswith("generate-markdown.ps1"))
+
+    @unittest.skipUnless(os.name == "nt", "requires native Windows PowerShell")
+    def test_native_windows_powershell_entrypoint_handles_spaces_and_cjk_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            listenkit = root / "Listen Kit 日语"
+            cli = listenkit / "cli"
+            cli.mkdir(parents=True)
+            script = cli / "generate-markdown.ps1"
+            script.write_text(
+                "param([Parameter(ValueFromRemainingArguments = $true)][string[]] $CommandArguments)\n"
+                "$outputIndex = [Array]::IndexOf($CommandArguments, '--output')\n"
+                "if ($outputIndex -lt 0) { exit 2 }\n"
+                "$outputPath = $CommandArguments[$outputIndex + 1]\n"
+                "[IO.File]::WriteAllText($outputPath, '# transcript', (New-Object Text.UTF8Encoding($false)))\n"
+                "$jsonPath = [IO.Path]::ChangeExtension($outputPath, '.json')\n"
+                "$payload = @{schema_version=1; engine='faster-whisper'; locale='en-US'; "
+                "language='English'; full_text='Hello from Windows'; segments=@(); timing_complete=$true}\n"
+                "[IO.File]::WriteAllText($jsonPath, ($payload | ConvertTo-Json -Depth 4), "
+                "(New-Object Text.UTF8Encoding($false)))\n"
+                "exit 0\n",
+                encoding="utf-8-sig",
+            )
+            (listenkit / "README.md").write_text("# ListenKit\n", encoding="utf-8")
+            source = root / "音频 file.wav"
+            source.write_bytes(b"audio")
+
+            with mock.patch.dict(MODULE.os.environ, {"LISTENKIT_ROOT": str(listenkit)}, clear=False):
+                payload = MODULE.invoke_listenkit(source, "en-US", "auto")
+
+        self.assertEqual("faster-whisper", payload["engine"])
+        self.assertEqual("Hello from Windows", payload["full_text"])
 
     def test_review_sidecar_records_resolved_slice_profile(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2168,7 +2275,9 @@ class TranscribeListeningTests(unittest.TestCase):
 
         command = run_mock.call_args.args[0]
         env = run_mock.call_args.kwargs["env"]
-        self.assertTrue(Path(command[1]).as_posix().endswith("ListenKit/cli/generate-markdown.sh"))
+        expected_suffix = "generate-markdown.ps1" if MODULE.current_platform_id() == "windows" else "generate-markdown.sh"
+        script_index = command.index("-File") + 1 if "-File" in command else 1
+        self.assertTrue(Path(command[script_index]).as_posix().endswith(f"ListenKit/cli/{expected_suffix}"))
         self.assertIn("--input", command)
         self.assertIn(str(Path("/tmp/audio.mp3")), command)
         self.assertIn("--language", command)
@@ -2220,6 +2329,7 @@ class TranscribeListeningTests(unittest.TestCase):
             generate = cli / "generate-markdown.sh"
             generate.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             generate.chmod(0o755)
+            (cli / "generate-markdown.ps1").write_text("exit 0\n", encoding="utf-8")
 
             with mock.patch.dict(MODULE.os.environ, {"LISTENKIT_ROOT": str(listenkit_root)}, clear=True):
                 with self.assertRaisesRegex(RuntimeError, "audio-slice export CLI"):
@@ -2277,7 +2387,9 @@ class TranscribeListeningTests(unittest.TestCase):
                     payload = MODULE.invoke_listenkit(Path("/tmp/audio.mp3"), "ja-JP", "apple")
 
         command = run_mock.call_args.args[0]
-        self.assertEqual(Path(command[1]), Path("/tmp/listenkit/cli/generate-markdown.sh"))
+        expected_suffix = "generate-markdown.ps1" if MODULE.current_platform_id() == "windows" else "generate-markdown.sh"
+        script_index = command.index("-File") + 1 if "-File" in command else 1
+        self.assertEqual(Path(command[script_index]), Path("/tmp/listenkit/cli") / expected_suffix)
         self.assertIn("--engine", command)
         self.assertIn("apple", command)
         self.assertNotIn("--auto-init", command)

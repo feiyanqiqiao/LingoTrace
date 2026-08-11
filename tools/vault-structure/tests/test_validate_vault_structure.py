@@ -113,6 +113,116 @@ class ValidateVaultStructureTests(unittest.TestCase):
 
             self.assertEqual(found, root_config)
 
+    def test_find_paths_config_prefers_current_lingotrace_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            current = root / ".lingotrace/paths.json"
+            legacy = root / "系统配置/paths.json"
+            current.parent.mkdir(parents=True)
+            legacy.parent.mkdir(parents=True)
+            current.write_text('{"path_roles": []}\n', encoding="utf-8")
+            legacy.write_text("{}\n", encoding="utf-8")
+
+            found = MODULE.find_paths_config(root)
+
+            self.assertEqual(found, current)
+
+    def test_validate_roles_accepts_current_path_roles_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            paths = {
+                "source_notes_root": "sources",
+                "listening_root": "listening",
+                "daily_notes_root": "daily",
+            }
+            for relative in paths.values():
+                (root / relative).mkdir(parents=True)
+            config = root / ".lingotrace/paths.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(
+                json.dumps(
+                    {
+                        "path_roles": [
+                            {"role": role, "relative_path": relative, "source": "vault_config"}
+                            for role, relative in paths.items()
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            errors = MODULE.validate_roles(root)
+
+            self.assertEqual([], errors)
+
+    def test_current_path_roles_reject_cross_platform_escape_forms(self) -> None:
+        for unsafe in ("../escape", r"..\escape", r"C:\escape", "C:escape", "/escape"):
+            with self.subTest(unsafe=unsafe), tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                config = root / ".lingotrace/paths.json"
+                config.parent.mkdir(parents=True)
+                config.write_text(
+                    json.dumps(
+                        {
+                            "path_roles": [
+                                {"role": "source_notes_root", "relative_path": unsafe, "source": "vault_config"}
+                            ]
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+                errors = MODULE.validate_roles(root)
+
+                self.assertTrue(any("must stay inside the Vault" in error for error in errors), errors)
+
+    def test_note_files_uses_current_configured_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            note = root / "sources" / "article.md"
+            note.parent.mkdir(parents=True)
+            note.write_text("# Article\n", encoding="utf-8")
+            config = root / ".lingotrace/paths.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(
+                json.dumps(
+                    {
+                        "path_roles": [
+                            {"role": "source_notes_root", "relative_path": "sources", "source": "vault_config"}
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual([note], MODULE.note_files(root))
+
+    def test_untitled_base_scan_stays_within_configured_content_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            configured = root / "sources" / "無題のファイル 1.base"
+            private = root / ".obsidian" / "無題のファイル 2.base"
+            configured.parent.mkdir(parents=True)
+            private.parent.mkdir(parents=True)
+            configured.write_text("views: []\n", encoding="utf-8")
+            private.write_text("views: []\n", encoding="utf-8")
+            config = root / ".lingotrace/paths.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(
+                json.dumps(
+                    {
+                        "path_roles": [
+                            {"role": "source_notes_root", "relative_path": "sources", "source": "vault_config"}
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            errors = MODULE.validate_untitled_bases(root)
+
+            self.assertEqual(["untitled base must be removed: sources/無題のファイル 1.base"], errors)
+
     def test_validate_roles_accepts_split_review_roots(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

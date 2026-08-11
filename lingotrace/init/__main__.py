@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import json
+import sys
 from pathlib import Path
 
+from lingotrace.core.json_output import emit_json
 from lingotrace.init.doctor import inspect_onboarding
 from lingotrace.init.english_vault import initialize_english_vault, plan_english_vault_initialization
 from lingotrace.init.japanese_vault import initialize_japanese_vault, plan_japanese_vault_initialization
@@ -69,6 +70,22 @@ def parse_args() -> argparse.Namespace:
     apply_update.add_argument("--runtime-root", type=Path, required=True)
     apply_update.add_argument("--apply", action="store_true")
 
+    for command_parser in (
+        initialize,
+        connect,
+        resolve,
+        connect_listenkit,
+        resolve_listenkit,
+        doctor,
+        check_update,
+        apply_update,
+    ):
+        command_parser.add_argument(
+            "--report-json",
+            type=Path,
+            help="Also atomically write the UTF-8 JSON report to this path.",
+        )
+
     return parser.parse_args()
 
 
@@ -120,7 +137,11 @@ def main() -> int:
             mode="apply" if args.apply else "preview",
         )
 
-    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+    try:
+        emit_json(report.to_dict(), report_json=args.report_json)
+    except OSError as exc:
+        print(f"Unable to write JSON report: {exc}", file=sys.stderr)
+        return 1
     return report.exit_code
 
 

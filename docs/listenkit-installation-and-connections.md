@@ -2,6 +2,8 @@
 
 ListenKit 是 LingoTrace 的可选媒体依赖，负责音视频获取、转写和切片。它不是 Vault 内容，也不属于某个语言包。本文定义 LingoTrace 在安装、发现、保存和恢复 ListenKit 程序目录时必须遵守的产品契约。
 
+下文的 `<python-command>` 指本机实际验证可用、版本至少为 3.11 的 Python launcher；Windows 通常是 `python`，macOS/Linux 通常是 `python3`。
+
 ## 1. 安装前必须确认位置
 
 Agent 在下载或安装 ListenKit 前，必须先解析当前设备的 LingoTrace 运行时。ListenKit 的默认建议永远是 **LingoTrace 运行时所在目录的同级 `ListenKit`**，同时允许用户指定其他绝对路径。
@@ -19,20 +21,23 @@ Agent 在下载或安装 ListenKit 前，必须先解析当前设备的 LingoTra
 
 ## 2. 保存设备级默认连接
 
-可用的 ListenKit 根目录至少包含：
+可用的 ListenKit 根目录至少包含 `README.md`，并包含当前操作系统对应的入口：
 
 ```text
 README.md
-cli/generate-markdown.sh
+Windows:     cli/generate-markdown.ps1
+macOS/Linux: cli/generate-markdown.sh
 ```
+
+Windows 原生链路只调用 PowerShell 入口，不探测 `/bin/bash`、WSL launcher 或 Git Bash 来运行 `.sh`。
 
 验证通过后，Agent 先预览、再登记设备级默认连接；该操作与任何语言 Vault 无关：
 
 ```bash
-python3 -m lingotrace.init connect-listenkit \
+<python-command> -m lingotrace.init connect-listenkit \
   --listenkit-root /absolute/path/to/ListenKit
 
-python3 -m lingotrace.init connect-listenkit \
+<python-command> -m lingotrace.init connect-listenkit \
   --listenkit-root /absolute/path/to/ListenKit \
   --apply
 ```
@@ -54,12 +59,12 @@ Linux:   ${XDG_DATA_HOME:-~/.local/share}/lingotrace/connections/listenkit.json
 只有某个 Vault 明确需要不同的 ListenKit checkout 时，才保存 Vault 覆盖：
 
 ```bash
-python3 -m lingotrace.init connect-listenkit \
+<python-command> -m lingotrace.init connect-listenkit \
   --scope vault \
   --vault /absolute/path/to/Vault \
   --listenkit-root /absolute/path/to/ListenKit
 
-python3 -m lingotrace.init connect-listenkit \
+<python-command> -m lingotrace.init connect-listenkit \
   --scope vault \
   --vault /absolute/path/to/Vault \
   --listenkit-root /absolute/path/to/ListenKit \
@@ -100,7 +105,7 @@ Vault 覆盖继续使用原有跨平台路径：
 音视频导入或转写前，Agent 从已经解析出的 LingoTrace 运行时执行：
 
 ```bash
-python3 -m lingotrace.init resolve-listenkit \
+<python-command> -m lingotrace.init resolve-listenkit \
   --vault /absolute/path/to/Vault
 ```
 

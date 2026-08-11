@@ -9,6 +9,7 @@ from typing import Callable
 from urllib.parse import urlparse
 
 from lingotrace.core.reports import CommandReport, Finding
+from lingotrace.init.executables import find_executable
 from lingotrace.init.runtime_connections import current_platform
 
 
@@ -601,12 +602,17 @@ def _git_failure_message(prefix: str, result: GitResult) -> str:
 
 
 def _run_git(runtime: Path, arguments: list[str]) -> GitResult:
+    git_command = find_executable("git")
+    if git_command is None:
+        return GitResult(returncode=127, stderr="Git executable was not found.")
     try:
         completed = subprocess.run(
-            ["git", "-C", str(runtime), *arguments],
+            [git_command, "-C", str(runtime), *arguments],
             text=True,
             capture_output=True,
             check=False,
+            encoding="utf-8",
+            errors="replace",
         )
     except OSError as exc:
         return GitResult(returncode=127, stderr=str(exc))

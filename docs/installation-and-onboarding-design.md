@@ -61,7 +61,7 @@ Obsidian 桌面客户端与 ListenKit 可以延期安装，但 Agent 必须说�
 
 ListenKit 默认建议由实际 LingoTrace 运行时动态推导：取运行时所在目录的同级 `ListenKit`，因此开发者的 `/path/to/Project/LingoTrace` 会得到 `/path/to/Project/ListenKit`。建议位置允许用户覆盖。实际安装位置默认保存在当前系统的用户应用数据目录，供所有语种 Vault 共享；Vault 内只保留显式覆盖和旧连接兼容。找不到时必须让用户选择重新安装或指定已有目录。完整契约见 [ListenKit 安装位置与设备级连接](listenkit-installation-and-connections.md)。
 
-最小学习运行时只需要仓库中的 `lingotrace/`。普通学习者默认使用 Git sparse checkout 获取该目录；不需要下载 `tests/`、`tools/`、`.github/`、贡献指南或产品设计文档。运行时保留 `.git` 元数据，以便后续 `git pull --ff-only` 更新。
+最小学习运行时需要仓库中的 `lingotrace/` 以及公开听力适配器 `tools/listening-transcribe-official/`。普通学习者默认使用 Git sparse checkout 只获取这两个目录；不需要下载 `tests/`、其他 `tools/`、`.github/`、贡献指南或产品设计文档。运行时保留 `.git` 元数据，以便后续 `git pull --ff-only` 更新。否则默认启用 `listening_notes` 的 Vault 会找不到公开生成器。
 
 开发者必须使用完整 checkout，因为开发需要测试、工具、文档和 GitHub 工作流。
 
@@ -82,7 +82,7 @@ Agent 可以在征得一次明确同意后执行一组已经解释过的同类�
 运行时安装后，Agent 使用统一诊断入口：
 
 ```bash
-python3 -m lingotrace.init doctor \
+<python-command> -m lingotrace.init doctor \
   --language english \
   --vault /absolute/path/to/LingoTrace-English \
   --runtime-root /absolute/path/to/runtime
@@ -91,9 +91,13 @@ python3 -m lingotrace.init doctor \
 诊断输出 JSON，区分必要错误和可延期警告，并给出当前平台、依赖发现结果及建议路径。初始化继续使用：
 
 ```bash
-python3 -m lingotrace.init vault --language english --vault /absolute/path/to/Vault --apply
-python3 -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
+<python-command> -m lingotrace.init vault --language english --vault /absolute/path/to/Vault --apply
+<python-command> -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
 ```
+
+`<python-command>` 必须是预检中实际执行成功且版本至少为 3.11 的 launcher：Windows 通常为 `python`，macOS/Linux 通常为 `python3`。诊断必须报告正在运行的 `sys.executable` 与版本，不能用另一个 PATH 候选冒充当前解释器。
+
+核心 runtime 的 Python >=3.11 与日语听力扩展的独立 Python 3.14 venv 是两层契约。后者只在用户同意安装日语听力依赖后，由 sparse runtime 内的 `tools/listening-transcribe-official/init_listening_runtime.py` 创建和检查；不得把依赖装入 core Python 或 Vault。
 
 文档入口分为：
 
@@ -111,6 +115,7 @@ python3 -m lingotrace.init resolve-runtime --vault /absolute/path/to/Vault
 - 诊断不会安装软件或写文件；缺少 Obsidian、Git 或 ListenKit 时给出可延期警告。
 - 缺少 Python、运行时无效、Vault 路径非绝对或 Vault/运行时互相嵌套时阻止继续。
 - 普通用户安装文档不会要求 fork、理解 PR 或运行开发测试。
+- 普通用户的 sparse runtime 同时包含 core 包与公开听力适配器，日语听力隔离 runtime 有可重复执行的公开初始化/检查入口。
 - 开发者文档明确区分个人 fork、上游仓库、topic branch、CI 和下一次改动前的上游同步。
 - 初始化仍先预览、不覆盖，并验证生成的 Vault 可以解析当前平台运行时和语言 Skill。
 - README 和文档索引在首屏清楚分流学习者与开发者。

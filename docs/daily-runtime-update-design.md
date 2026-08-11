@@ -57,8 +57,10 @@ SSH、HTTPS 和带 `.git` 后缀的同一 GitHub 仓库应识别为相同来源�
 
 Agent 解析 Vault 当前平台运行时后执行：
 
+`<python-command>` 是本机已经验证可用、版本至少为 3.11 的 Python launcher；Windows 通常是 `python`，macOS/Linux 通常是 `python3`。
+
 ```bash
-python3 -m lingotrace.init check-update \
+<python-command> -m lingotrace.init check-update \
   --vault /absolute/path/to/Vault \
   --runtime-root /absolute/path/to/runtime
 ```
@@ -93,7 +95,7 @@ python3 -m lingotrace.init check-update \
 正式 checkout 且用户明确同意时执行：
 
 ```bash
-python3 -m lingotrace.init apply-update \
+<python-command> -m lingotrace.init apply-update \
   --vault /absolute/path/to/Vault \
   --runtime-root /absolute/path/to/runtime \
   --apply
