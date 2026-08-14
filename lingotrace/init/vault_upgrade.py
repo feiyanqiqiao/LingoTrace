@@ -34,17 +34,20 @@ def upgrade_vault(vault_root: str | Path, *, mode: str = "preview") -> CommandRe
     manifest = json.loads((pack_root / "manifest.json").read_text(encoding="utf-8"))
     planned_writes: list[dict[str, Any]] = []
     errors: list[Finding] = []
+    warnings: list[Finding] = []
 
     enabled = list(context.get("enabled_capabilities") or [])
-    if "review_queue" not in enabled:
+    lifecycle_capabilities = ("review_queue", "review_lifecycle_migration", "vocab_consolidation")
+    missing_capabilities = [capability for capability in lifecycle_capabilities if capability not in enabled]
+    if missing_capabilities:
         upgraded_context = dict(context)
-        upgraded_context["enabled_capabilities"] = [*enabled, "review_queue"]
+        upgraded_context["enabled_capabilities"] = [*enabled, *missing_capabilities]
         upgraded_context["language_pack_version"] = manifest["language_pack_version"]
         planned_writes.append(
             {
                 "path": ".lingotrace/vault-context.json",
                 "action": "write_json",
-                "reason": "enable the stable review queue capability",
+                "reason": "enable stable review lifecycle and migration capabilities",
                 "content": upgraded_context,
             }
         )
@@ -79,11 +82,12 @@ def upgrade_vault(vault_root: str | Path, *, mode: str = "preview") -> CommandRe
                 }
             )
             continue
-        errors.append(
+        warnings.append(
             Finding(
-                code="modified_pack_view",
+                code="modified_pack_view_preserved",
                 message=f"Pack view differs from the known public template and will not be overwritten (current {current_hash[:12]}, pack {source_hash[:12]}).",
                 path=relative,
+                severity="warning",
             )
         )
 
@@ -92,9 +96,10 @@ def upgrade_vault(vault_root: str | Path, *, mode: str = "preview") -> CommandRe
         mode=mode,
         exit_code=1 if errors else 0,
         errors=errors,
+        warnings=warnings,
         read_files=[".lingotrace/vault-context.json", f"lingotrace/packs/{pack_directory}/manifest.json"],
         planned_writes=planned_writes,
-        blocked_files=[finding.path for finding in errors if finding.path],
+        blocked_files=[finding.path for finding in warnings if finding.path],
         artifacts={"language_pack": pack_id},
     )
     if mode != "apply" or not report.accepted:

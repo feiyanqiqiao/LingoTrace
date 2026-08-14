@@ -25,6 +25,14 @@ CAPABILITY_FIELDS = {
         "change_date",
         "existing_update_confirmed",
     },
+    "review_lifecycle_migration": {
+        "change_date",
+        "existing_update_confirmed",
+    },
+    "vocab_consolidation": {
+        "change_date",
+        "existing_update_confirmed",
+    },
     "speaking_cards": {"candidate"},
     "review_rollover": {"run_date"},
 }

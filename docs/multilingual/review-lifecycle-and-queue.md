@@ -60,3 +60,27 @@ The stable `review_queue` capability accepts exact Vault-relative Markdown paths
 `review_rollover` processes only `queued && done_today`. Completing `day180` marks the original card `mastered`; it does not create or update a second base-vocabulary copy.
 
 `base_vocab_root` remains readable for compatibility but accepts no new review-material or rollover writes. Consolidating legacy base cards is a separate explicit migration.
+
+## Legacy Lifecycle Migration
+
+`review_lifecycle_migration` scans configured review and material roles without writing during preview. It reports exact paths and before/after values, requires `existing_update_confirmed: true` for apply, removes `status` and `review_enabled`, and must return zero remaining writes on the verification preview.
+
+Legacy mapping is conservative:
+
+- `mastered` and `promoted` become `mastered`; `archived` remains archived.
+- Explicit legacy `review_enabled: false` becomes backlog while retaining progress; `review_enabled: true` becomes queued and receives a valid day/date initialization when missing.
+- An active record with real review history, a stage beyond `day0`, or a valid vocabulary/grammar/error/pronunciation schedule becomes `queued`.
+- Unscheduled active records become `backlog`.
+- Listening, speaking, and chunk material at `day0` with no completed review becomes `backlog`.
+- A progressed record with a missing next date is queued on the explicit migration date; invalid explicit new-model combinations block the batch.
+
+## Vocabulary Consolidation
+
+`vocab_consolidation` runs only after lifecycle migration and keeps `focus_vocab_root` as the single canonical vocabulary directory.
+
+- Base-only unscheduled cards become focus backlog cards; legacy promoted cards become focus mastered cards; real schedules remain queued.
+- For a duplicate, focus frontmatter, schedule, and body are authoritative. Base fills only blank scalar fields and contributes deduplicated lists and sources.
+- Counters use the greater value, `first_seen` uses the earliest valid date, and recent dates use the latest valid date.
+- Different non-empty focus and base bodies block the complete batch for manual review.
+- A successfully consolidated base card is retained at its old path with `review_status: archived`, a canonical-card link, and an in-note redirect. It is never deleted.
+- A second preview after apply must report zero remaining consolidation writes.

@@ -20,7 +20,7 @@ Choose an actually runnable Python 3.11+ launcher and refer to it below as `<pyt
 <python-command> -m lingotrace.agent <capability> --vault <current-vault> --payload <temporary-utf8-json> --report-json <temporary-report-json>
 ```
 
-The capability is one of `listening_notes`, `source_notes`, `review_materials`, `review_queue`, `speaking_cards`, or `review_rollover`. Build the payload from the natural-language request; never ask the user to prepare this internal JSON. Keep temporary payloads and reports outside the Vault, delete them after use, preview before adding `--apply`, and trust the structured exit report rather than localized console text. The CLI fixes `vault_root` and `mode` from its own arguments, rejects unknown or reserved payload fields, selects the language pack from `.lingotrace/vault-context.json`, and still routes every mutation through the core guard.
+The capability is one of `listening_notes`, `source_notes`, `review_materials`, `review_queue`, `review_lifecycle_migration`, `vocab_consolidation`, `speaking_cards`, or `review_rollover`. Build the payload from the natural-language request; never ask the user to prepare this internal JSON. Keep temporary payloads and reports outside the Vault, delete them after use, preview before adding `--apply`, and trust the structured exit report rather than localized console text. The CLI fixes `vault_root` and `mode` from its own arguments, rejects unknown or reserved payload fields, selects the language pack from `.lingotrace/vault-context.json`, and still routes every mutation through the core guard.
 
 ## Daily Runtime Update
 
@@ -40,6 +40,7 @@ Use these intent families:
 - Source material to study note: turn an article, transcript, URL, screenshot text, video content, or pasted text into a traceable Japanese study note.
 - Word, grammar, pronunciation, or error to review: add, update, deduplicate, or organize review material.
 - Material lifecycle change: add an existing item to review, remove it from the queue while retaining progress, or restart mastered material.
+- Explicit legacy migration: audit old lifecycle fields or consolidate the old base/focus vocabulary layers after the user asks to upgrade existing data.
 - Reviewed chunk or useful sentence to active output: create, merge, or update a speaking card for language the user wants to be able to say.
 - End-of-day review settlement: advance completed review items, update next review dates, or close today's review.
 - Dashboard or view maintenance: update how a table, Base, filter, formula, column, sort order, or view displays learning items.
@@ -69,6 +70,8 @@ Map intuitive study requests to the Japanese pack capabilities:
 | 帮我把这篇材料整理成日语学习笔记 / 生成学习笔记 | Source note task | `source_notes` |
 | 把这个词加入复习 / 建词卡 / 建语法卡 | Review material task | `review_materials` |
 | 把这些素材加入复习 / 先退出复习队列 / 重新学习这张卡 | Review queue task | `review_queue` |
+| 审计并迁移旧复习状态 | Review lifecycle migration | `review_lifecycle_migration` |
+| 合并旧的双层单词卡 | Vocabulary consolidation | `vocab_consolidation` |
 | 把我已经 review 的这些语块转入口语库 / 这句话很实用，帮我做成口语卡 | Speaking card task | `speaking_cards` |
 | 今天复习结束了，帮我结算 / 结算复习 / 更新总训练表 / 请更新总训练表 | Review rollover task | `review_rollover` |
 
@@ -89,6 +92,8 @@ Agent Skill must not write Vault files directly. Vault file changes must route t
 Review rollover is card-frontmatter backed: settlement reads and updates the configured review cards directly. The Obsidian total-training Base reads ordinary card frontmatter. Do not create or rely on a parallel review-state JSON store or generated review-state snapshot notes.
 
 New vocabulary, grammar, explicit-error, and pronunciation-weakness cards default to `review_status: queued` with `review_stage: day0`. Listening notes, speaking cards, and chunks default to `review_status: backlog` with no schedule. Only create those material types as `queued/day0` when the user explicitly asks to add them to review in the same request. Never toggle `review_status` by hand: use `review_queue` so resume/restart dates and lifecycle constraints are initialized together.
+
+Legacy migration is always explicit and two-step. First run a read-only preview and report every path, field change, and conflict. Apply only after confirmation, then run the same preview again and require zero remaining writes. Run lifecycle migration before vocabulary consolidation. Consolidation keeps `focus_vocab_root` canonical, never deletes a base card, and blocks the whole batch when focus and base contain different non-empty bodies; an accepted base card becomes an archived redirect to the canonical focus card.
 
 Before a write-capable task, the agent must confirm the learning library context exists and that the matching capability is enabled. If context or capability checks fail, stop before writing and explain the missing setup in user-facing language.
 

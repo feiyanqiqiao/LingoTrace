@@ -113,6 +113,28 @@
       "manual_review_cases": []
     },
     {
+      "id": "review_lifecycle_migration",
+      "maturity": "stable",
+      "depends_on": [],
+      "read_path_roles": ["focus_vocab_root", "base_vocab_root", "grammar_root", "error_root", "speaking_card_root", "listening_root", "pronunciation_accent_root", "pronunciation_phoneme_root"],
+      "write_path_roles": ["focus_vocab_root", "base_vocab_root", "grammar_root", "error_root", "speaking_card_root", "listening_root", "pronunciation_accent_root", "pronunciation_phoneme_root"],
+      "external_tools": [],
+      "behavior_evidence": ["JP-MIGRATE-REVIEW-001"],
+      "conformance_tests": ["tests/lingotrace/migration/test_review_card_migration.py"],
+      "manual_review_cases": []
+    },
+    {
+      "id": "vocab_consolidation",
+      "maturity": "stable",
+      "depends_on": ["review_lifecycle_migration"],
+      "read_path_roles": ["focus_vocab_root", "base_vocab_root"],
+      "write_path_roles": ["focus_vocab_root", "base_vocab_root"],
+      "external_tools": [],
+      "behavior_evidence": ["JP-CONSOLIDATE-VOCAB-001"],
+      "conformance_tests": ["tests/lingotrace/migration/test_review_card_migration.py"],
+      "manual_review_cases": ["different non-empty focus and base bodies require manual resolution"]
+    },
+    {
       "id": "speaking_cards",
       "maturity": "stable",
       "depends_on": ["review_materials"],
@@ -334,6 +356,18 @@
       "id": "review_queue_workflow",
       "capability_id": "review_queue",
       "entrypoint": "lingotrace.packs.japanese.workflows:review_queue",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "review_lifecycle_migration_workflow",
+      "capability_id": "review_lifecycle_migration",
+      "entrypoint": "lingotrace.packs.japanese.workflows:review_lifecycle_migration",
+      "call_policy": "through_core_write_guard"
+    },
+    {
+      "id": "vocab_consolidation_workflow",
+      "capability_id": "vocab_consolidation",
+      "entrypoint": "lingotrace.packs.japanese.workflows:vocab_consolidation",
       "call_policy": "through_core_write_guard"
     },
     {
