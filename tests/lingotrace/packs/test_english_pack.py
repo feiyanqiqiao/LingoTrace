@@ -66,6 +66,7 @@ def create_target_context(root: Path) -> None:
                     "listening_notes",
                     "source_notes",
                     "review_materials",
+                    "review_queue",
                     "speaking_cards",
                     "review_rollover",
                     "total_training_dashboard",
@@ -101,7 +102,7 @@ def review_card(
     *,
     track: str = "class_review",
     item_type: str = "vocab",
-    status: str = "active",
+    review_status: str = "queued",
     done_today: str = "true",
     review_stage: str = "day0",
     next_review: str = "2026-06-21",
@@ -123,7 +124,7 @@ def review_card(
         "---",
         f"track: {track}",
         f"item_type: {item_type}",
-        f"status: {status}",
+        f"review_status: {review_status}",
         f"done_today: {done_today}",
         f"review_stage: {review_stage}",
         f"next_review: {next_review}",
@@ -495,7 +496,7 @@ class EnglishParityWorkflowTests(unittest.TestCase):
             body = card.read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertIn("status: active", body)
+        self.assertIn("review_status: queued", body)
         self.assertIn("review_stage: day0", body)
         self.assertIn("next_review: 2026-08-08", body)
         self.assertIn("[[sources/new-source|new-source]]", body)
@@ -666,7 +667,7 @@ class TestEnglishReviewRolloverContract(unittest.TestCase):
             if to_next_review:
                 self.assertIn(f"next_review: {to_next_review}", body)
             if to_stage == "mastered":
-                self.assertIn("status: mastered", body)
+                self.assertIn("review_status: mastered", body)
 
     def test_apply_updates_done_today_review_stage_next_review_and_mastered_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -681,7 +682,7 @@ class TestEnglishReviewRolloverContract(unittest.TestCase):
         envelope = report.to_dict()
         self.assertTrue(report.accepted, envelope)
         self.assertIn("review_stage: mastered", body)
-        self.assertIn("status: mastered", body)
+        self.assertIn("review_status: mastered", body)
         self.assertIn("done_today: false", body)
         self.assertIn("last_reviewed: 2026-06-21", body)
 
@@ -725,9 +726,9 @@ class TestEnglishReviewRolloverContract(unittest.TestCase):
         self.assertIn("review_stage: day3", body)
         self.assertIn("next_review: 2026-06-25", body)
 
-    # US-4, US-5: Mastery Sink tests ---------------------------------------
+    # US-4, US-5: In-place mastery tests ------------------------------------
 
-    def test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body(self) -> None:
+    def test_review_rollover_mastery_does_not_rewrite_existing_base_vocab(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
@@ -778,21 +779,16 @@ seen_count: 2
             base_body = base_path.read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertEqual(
-            ["review/base/vocab/base.md", "review/focus/vocab/focus.md"],
-            sorted(report.to_dict()["changed_files"]),
-        )
-        self.assertIn("status: mastered", focus_body)
-        self.assertIn("status: promoted", base_body)
-        self.assertIn("meaning_zh: 无处不在的", base_body)
-        self.assertIn("english_definition: present, appearing, or found everywhere", base_body)
-        self.assertIn("collocations: ubiquitous computing", base_body)
-        self.assertIn('- "[[base-source]]"', base_body)
-        self.assertIn('- "[[focus-source]]"', base_body)
+        self.assertEqual(["review/focus/vocab/focus.md"], report.to_dict()["changed_files"])
+        self.assertIn("review_status: mastered", focus_body)
+        self.assertNotIn("status: active", focus_body)
+        self.assertIn("meaning_zh: 旧的无处不在释义", base_body)
+        self.assertNotIn("english_definition:", base_body)
+        self.assertIn("source_notes: [[base-source]]", base_body)
         self.assertIn("seen_count: 2", base_body)
         self.assertIn("这段英文释义必须保留。", base_body)
 
-    def test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match(self) -> None:
+    def test_review_rollover_does_not_create_base_vocab_after_day180(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
@@ -822,21 +818,11 @@ Review card body.
 
             report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
             focus_body = focus_path.read_text(encoding="utf-8")
-            base_body = base_path.read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertEqual(
-            ["review/base/vocab/ubiquitous.md", "review/focus/vocab/new-base.md"],
-            sorted(report.to_dict()["changed_files"]),
-        )
-        self.assertIn("status: mastered", focus_body)
-        self.assertIn("track: base_vocab", base_body)
-        self.assertIn("status: promoted", base_body)
-        self.assertIn("headword: ubiquitous", base_body)
-        self.assertIn("ipa: /juːˈbɪk.wɪ.təs/", base_body)
-        self.assertIn("meaning_zh: 无处不在的", base_body)
-        self.assertIn("english_definition: present, appearing, or found everywhere", base_body)
-        self.assertIn('- "[[focus-source]]"', base_body)
+        self.assertEqual(["review/focus/vocab/new-base.md"], report.to_dict()["changed_files"])
+        self.assertIn("review_status: mastered", focus_body)
+        self.assertFalse(base_path.exists())
 
     # US-5, US-6, US-7: Non-focus scope safety ----------------------------
 
@@ -848,7 +834,7 @@ Review card body.
             base_path = root / "review/base/vocab/base.md"
             daily_path = root / "daily/2026-06-21.md"
             write(focus_path, review_card(review_stage="day1", next_review="2026-06-21"))
-            write(base_path, review_card(status="active", done_today="true", review_stage="day1", next_review="2026-06-21"))
+            write(base_path, review_card(review_status="queued", done_today="true", review_stage="day1", next_review="2026-06-21"))
             write(daily_path, "# Daily\n\n- manual note\n")
             before_base = base_path.read_text(encoding="utf-8")
             before_daily = daily_path.read_text(encoding="utf-8")
@@ -993,6 +979,14 @@ Review card body.
             self.assertIn(contract, content)
         for contract in expected_support_contracts:
             self.assertIn(contract, content)
+
+    def test_material_library_surfaces_backlog_and_mastered_without_editable_status_column(self) -> None:
+        content = (PACK_ROOT / "views" / "material-library.base").read_text(encoding="utf-8")
+        for name in ("待加入复习", "听力素材", "生活口语与语块", "词汇语法素材", "已掌握"):
+            self.assertIn(f"name: {name}", content)
+        self.assertIn('review_status == "backlog"', content)
+        self.assertIn('review_status == "mastered"', content)
+        self.assertNotIn("      - review_status\n", content)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,19 @@
 
 ---
 
+## [20260814-165719]
+### 新增 (Added)
+- 英日语言包新增稳定 `review_queue` 能力，以精确 Vault 相对路径完成入队、退出、续接和重置；共享生命周期统一使用 `review_status: backlog/queued/mastered/archived`，并在批量写入前验证状态组合。
+- 新增英日 `material-library.base` 素材库以及 `upgrade-vault` 入口；旧 Vault 仅在总训练 Base 与已知公共模板一致时自动升级，检测到人工修改时阻止覆盖并报告哈希差异。
+
+### 变更 (Changed)
+- 单词、语法、错误和发音弱项默认进入 `queued/day0`；听力、生活口语和语块默认进入 `backlog`，需通过队列能力显式启用复习。
+- 总训练所有训练视图只显示 `queued` 条目；复习结算只处理 `queued && done_today`，完成 `day180` 后在原卡标记 `mastered`，不再制造基础词库副本。
+- `base_vocab_root` 在日常复习材料与结算能力中进入只读兼容期；英日 Agent Skill、共享复习契约、模板和初始化清单同步更新。
+
+### 测试 (Tests)
+- 新增四态约束、队列转换、英日创建默认值、批量原子性、原卡掌握、素材库和旧 Vault 安全升级覆盖；通过 core 267、听力 112（1 skipped）、Vault 结构 23、架构 42，共 444 项 unittest。
+
 ## [20260811-094946]
 ### 新增 (Added)
 - 新增仓库级 `.gitattributes`：普通文本统一使用 LF，Windows `.bat` 与 `.cmd` 脚本保留 CRLF；同步将该公共元数据加入 `.gitignore` 反向 allowlist 和 staged public-file allowlist。

@@ -26,6 +26,7 @@ class EnglishVaultInitializationTests(unittest.TestCase):
                 "listening_notes",
                 "source_notes",
                 "review_materials",
+                "review_queue",
                 "speaking_cards",
                 "review_rollover",
                 "total_training_dashboard",
@@ -39,6 +40,7 @@ class EnglishVaultInitializationTests(unittest.TestCase):
             "templates/speaking-card.md",
             "templates/chunk-card.md",
             "views/total-training.base",
+            "views/material-library.base",
         ):
             self.assertIn(path, planned)
         self.assertIn("AGENTS.md", planned)

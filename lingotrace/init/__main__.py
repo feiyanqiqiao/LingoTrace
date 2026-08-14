@@ -11,6 +11,7 @@ from lingotrace.init.japanese_vault import initialize_japanese_vault, plan_japan
 from lingotrace.init.listenkit_connections import register_listenkit_connection, resolve_listenkit_connection
 from lingotrace.init.runtime_connections import register_runtime_connection, resolve_runtime_connection
 from lingotrace.init.runtime_updates import apply_runtime_update, check_runtime_update
+from lingotrace.init.vault_upgrade import upgrade_vault
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,6 +23,10 @@ def parse_args() -> argparse.Namespace:
     initialize.add_argument("--vault", type=Path, required=True)
     initialize.add_argument("--runtime-root", type=Path)
     initialize.add_argument("--apply", action="store_true")
+
+    upgrade = subparsers.add_parser("upgrade-vault", help="Preview or apply safe pack artifact upgrades to an existing Vault.")
+    upgrade.add_argument("--vault", type=Path, required=True)
+    upgrade.add_argument("--apply", action="store_true")
 
     connect = subparsers.add_parser("connect-runtime", help="Append a runtime path for the current platform.")
     connect.add_argument("--vault", type=Path, required=True)
@@ -72,6 +77,7 @@ def parse_args() -> argparse.Namespace:
 
     for command_parser in (
         initialize,
+        upgrade,
         connect,
         resolve,
         connect_listenkit,
@@ -100,6 +106,8 @@ def main() -> int:
             args.vault,
             runtime_root=args.runtime_root,
         )
+    elif args.command == "upgrade-vault":
+        report = upgrade_vault(args.vault, mode="apply" if args.apply else "preview")
     elif args.command == "connect-runtime":
         report = register_runtime_connection(
             args.vault,

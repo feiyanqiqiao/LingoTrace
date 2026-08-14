@@ -20,6 +20,11 @@ CAPABILITY_FIELDS = {
         "extraction_date",
         "existing_update_confirmed",
     },
+    "review_queue": {
+        "items",
+        "change_date",
+        "existing_update_confirmed",
+    },
     "speaking_cards": {"candidate"},
     "review_rollover": {"run_date"},
 }

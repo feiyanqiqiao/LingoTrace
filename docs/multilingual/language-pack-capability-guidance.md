@@ -43,6 +43,7 @@ Before starting or reviewing a language-pack PR:
 
 | Area | Guidance status | Guidance file |
 | --- | --- | --- |
+| `review_queue` and shared lifecycle | Reference Guidance | `docs/multilingual/review-lifecycle-and-queue.md` |
 | `review_rollover` | Reference Guidance | `docs/multilingual/review-rollover-user-stories.md` |
 | `total_training_dashboard` | Reference Guidance | `docs/multilingual/total-training-dashboard-user-stories.md` |
 | `listening_notes` | Reference Guidance | `docs/multilingual/listening-notes-user-stories.md` |

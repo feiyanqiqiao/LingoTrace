@@ -153,7 +153,10 @@ class JapanesePackTests(unittest.TestCase):
             self.assertTrue((REPO_ROOT / record["path"]).exists(), record["path"])
 
         default_views = manifest["default_views"]
-        self.assertEqual(["total_training_dashboard"], [record["id"] for record in default_views])
+        self.assertEqual(
+            ["total_training_dashboard", "material_library_dashboard"],
+            [record["id"] for record in default_views],
+        )
         for record in default_views:
             self.assertEqual("recreate-from-pack", record["artifact_class"])
             self.assertTrue((REPO_ROOT / record["path"]).exists(), record["path"])
@@ -166,7 +169,7 @@ class JapanesePackTests(unittest.TestCase):
         required = {
             "track",
             "item_type",
-            "status",
+            "review_status",
             "priority",
             "done_today",
             "source_notes",
@@ -183,7 +186,7 @@ class JapanesePackTests(unittest.TestCase):
             text = (PACK_ROOT / "templates" / filename).read_text(encoding="utf-8")
             fields, _ = workflows._frontmatter_and_body(text)
             self.assertTrue(required.issubset(fields), filename)
-            self.assertEqual("active", fields["status"])
+            self.assertEqual("queued", fields["review_status"])
             self.assertEqual("day0", fields["review_stage"])
             self.assertIs(fields["done_today"], False)
             self.assertIsInstance(fields["source_notes"], list)
@@ -248,7 +251,7 @@ class JapanesePackTests(unittest.TestCase):
         order = list_values(today, "order")
         sort = sort_properties(today)
 
-        self.assertIn('next_day_flag: if(status == "active" && next_review', template)
+        self.assertIn('next_day_flag: if(review_status == "queued" && next_review', template)
         self.assertIn('date(next_review) <= today() + "1d"', formula(template, "next_day_flag"))
         self.assertIn('!(last_reviewed && date(last_reviewed) >= today())', formula(template, "next_day_flag"))
         self.assertIn("formula.next_day_flag == true", today)
@@ -261,8 +264,16 @@ class JapanesePackTests(unittest.TestCase):
 
         self.assertNotIn("views/review-state", template)
         self.assertNotIn(".lingotrace/review-state", template)
-        for property_name in ("done_today", "next_review", "last_reviewed", "status"):
+        for property_name in ("done_today", "next_review", "last_reviewed", "review_status"):
             self.assertIn(property_name, template)
+
+    def test_material_library_surfaces_backlog_and_mastered_without_editable_status_column(self) -> None:
+        template = (PACK_ROOT / "views" / "material-library.base").read_text(encoding="utf-8")
+        for name in ("待加入复习", "听力素材", "生活口语与语块", "词汇语法素材", "已掌握"):
+            self.assertIn(f"name: {name}", template)
+        self.assertIn('review_status == "backlog"', template)
+        self.assertIn('review_status == "mastered"', template)
+        self.assertNotIn("      - review_status\n", template)
 
     def test_workflows_are_declarative_and_do_not_call_old_jp_skills(self) -> None:
         manifest = read_json(MANIFEST_PATH)
@@ -288,7 +299,7 @@ class JapanesePackTests(unittest.TestCase):
             {
                 "track": "class_review",
                 "item_type": "vocab",
-                "status": "active",
+                "review_status": "queued",
                 "priority": "normal",
                 "done_today": False,
                 "headword": "合成語",

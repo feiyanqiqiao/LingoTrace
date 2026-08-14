@@ -7,7 +7,7 @@ This document defines the public card-format and link-safety behavior implemente
 ## Creation And Update Boundary
 
 - Structured `item` input creates new vocabulary, grammar, error, and pronunciation cards after role-scoped duplicate checks.
-- New active cards receive complete scheduling metadata: `status`, `priority`, `done_today`, first/last-seen dates, counters, `review_stage`, `next_review`, `last_reviewed`, source links, and tags.
+- New queued cards receive complete scheduling metadata: `review_status`, `priority`, `done_today`, first/last-seen dates, counters, `review_stage`, `next_review`, `last_reviewed`, source links, and tags.
 - Applying any mutation to an existing card requires `existing_update_confirmed=True`.
 - Confirmed structured-item updates preserve the existing semantic frontmatter and body. They may append verified provenance and update lifecycle metadata.
 - A full existing-card reformat must use an explicitly confirmed `card` payload. No bulk migration is implied.

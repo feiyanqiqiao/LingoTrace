@@ -51,7 +51,7 @@ Labels:
 | `US-2` Fixed memory-curve advancement | `Required` | `Covered` | `Covered` | The stage names and SRS fields are shared unless a pack documents an exception. |
 | `US-3` Delayed overdue rescheduling | `Required` | `Covered` | `Covered` | Delay thresholds are part of the shared rollover rule. |
 | `US-4` day180 mastered transition | `Required` | `Covered` | `Covered` | Type-specific mastery effects must stay explicit. |
-| `US-5` Base vocabulary writes only through mastery sink | `Required` | `Covered` | `Covered` | Vocabulary-field mapping remains language-owned. |
+| `US-5` Base vocabulary stays read only during settlement | `Required` | `Covered` | `Covered` | Legacy consolidation is a separate migration. |
 | `US-6` Daily-note independence | `Required` | `Covered` | `Covered` | Normal settlement should not depend on daily-note writes. |
 | `US-7` Daily notes without anchors unchanged | `Optional` | `Covered` | `N/A` | Required only for packs that maintain dated daily notes. |
 | `US-8` Missing daily note resilience | `Optional` | `Covered` | `N/A` | Required only for packs with daily-note integration. |
@@ -109,7 +109,7 @@ As a learner, I want completed review items to advance along a fixed memory curv
 Acceptance criteria:
 
 - Apply writes ordinary review-card frontmatter through core file mutations.
-- Only cards with `status: active` and `done_today: true` are eligible.
+- Only cards with `review_status: queued` and `done_today: true` are eligible.
 - The stage chain is fixed: `day0 -> day1 -> day3 -> day7 -> day14 -> day30 -> day90 -> day180 -> mastered`.
 - Apply sets `done_today: false` in card frontmatter.
 - Apply advances `review_stage` by the fixed memory curve in card frontmatter.
@@ -148,36 +148,34 @@ As a learner, I want a card that finishes `day180` to leave active review, so th
 Acceptance criteria:
 
 - A card that advances from `day180` becomes `review_stage: mastered`.
-- The card's `status` becomes `mastered`.
+- The card's `review_status` becomes `mastered`.
 - `done_today` is cleared.
 - `last_reviewed` is set to the settlement run date.
 - `next_review` is cleared because mastered cards are no longer scheduled by the normal active-review queue.
-- A completed focus vocabulary card is promoted into the base vocabulary layer while preserving existing base-card manual content.
+- A completed focus vocabulary card remains the canonical card; rollover does not write a base vocabulary copy.
 - If a future language pack needs type-specific mastery behavior, it must update this contract and its tests before changing implementation.
 
 Regression coverage:
 
 - `test_review_rollover_applies_every_memory_curve_transition_from_run_date`
 - `test_apply_updates_done_today_review_stage_next_review_and_mastered_status`
-- `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`
-- `test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match`
+- `test_review_rollover_mastery_does_not_rewrite_existing_base_vocab`
+- `test_review_rollover_does_not_create_base_vocab_after_day180`
 
-### 5. Restrict base vocabulary writes to mastery sink
+### 5. Keep base vocabulary read only during settlement
 
-As a learner, I want settlement to update base vocabulary only when a focus vocabulary card completes the full review cycle, so long-term vocabulary remains aligned without broad base rewrites.
+As a learner, I want settlement to update only the canonical focus card, so mastery does not manufacture a second vocabulary layer.
 
 Acceptance criteria:
 
-- Existing base vocabulary Markdown remains unchanged for non-mastered cards and non-vocabulary cards.
-- When a focus vocabulary card advances from `day180` to `mastered`, stable vocabulary fields are written to the base vocabulary layer.
-- Existing base vocabulary manual body content is preserved.
-- Base source references are merged with the completed focus card's source references.
-- Any broad base-vocabulary merge, move, deletion, or rewrite outside mastery sink must run through a separate explicit content-maintenance workflow.
+- Existing base vocabulary Markdown remains unchanged for every settlement.
+- When a focus vocabulary card advances from `day180`, that same file becomes the mastered canonical card.
+- Any base-vocabulary merge, move, archival stub, or rewrite requires the explicit consolidation migration.
 
 Regression coverage:
 
-- `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`
-- `test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match`
+- `test_review_rollover_mastery_does_not_rewrite_existing_base_vocab`
+- `test_review_rollover_does_not_create_base_vocab_after_day180`
 - `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab`
 
 ### 6. Do not rewrite daily notes during settlement
@@ -269,8 +267,8 @@ Regression coverage:
 | Delayed overdue reschedule | `test_review_rollover_reschedules_overdue_card_without_advancing_stage` | Covered | Yes |
 | `overdue_days == allowed_delay` advances | `test_review_rollover_advances_when_overdue_days_equal_allowed_delay` | Covered | Yes |
 | day180 card becomes mastered | `test_review_rollover_applies_every_memory_curve_transition_from_run_date` | Covered | Yes |
-| day180 focus vocab sinks to base | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`; `test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match` | Covered | Yes |
-| Existing base-card manual body preserved during sink | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body` | Covered | Yes |
+| day180 focus vocab remains canonical in focus | `test_review_rollover_does_not_create_base_vocab_after_day180` | Covered | Yes |
+| Existing base-card remains unchanged | `test_review_rollover_mastery_does_not_rewrite_existing_base_vocab` | Covered | Yes |
 | Non-mastered base-card untouched | `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab` | Covered | Yes |
 | Existing daily note untouched | `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab` | Covered | Yes |
 | Daily note without anchor untouched | `test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab` | Covered | Yes |
@@ -284,7 +282,7 @@ Before adding `review_rollover` to a new language pack:
 
 - Declare the capability in the language-pack manifest.
 - Define review-card path roles for that pack.
-- Reuse the shared frontmatter fields: `status`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
+- Reuse the shared frontmatter fields: `review_status`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
 - Implement the fixed memory curve or document an approved exception.
 - Add pack-level tests mapped to every required row in the migration matrix.
 - Ensure the agent skill maps clear settlement requests to `preview -> apply -> second preview`.

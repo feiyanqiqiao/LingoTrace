@@ -2157,7 +2157,7 @@ def build_default_frontmatter(
         practice_focus = "先通读脚本抓主题，再对照带时间字幕精修 1-3 个长句。"
     lines = [
         "track: listening",
-        "status: active",
+        "review_status: backlog",
         "priority: high",
         "done_today: false",
         f"audio_ref: {audio_ref_for_note(audio_path)}",
@@ -2175,8 +2175,8 @@ def build_default_frontmatter(
     lines.append(f"last_seen: {today}")
     lines.append("seen_count: 1")
     lines.append("error_count: 0")
-    lines.append("review_stage: day0")
-    lines.append(f"next_review: {today}")
+    lines.append('review_stage: ""')
+    lines.append('next_review: ""')
     lines.append('last_reviewed: ""')
     namespace = "jp" if is_japanese_locale(locale) else "en"
     lines.extend(["tags:", f"  - {namespace}/listening", f"  - {namespace}/p0_plus"])

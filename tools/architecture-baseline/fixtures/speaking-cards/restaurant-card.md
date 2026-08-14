@@ -1,7 +1,11 @@
 ---
 track: survival_speaking
 item_type: speaking_card
-review_status: human_reviewed
+review_status: backlog
+content_review_status: human_reviewed
+done_today: false
+review_stage: ""
+next_review: ""
 jp_text: 予約しています。山田です。
 scene: restaurant
 speaker_role: customer

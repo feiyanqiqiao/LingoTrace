@@ -1,7 +1,7 @@
 ---
 track: class_review
 item_type: error
-status: active
+review_status: queued
 priority: normal
 done_today: false
 source_notes: []

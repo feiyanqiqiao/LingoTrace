@@ -43,6 +43,7 @@
 
 | 范围 | 指引状态 | 指引文件 |
 | --- | --- | --- |
+| `review_queue` 与共享生命周期 | Reference Guidance | `docs/multilingual/review-lifecycle-and-queue.md` |
 | `review_rollover` | Reference Guidance | `docs/multilingual/review-rollover-user-stories.md` |
 | `total_training_dashboard` | Reference Guidance | `docs/multilingual/total-training-dashboard-user-stories.md` |
 | `listening_notes` | Reference Guidance | `docs/multilingual/listening-notes-user-stories.md` |

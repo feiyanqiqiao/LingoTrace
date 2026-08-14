@@ -1,0 +1,83 @@
+filters:
+  and:
+    - file.ext == "md"
+    - or:
+        - track == "class_review"
+        - track == "base_vocab"
+        - track == "survival_speaking"
+        - track == "listening"
+        - track == "pronunciation"
+formulas:
+  status_label: if(review_status == "backlog", "待加入复习", if(review_status == "mastered", "已掌握", if(review_status == "queued", "复习中", "已归档")))
+  type_label: if(item_type == "vocab", "单词", if(item_type == "grammar", "语法", if(item_type == "chunk", "语块", if(item_type == "speaking_card", "口语卡", if(track == "listening", "听力", "其他")))))
+  core_text: 'if(item_type == "vocab", if(headword, headword, file.name), if(item_type == "grammar", if(pattern, pattern, file.name), if(item_type == "chunk", if(chunk_pattern, chunk_pattern, if(en_text, en_text, file.name)), if(track == "survival_speaking", if(en_text, en_text, file.name), if(track == "listening", if(practice_focus, practice_focus, file.name), file.name)))))'
+  support_text: 'if(meaning_zh, meaning_zh, if(chunk_meaning_zh, chunk_meaning_zh, if(weak_points, weak_points, "")))'
+properties:
+  formula.status_label:
+    displayName: 状态
+  formula.type_label:
+    displayName: 类型
+  formula.core_text:
+    displayName: 核心内容
+  formula.support_text:
+    displayName: 说明
+  review_stage:
+    displayName: 已保留进度
+  next_review:
+    displayName: 原排程日期
+views:
+  - type: table
+    name: 待加入复习
+    filters: review_status == "backlog"
+    order:
+      - file.name
+      - formula.status_label
+      - formula.type_label
+      - formula.core_text
+      - formula.support_text
+      - review_stage
+  - type: table
+    name: 听力素材
+    filters:
+      and:
+        - review_status == "backlog"
+        - track == "listening"
+    order:
+      - file.name
+      - formula.status_label
+      - formula.core_text
+      - formula.support_text
+  - type: table
+    name: 生活口语与语块
+    filters:
+      and:
+        - review_status == "backlog"
+        - track == "survival_speaking"
+    order:
+      - file.name
+      - formula.status_label
+      - formula.type_label
+      - formula.core_text
+      - formula.support_text
+  - type: table
+    name: 词汇语法素材
+    filters:
+      and:
+        - review_status == "backlog"
+        - item_type == "vocab" || item_type == "grammar"
+    order:
+      - file.name
+      - formula.status_label
+      - formula.type_label
+      - formula.core_text
+      - formula.support_text
+      - review_stage
+  - type: table
+    name: 已掌握
+    filters: review_status == "mastered"
+    order:
+      - file.name
+      - formula.status_label
+      - formula.type_label
+      - formula.core_text
+      - formula.support_text

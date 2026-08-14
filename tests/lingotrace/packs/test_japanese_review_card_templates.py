@@ -66,7 +66,7 @@ def complete_vocab_fields(*, source_notes: list[str] | None = None) -> dict[str,
     return {
         "track": "class_review",
         "item_type": "vocab",
-        "status": "active",
+        "review_status": "queued",
         "priority": "normal",
         "done_today": False,
         "headword": "自身",
@@ -376,7 +376,7 @@ next_review: 2026-07-20
                     "fields": {
                         "track": "class_review",
                         "item_type": "grammar",
-                        "status": "active",
+                        "review_status": "queued",
                         "priority": "normal",
                         "done_today": False,
                         "pattern": "〜ようだ",

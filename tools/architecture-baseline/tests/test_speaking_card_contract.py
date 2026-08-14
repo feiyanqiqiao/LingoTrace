@@ -10,7 +10,8 @@ class SpeakingCardContractTests(unittest.TestCase):
         frontmatter, body = parse_markdown_fixture("speaking-cards", "restaurant-card.md")
 
         self.assertEqual(frontmatter["track"], "survival_speaking")
-        self.assertEqual(frontmatter["review_status"], "human_reviewed")
+        self.assertEqual(frontmatter["review_status"], "backlog")
+        self.assertEqual(frontmatter["content_review_status"], "human_reviewed")
         self.assertEqual(frontmatter["jp_text"], "予約しています。山田です。")
         self.assertEqual(frontmatter["scene"], "restaurant")
         self.assertIn("artifacts/restaurant-line.slice.txt", embedded_links(body))

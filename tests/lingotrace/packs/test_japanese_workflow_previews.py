@@ -32,6 +32,7 @@ def create_target_context(root: Path) -> None:
                     "listening_notes",
                     "source_notes",
                     "review_materials",
+                    "review_queue",
                     "speaking_cards",
                     "review_rollover",
                 ],
@@ -70,7 +71,7 @@ def review_card(
     *,
     track: str = "class_review",
     item_type: str = "vocab",
-    status: str = "active",
+    review_status: str = "queued",
     done_today: str = "true",
     review_stage: str = "day0",
     next_review: str = "2026-06-21",
@@ -79,7 +80,7 @@ def review_card(
     return f"""---
 track: {track}
 item_type: {item_type}
-status: {status}
+review_status: {review_status}
 done_today: {done_today}
 review_stage: {review_stage}
 next_review: {next_review}
@@ -265,7 +266,9 @@ class JapaneseWorkflowPreviewTests(unittest.TestCase):
             accepted = workflows.listening_notes(vault_root=root, input_artifact=payload, mode="apply")
 
             self.assertEqual(rejected.errors[0].code, "existing_listening_note_confirmation_required")
-            self.assertEqual(note_path.read_text(encoding="utf-8"), "new")
+            saved = note_path.read_text(encoding="utf-8")
+            self.assertIn("review_status: backlog", saved)
+            self.assertTrue(saved.rstrip().endswith("new"))
             self.assertTrue(accepted.accepted, accepted.to_dict())
 
     def test_speaking_cards_reject_unreviewed_candidates(self) -> None:
@@ -373,7 +376,7 @@ source_notes:
                     "fields": {
                         "track": "class_review",
                         "item_type": "vocab",
-                        "status": "active",
+                        "review_status": "queued",
                         "priority": "normal",
                         "done_today": False,
                         "first_seen": "2026-06-21",
@@ -516,7 +519,7 @@ source_notes: []
         self.assertEqual("create_focus_card", preview_envelope["planned_writes"][0]["action"])
         self.assertTrue(apply.accepted, apply_envelope)
         self.assertEqual(["review/focus/vocab/合成語.md"], apply_envelope["changed_files"])
-        self.assertIn("status: active", body)
+        self.assertIn("review_status: queued", body)
         self.assertIn("done_today: false", body)
         self.assertIn("review_stage: day0", body)
         self.assertIn("next_review: 2026-06-22", body)
@@ -572,7 +575,7 @@ source_notes: [[old-source]]
         self.assertEqual(["review/focus/vocab/合成語.md"], files)
         self.assertIn('  - "[[old-source]]"', body)
         self.assertIn('  - "[[sources/new-source|new-source]]"', body)
-        self.assertIn("status: active", body)
+        self.assertIn("review_status: queued", body)
         self.assertIn("done_today: false", body)
         self.assertIn("review_stage: day0", body)
         self.assertIn("next_review: 2026-06-22", body)
@@ -911,7 +914,7 @@ base 内容。
         envelope = report.to_dict()
         self.assertTrue(report.accepted, envelope)
         self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
-        self.assertIn("status: active", focus_body)
+        self.assertIn("review_status: queued", focus_body)
         self.assertIn("review_stage: day0", focus_body)
         self.assertIn('  - "[[base-source]]"', focus_body)
         self.assertIn('  - "[[sources/new-source|new-source]]"', focus_body)
@@ -1014,7 +1017,7 @@ meaning_zh: 合成词
         envelope = report.to_dict()
         self.assertTrue(report.accepted, envelope)
         self.assertEqual(["review/focus/vocab/合成語.md"], envelope["changed_files"])
-        self.assertIn("status: active", body)
+        self.assertIn("review_status: queued", body)
         self.assertIn("review_stage: day0", body)
         self.assertIn("next_review: 2026-06-22", body)
         self.assertIn("last_reviewed: ", body)
@@ -1072,13 +1075,13 @@ meaning_zh: 合成词
 
             grammar = (root / "review/grammar/ことによって.md").read_text(encoding="utf-8")
             error = (root / "review/errors/2026-06-22_店として知られている.md").read_text(encoding="utf-8")
-            self.assertIn("status: active", grammar)
+            self.assertIn("review_status: queued", grammar)
             self.assertIn("done_today: false", grammar)
             self.assertIn("review_stage: day0", grammar)
             self.assertIn("next_review: 2026-06-22", grammar)
             self.assertIn("  - V辞書形 + ことによって", grammar)
             self.assertIn("## 接续、用法与例句", grammar)
-            self.assertIn("status: active", error)
+            self.assertIn("review_status: queued", error)
             self.assertIn("done_today: false", error)
             self.assertIn("review_stage: day0", error)
             self.assertIn("next_review: 2026-06-22", error)
@@ -1714,7 +1717,7 @@ meaning_zh: 合成词
                 self.assertIn(f"next_review: {next_review}", body)
                 self.assertIn("last_reviewed: 2026-06-21", body)
                 if next_stage == "mastered":
-                    self.assertIn("status: mastered", body)
+                    self.assertIn("review_status: mastered", body)
 
     def test_review_rollover_reschedules_overdue_card_without_advancing_stage(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1813,7 +1816,7 @@ last_reviewed: 2026-05-29
         self.assertIn("done_today: true", bad_body)
         self.assertIn("next_review: not-a-date", bad_body)
 
-    def test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body(self) -> None:
+    def test_review_rollover_mastery_does_not_rewrite_existing_base_vocab(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
@@ -1863,17 +1866,15 @@ seen_count: 2
             base_body = base_path.read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertEqual(["review/base/vocab/base.md", "review/focus/vocab/focus.md"], sorted(report.to_dict()["changed_files"]))
-        self.assertIn("status: mastered", focus_body)
-        self.assertIn("status: promoted", base_body)
-        self.assertIn("meaning_zh: 合成词", base_body)
-        self.assertIn("accent_display: ごうせいご⓪", base_body)
-        self.assertIn('  - "[[base-source]]"', base_body)
-        self.assertIn('  - "[[focus-source]]"', base_body)
+        self.assertEqual(["review/focus/vocab/focus.md"], report.to_dict()["changed_files"])
+        self.assertIn("review_status: mastered", focus_body)
+        self.assertIn("meaning_zh: 旧解释", base_body)
+        self.assertNotIn("accent_display:", base_body)
+        self.assertIn("source_notes: [[base-source]]", base_body)
         self.assertIn("seen_count: 2", base_body)
         self.assertIn("这段必须保留。", base_body)
 
-    def test_review_rollover_creates_base_vocab_when_day180_focus_vocab_has_no_base_match(self) -> None:
+    def test_review_rollover_does_not_create_base_vocab_after_day180(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
@@ -1902,17 +1903,11 @@ source_notes: [[focus-source]]
 
             report = workflows.review_rollover(vault_root=root, run_date="2026-06-21", mode="apply")
             focus_body = focus_path.read_text(encoding="utf-8")
-            base_body = base_path.read_text(encoding="utf-8")
 
         self.assertTrue(report.accepted, report.to_dict())
-        self.assertEqual(["review/base/vocab/合成語.md", "review/focus/vocab/new-base.md"], sorted(report.to_dict()["changed_files"]))
-        self.assertIn("status: mastered", focus_body)
-        self.assertIn("track: base_vocab", base_body)
-        self.assertIn("status: promoted", base_body)
-        self.assertIn("headword: 合成語", base_body)
-        self.assertIn("reading: ごうせいご", base_body)
-        self.assertIn("meaning_zh: 合成词", base_body)
-        self.assertIn('  - "[[focus-source]]"', base_body)
+        self.assertEqual(["review/focus/vocab/new-base.md"], report.to_dict()["changed_files"])
+        self.assertIn("review_status: mastered", focus_body)
+        self.assertFalse(base_path.exists())
 
     def test_review_rollover_does_not_touch_daily_notes_or_non_mastered_base_vocab(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1923,7 +1918,7 @@ source_notes: [[focus-source]]
             daily_path = root / "daily/2026-06-21.md"
             daily_without_anchor_path = root / "daily/2026-06-20.md"
             write(focus_path, review_card(review_stage="day1", next_review="2026-06-21"))
-            write(base_path, review_card(status="active", done_today="true", review_stage="day1", next_review="2026-06-21"))
+            write(base_path, review_card(review_status="queued", done_today="true", review_stage="day1", next_review="2026-06-21"))
             write(daily_path, "# Daily\n\n- manual note\n")
             write(daily_without_anchor_path, "# Daily without anchor\n")
             before_base = base_path.read_text(encoding="utf-8")

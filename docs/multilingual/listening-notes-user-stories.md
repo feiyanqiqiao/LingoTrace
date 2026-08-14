@@ -419,7 +419,7 @@ Acceptance criteria:
 
 Japanese reference:
 
-- Japanese listening notes use `track: listening`, `status`, `priority`, `done_today`, `review_stage`, `next_review`, `segment_count`, `weak_points`, `practice_focus`, and `daily_use_sentences`.
+- Japanese listening notes use `track: listening`, `review_status: backlog`, `priority`, `done_today: false`, blank scheduling fields, `segment_count`, `weak_points`, `practice_focus`, and `daily_use_sentences` unless the user explicitly activates review.
 - The total-training dashboard includes listening notes through `track == "listening"`.
 
 Regression coverage:
