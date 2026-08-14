@@ -5,6 +5,13 @@
 
 ---
 
+## [20260814-182042]
+### 修复 (Fixed)
+- `vocab_consolidation` 现在会识别旧 base/focus 单词目录中带有 `headword`、但尚未声明 `item_type: vocab` 的遗留卡片，避免双层单词迁移静默漏掉早期卡片。
+
+### 测试 (Tests)
+- 将无 `item_type` 的 base-only 卡加入英日共用迁移夹具；通过 core/migration 270、听力 112（1 skipped）、Vault 结构 23、架构 42，共 447 项 unittest。
+
 ## [20260814-171331]
 ### 新增 (Added)
 - 英日语言包新增显式 `review_lifecycle_migration`：先只读列出逐文件、逐字段的旧状态映射，确认后原子应用，并以第二次预览验证无剩余迁移项。

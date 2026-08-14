@@ -322,7 +322,9 @@ def _vocab_by_key(
 ) -> dict[str, tuple[Path, dict[str, Any]]]:
     result: dict[str, tuple[Path, dict[str, Any]]] = {}
     for path, fields in scanner(root, paths, roles):
-        if fields.get("item_type") != "vocab":
+        item_type = fields.get("item_type")
+        is_legacy_vocab = item_type in (None, "") and bool(fields.get("headword"))
+        if item_type != "vocab" and not is_legacy_vocab:
             continue
         key = _vocab_key(fields, path)
         if key in result:
