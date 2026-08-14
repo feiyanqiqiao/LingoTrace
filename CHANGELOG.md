@@ -5,6 +5,16 @@
 
 ---
 
+## [20260814-183050]
+### 新增 (Added)
+- `vocab_consolidation` 新增逐路径 `body_conflict_resolutions`：人工审核后可明确指定某张旧 base 卡采用 focus 正文权威，继续安全合并元数据并将原 base 正文保留在 archived 跳转卡中。
+
+### 安全 (Security)
+- 冲突解决只接受 `base_vocab_root` 下精确 Markdown 路径和 `focus` 权威；未列出的冲突、越界路径、其他权威以及不再对应当前冲突的过期确认都会阻断整批写入。
+
+### 测试 (Tests)
+- 英日迁移夹具新增正文冲突阻断、过期确认拒绝、逐路径确认、focus 正文保留、base 原文保留和二次预览归零覆盖；通过 core/migration 270、听力 112（1 skipped）、Vault 结构 23、架构 42，共 447 项 unittest。
+
 ## [20260814-182042]
 ### 修复 (Fixed)
 - `vocab_consolidation` 现在会识别旧 base/focus 单词目录中带有 `headword`、但尚未声明 `item_type: vocab` 的遗留卡片，避免双层单词迁移静默漏掉早期卡片。
