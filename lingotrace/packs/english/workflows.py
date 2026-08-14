@@ -555,6 +555,7 @@ def vocab_consolidation(
     *,
     change_date: str | None = None,
     existing_update_confirmed: bool = False,
+    body_conflict_resolutions: dict[str, str] | None = None,
     mode: str = "preview",
 ) -> CommandReport:
     if vault_root is None:
@@ -572,6 +573,7 @@ def vocab_consolidation(
         render_markdown=_render_markdown,
         change_date=change_date or dt.date.today().isoformat(),
         existing_update_confirmed=existing_update_confirmed,
+        body_conflict_resolutions=body_conflict_resolutions,
         mode=mode,
     )
 

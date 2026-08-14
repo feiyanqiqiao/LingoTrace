@@ -81,6 +81,7 @@ Legacy mapping is conservative:
 - Base-only unscheduled cards become focus backlog cards; legacy promoted cards become focus mastered cards; real schedules remain queued.
 - For a duplicate, focus frontmatter, schedule, and body are authoritative. Base fills only blank scalar fields and contributes deduplicated lists and sources.
 - Counters use the greater value, `first_seen` uses the earliest valid date, and recent dates use the latest valid date.
-- Different non-empty focus and base bodies block the complete batch for manual review.
+- Different non-empty focus and base bodies block the complete batch for manual review. After review, the user may confirm exact base-card paths through `body_conflict_resolutions` with `focus` authority; unlisted conflicts, stale paths, and any other authority continue to block the batch.
+- A confirmed focus-body resolution keeps the focus body and schedule, applies the ordinary safe metadata merge, and preserves the original base body in the archived redirect.
 - A successfully consolidated base card is retained at its old path with `review_status: archived`, a canonical-card link, and an in-note redirect. It is never deleted.
 - A second preview after apply must report zero remaining consolidation writes.

@@ -155,6 +155,39 @@ class ReviewCardMigrationTests(unittest.TestCase):
                 self.assertFalse((root / "review/focus/vocab/otherwise.md").exists())
                 self.assertEqual(before, (root / "review/base/vocab/otherwise.md").read_text(encoding="utf-8"))
 
+                stale = workflows.vocab_consolidation(
+                    vault_root=root,
+                    change_date="2026-08-14",
+                    body_conflict_resolutions={"review/base/vocab/otherwise.md": "focus"},
+                )
+                self.assertFalse(stale.accepted)
+                self.assertIn("unused_body_conflict_resolution", {finding.code for finding in stale.errors})
+
+                resolutions = {"review/base/vocab/conflict.md": "focus"}
+                preview = workflows.vocab_consolidation(
+                    vault_root=root,
+                    change_date="2026-08-14",
+                    body_conflict_resolutions=resolutions,
+                )
+                self.assertTrue(preview.accepted, preview.to_dict())
+                applied = workflows.vocab_consolidation(
+                    vault_root=root,
+                    change_date="2026-08-14",
+                    existing_update_confirmed=True,
+                    body_conflict_resolutions=resolutions,
+                    mode="apply",
+                )
+                self.assertTrue(applied.accepted, applied.to_dict())
+                focus = (root / "review/focus/vocab/conflict.md").read_text(encoding="utf-8")
+                self.assertIn("Focus manual body.", focus)
+                self.assertNotIn("Base manual body.", focus)
+                archived_base = (root / "review/base/vocab/conflict.md").read_text(encoding="utf-8")
+                self.assertIn("review_status: archived", archived_base)
+                self.assertIn("Base manual body.", archived_base)
+                second = workflows.vocab_consolidation(vault_root=root, change_date="2026-08-14")
+                self.assertTrue(second.accepted, second.to_dict())
+                self.assertEqual([], second.planned_writes)
+
 
 if __name__ == "__main__":
     unittest.main()

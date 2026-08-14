@@ -32,6 +32,7 @@ CAPABILITY_FIELDS = {
     "vocab_consolidation": {
         "change_date",
         "existing_update_confirmed",
+        "body_conflict_resolutions",
     },
     "speaking_cards": {"candidate"},
     "review_rollover": {"run_date"},

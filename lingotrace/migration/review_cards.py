@@ -126,6 +126,7 @@ def vocab_consolidation(
     render_markdown: MarkdownRenderer,
     change_date: str,
     existing_update_confirmed: bool,
+    body_conflict_resolutions: dict[str, str] | None,
     mode: str,
 ) -> CommandReport:
     root = Path(vault_root)
@@ -146,6 +147,11 @@ def vocab_consolidation(
             mode,
             errors=[Finding(code="missing_path_role", message="Vocabulary consolidation requires focus_vocab_root and base_vocab_root.")],
         )
+    resolution_error = _body_conflict_resolution_error(body_conflict_resolutions, base_root=base_root)
+    if resolution_error:
+        return _report("vocab-consolidation", mode, errors=[resolution_error])
+    resolutions = dict(body_conflict_resolutions or {})
+    used_resolutions: set[str] = set()
 
     try:
         focus = _vocab_by_key(root, paths, ("focus_vocab_root",), scanner)
@@ -178,14 +184,17 @@ def vocab_consolidation(
             focus_text = focus_path.read_text(encoding="utf-8")
             focus_fields, focus_body = read_frontmatter_body(focus_text)
             if _manual_body_conflict(focus_body, base_body):
-                errors.append(
-                    Finding(
-                        code="manual_vocab_body_conflict",
-                        message="Focus and base vocabulary cards contain different non-empty bodies and require manual review.",
-                        path=base_relative,
+                if resolutions.get(base_relative) == "focus":
+                    used_resolutions.add(base_relative)
+                else:
+                    errors.append(
+                        Finding(
+                            code="manual_vocab_body_conflict",
+                            message="Focus and base vocabulary cards contain different non-empty bodies and require manual review.",
+                            path=base_relative,
+                        )
                     )
-                )
-                continue
+                    continue
             merged = _merge_vocab_fields(focus_fields, parsed_base_fields)
             lifecycle_errors = validate_review_lifecycle(merged)
             if lifecycle_errors:
@@ -252,6 +261,15 @@ def vocab_consolidation(
         )
         plans.append({"path": base_relative, "action": "archive_legacy_base_vocab", "canonical_path": target_relative})
         occupied_targets.add(target_relative)
+
+    for relative in sorted(set(resolutions) - used_resolutions):
+        errors.append(
+            Finding(
+                code="unused_body_conflict_resolution",
+                message="The confirmed focus-body resolution does not match a current manual body conflict.",
+                path=relative,
+            )
+        )
 
     if errors:
         return _report(
@@ -400,6 +418,32 @@ def _archived_base_body(body: str, canonical_path: str) -> str:
 
 def _manual_body_conflict(focus_body: str, base_body: str) -> bool:
     return bool(focus_body.strip() and base_body.strip() and focus_body.strip() != base_body.strip())
+
+
+def _body_conflict_resolution_error(resolutions: Any, *, base_root: str) -> Finding | None:
+    if resolutions is None:
+        return None
+    if not isinstance(resolutions, dict):
+        return Finding(
+            code="invalid_body_conflict_resolutions",
+            message="body_conflict_resolutions must map exact base-card paths to 'focus'.",
+        )
+    prefix = f"{base_root.rstrip('/')}/"
+    for relative, authority in resolutions.items():
+        if not isinstance(relative, str) or not relative.startswith(prefix) or not relative.endswith(".md"):
+            return Finding(
+                code="invalid_body_conflict_resolution_path",
+                message="Each body conflict resolution must target an exact Markdown path under base_vocab_root.",
+                path=str(relative),
+            )
+        parts = Path(relative).parts
+        if Path(relative).is_absolute() or ".." in parts or authority != "focus":
+            return Finding(
+                code="invalid_body_conflict_resolution",
+                message="Each body conflict resolution must use an exact safe base-card path with authority 'focus'.",
+                path=relative,
+            )
+    return None
 
 
 def _merge_lists(left: Any, right: Any) -> list[Any]:
