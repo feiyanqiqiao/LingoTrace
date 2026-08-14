@@ -5,6 +5,15 @@
 
 ---
 
+## [20260815-080855]
+### 变更 (Changed)
+- 英日语言包不再为新 Vault 声明或创建 `base_vocab_root`；`focus_vocab_root` 成为唯一默认单词目录，素材库也不再纳入已归档的旧 base 卡。
+- 普通单词维护在没有旧目录角色时可直接创建和更新 focus 卡；仍显式配置旧角色的 Vault 可继续完成只读检索与显式单词合并，迁移完成后再移除该配置。
+- 英日 Agent Skill 与共享复习契约补充旧目录角色的退役条件：状态与单词合并二次预览归零、旧链接改写完成后，可保留旧目录文件但不再将其声明为学习路径。
+
+### 测试 (Tests)
+- 新增英日初始化不创建旧单词目录、素材库排除旧 base 卡、无旧角色时仍可创建 focus 单词卡的覆盖；通过 core/migration 270、听力 112（1 skipped）、Vault 结构 23、架构 42，共 447 项 unittest。
+
 ## [20260814-183050]
 ### 新增 (Added)
 - `vocab_consolidation` 新增逐路径 `body_conflict_resolutions`：人工审核后可明确指定某张旧 base 卡采用 focus 正文权威，继续安全合并元数据并将原 base 正文保留在 archived 跳转卡中。

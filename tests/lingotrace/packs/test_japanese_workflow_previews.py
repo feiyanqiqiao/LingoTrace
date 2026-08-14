@@ -67,6 +67,13 @@ def write_source(root: Path, name: str) -> None:
     write(root / f"sources/{name}.md", f"# {name}\n")
 
 
+def remove_base_vocab_role(root: Path) -> None:
+    path = root / ".lingotrace/paths.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["path_roles"] = [entry for entry in payload["path_roles"] if entry["role"] != "base_vocab_root"]
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
 def review_card(
     *,
     track: str = "class_review",
@@ -485,6 +492,7 @@ source_notes: []
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            remove_base_vocab_role(root)
             write_source(root, "source-note")
 
             preview = workflows.review_materials(

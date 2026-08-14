@@ -183,7 +183,6 @@
       "depends_on": [],
       "read_path_roles": [
         "focus_vocab_root",
-        "base_vocab_root",
         "grammar_root",
         "error_root",
         "speaking_card_root",
@@ -220,7 +219,6 @@
       "read_path_roles": [
         "daily_notes_root",
         "focus_vocab_root",
-        "base_vocab_root",
         "grammar_root",
         "error_root",
         "speaking_card_root",
@@ -315,7 +313,6 @@
   "tag_namespace": "en",
   "default_path_roles": {
     "focus_vocab_root": "review/focus/vocab",
-    "base_vocab_root": "review/base/vocab",
     "grammar_root": "review/grammar",
     "error_root": "review/errors",
     "speaking_card_root": "speaking/cards",

@@ -29,12 +29,15 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
         self.assertEqual("write_text", planned_by_path["AGENTS.md"]["action"])
         self.assertEqual("write_json", planned_by_path[runtime_connection_relative_path()]["action"])
         self.assertEqual("create_directory", planned_by_path["review/focus/vocab"]["action"])
+        self.assertNotIn("review/base/vocab", planned_by_path)
         self.assertEqual("create_directory", planned_by_path["review/pronunciation/accent"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/focus-vocab-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/grammar-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/error-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["views/total-training.base"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["views/material-library.base"]["action"])
+        path_roles = planned_by_path[".lingotrace/paths.json"]["content"]["path_roles"]
+        self.assertNotIn("base_vocab_root", {entry["role"] for entry in path_roles})
 
         self.assertEqual(
             "vault-local-runtime-connection",

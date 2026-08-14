@@ -45,6 +45,9 @@ class EnglishVaultInitializationTests(unittest.TestCase):
             "views/material-library.base",
         ):
             self.assertIn(path, planned)
+        self.assertNotIn("review/base/vocab", planned)
+        path_roles = planned[".lingotrace/paths.json"]["content"]["path_roles"]
+        self.assertNotIn("base_vocab_root", {entry["role"] for entry in path_roles})
         self.assertIn("AGENTS.md", planned)
         runtime_path = runtime_connection_relative_path()
         self.assertEqual(current_platform(), planned[runtime_path]["content"]["platform"])
