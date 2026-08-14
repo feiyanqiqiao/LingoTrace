@@ -253,7 +253,7 @@ Acceptance criteria:
 
 - The Base template does not reference `views/review-state`.
 - The dashboard does not depend on `.lingotrace/review-state/*.json`.
-- The source state fields remain ordinary card frontmatter fields such as `done_today`, `next_review`, `review_stage`, `last_reviewed`, and `status`; a dashboard may choose a smaller displayed subset when the field is not needed for the review queue.
+- The source state fields remain ordinary card frontmatter fields such as `review_status`, `done_today`, `next_review`, `review_stage`, and `last_reviewed`; every training view filters to `review_status: queued`.
 
 Regression coverage:
 
@@ -312,7 +312,7 @@ Before adding a total-training dashboard to a new language pack:
 - Declare the dashboard artifact in the language-pack manifest.
 - Create a pack-owned `views/total-training.base` template.
 - Define the review-card roots or query scope used by the dashboard.
-- Reuse shared review-state fields such as `status`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
+- Reuse shared review-state fields such as `review_status`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
 - Define language-specific display mapping for each supported `item_type`.
 - Define fallback order for optional fields.
 - Preserve stable row targeting: file identity first, `done_today` second, deterministic sorting.

@@ -10,6 +10,12 @@ from typing import Any
 
 from lingotrace.core.mutations import FileMutation, run_file_mutations
 from lingotrace.core.reports import CommandReport, Finding
+from lingotrace.core.review_lifecycle import (
+    ACTIVE_REVIEW_STAGES,
+    effective_review_status,
+    queue_transition_updates,
+    validate_review_lifecycle,
+)
 from lingotrace.packs.japanese.validators import (
     validate_existing_review_material,
     validate_review_materials,
@@ -27,6 +33,7 @@ REVIEW_MATERIAL_ROLES = (
     "pronunciation_accent_root",
     "pronunciation_phoneme_root",
 )
+WRITABLE_REVIEW_MATERIAL_ROLES = tuple(role for role in REVIEW_MATERIAL_ROLES if role != "base_vocab_root")
 ROLLOVER_ROLES = (
     "focus_vocab_root",
     "grammar_root",
@@ -36,6 +43,7 @@ ROLLOVER_ROLES = (
     "pronunciation_accent_root",
     "pronunciation_phoneme_root",
 )
+QUEUE_ROLES = ROLLOVER_ROLES
 STAGE_ADVANCEMENT = {
     "day0": ("day1", 1),
     "day1": ("day3", 3),
@@ -330,10 +338,16 @@ def speaking_cards(
             "unreviewed_speaking_candidate",
             "Speaking cards require an explicitly reviewed candidate before write.",
         )
-    mutation = _artifact_mutation(candidate, action="write_speaking_card", reason="reviewed speaking candidate")
+    mutation = _artifact_mutation(
+        candidate,
+        action="write_speaking_card",
+        reason="reviewed speaking candidate",
+        default_review_status="backlog",
+    )
     if isinstance(mutation, Finding):
         return _workflow_error("speaking_cards-workflow", mode, mutation.code, mutation.message, mutation.path)
     root = Path(vault_root)
+    mutation = _preserve_existing_review_lifecycle(root, mutation)
     finding, read_files = _validate_chunk_candidate_identity(root, mutation)
     if finding is not None:
         return _workflow_report(
@@ -346,6 +360,164 @@ def speaking_cards(
     report = _run_mutations(root, "speaking_cards", [mutation], mode)
     report.read_files = list(dict.fromkeys([*read_files, *report.read_files]))
     return report
+
+
+def review_queue(
+    vault_root: str | Path | None = None,
+    *,
+    items: list[dict[str, Any]] | None = None,
+    change_date: str | None = None,
+    existing_update_confirmed: bool = False,
+    mode: str = "preview",
+) -> CommandReport:
+    if vault_root is None:
+        return _missing_vault_root("review_queue")
+    root = Path(vault_root)
+    errors, read_files = _target_context_errors(root, "review_queue")
+    if errors:
+        return _workflow_report("review_queue-workflow", mode, errors=errors, read_files=read_files)
+    if not isinstance(items, list) or not items:
+        return _workflow_report(
+            "review_queue-workflow",
+            mode,
+            errors=[Finding(code="missing_queue_items", message="review_queue requires a non-empty items list.", path="items")],
+            read_files=read_files,
+        )
+    queue_date = change_date or dt.date.today().isoformat()
+    try:
+        dt.date.fromisoformat(queue_date)
+    except ValueError:
+        return _workflow_report(
+            "review_queue-workflow",
+            mode,
+            errors=[Finding(code="invalid_change_date", message="change_date must use YYYY-MM-DD format.", path="change_date")],
+            read_files=read_files,
+        )
+    if mode == "apply" and not existing_update_confirmed:
+        return _workflow_report(
+            "review_queue-workflow",
+            mode,
+            errors=[
+                Finding(
+                    code="review_queue_confirmation_required",
+                    message="Applying review queue changes requires existing_update_confirmed: true.",
+                )
+            ],
+            read_files=read_files,
+        )
+
+    paths = _path_roles(root)
+    read_files.append(".lingotrace/paths.json")
+    allowed_roots = tuple(paths[role] for role in QUEUE_ROLES if paths.get(role))
+    mutations: list[FileMutation] = []
+    seen_paths: set[str] = set()
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            errors.append(
+                Finding(code="invalid_queue_item", message="Every review queue item must be an object.", path=f"items[{index}]")
+            )
+            continue
+        relative_path = item.get("path")
+        if not isinstance(relative_path, str) or not relative_path.endswith(".md"):
+            errors.append(
+                Finding(code="invalid_queue_path", message="Queue item path must be a Vault-relative Markdown path.", path=f"items[{index}].path")
+            )
+            continue
+        candidate = PurePosixPath(relative_path)
+        if candidate.is_absolute() or ".." in candidate.parts or "\\" in relative_path or _contains_control_character(relative_path):
+            errors.append(
+                Finding(code="invalid_queue_path", message="Queue item path must be a safe Vault-relative Markdown path.", path=relative_path)
+            )
+            continue
+        if relative_path in seen_paths:
+            errors.append(Finding(code="duplicate_queue_path", message="Queue item paths must be unique.", path=relative_path))
+            continue
+        seen_paths.add(relative_path)
+        if not any(_path_is_within_role(relative_path, role_root) for role_root in allowed_roots):
+            errors.append(
+                Finding(code="queue_item_outside_role", message="Queue items must stay inside configured review queue roles.", path=relative_path)
+            )
+            continue
+        card_path = root / relative_path
+        if not card_path.is_file():
+            errors.append(Finding(code="missing_queue_item", message="Queue item does not exist.", path=relative_path))
+            continue
+        read_files.append(relative_path)
+        fields = _frontmatter(card_path)
+        current_status = effective_review_status(fields)
+        if current_status == "archived":
+            errors.append(
+                Finding(code="archived_queue_item", message="Archived material must be restored before it can enter the review queue.", path=relative_path)
+            )
+            continue
+        target_status = item.get("target_status")
+        activation = item.get("activation")
+        if current_status == "mastered" and target_status == "backlog":
+            errors.append(
+                Finding(code="invalid_mastered_transition", message="Mastered material can only restart into the queue or remain mastered.", path=relative_path)
+            )
+            continue
+        if current_status == "mastered" and target_status == "queued" and activation != "restart":
+            errors.append(
+                Finding(code="mastered_restart_required", message="Mastered material requires activation: restart.", path=relative_path)
+            )
+            continue
+        updates = queue_transition_updates(
+            fields,
+            target_status=str(target_status or ""),
+            activation=str(activation) if activation is not None else None,
+            change_date=queue_date,
+        )
+        if isinstance(updates, Finding):
+            errors.append(
+                Finding(
+                    code=updates.code,
+                    message=updates.message,
+                    severity=updates.severity,
+                    path=updates.path or relative_path,
+                )
+            )
+            continue
+        if target_status == "backlog" and fields.get("review_stage") not in (None, "", *ACTIVE_REVIEW_STAGES):
+            updates.update({"review_stage": "", "next_review": ""})
+        proposed = dict(fields)
+        proposed.pop("status", None)
+        proposed.update(updates)
+        lifecycle_errors = validate_review_lifecycle(proposed)
+        if lifecycle_errors:
+            for finding in lifecycle_errors:
+                errors.append(
+                    Finding(
+                        code=finding.code,
+                        message=finding.message,
+                        severity=finding.severity,
+                        path=relative_path,
+                    )
+                )
+            continue
+        action = "queue_review_material" if target_status == "queued" else "backlog_review_material"
+        mutations.append(
+            FileMutation(
+                path=relative_path,
+                content=_replace_frontmatter_fields(
+                    card_path.read_text(encoding="utf-8"),
+                    updates,
+                    remove_fields=("status",),
+                ),
+                action=action,
+                reason=f"review lifecycle changes from {current_status} to {target_status}",
+            )
+        )
+
+    if errors:
+        return _workflow_report(
+            "review_queue-workflow",
+            mode,
+            errors=errors,
+            read_files=list(dict.fromkeys(read_files)),
+            blocked_files=[mutation.path for mutation in mutations],
+        )
+    return _run_mutations(root, "review_queue", mutations, mode)
 
 
 def review_rollover(
@@ -382,7 +554,9 @@ def review_rollover(
     mutations: list[FileMutation] = []
     for card_path, fields in _cards_for_roles(root, paths, ROLLOVER_ROLES):
         read_files.append(card_path.relative_to(root).as_posix())
-        if fields.get("status") != "active" or not _truthy(fields.get("done_today")):
+        if not _truthy(fields.get("done_today")):
+            continue
+        if effective_review_status(fields) != "queued" and fields.get("status") != "active":
             continue
         validation = validate_review_rollover(fields)
         if not validation.accepted:
@@ -425,8 +599,7 @@ def review_rollover(
             "next_review": next_review,
             "last_reviewed": rollover_date.isoformat(),
         }
-        if next_stage == "mastered":
-            updates["status"] = "mastered"
+        updates["review_status"] = "mastered" if next_stage == "mastered" else "queued"
         planned_writes.append(
             {
                 "path": card_path.relative_to(root).as_posix(),
@@ -449,25 +622,10 @@ def review_rollover(
                 content=_replace_frontmatter_fields(
                     card_path.read_text(encoding="utf-8"),
                     updates,
+                    remove_fields=("status",),
                 ),
             )
         )
-        if next_stage == "mastered" and fields.get("item_type") == "vocab":
-            base_mutation = _base_vocab_sink_mutation(root, paths, card_path, fields)
-            if isinstance(base_mutation, Finding):
-                errors.append(base_mutation)
-                continue
-            if base_mutation is not None:
-                planned_writes.append(
-                    {
-                        "path": base_mutation.path,
-                        "action": "preview_base_vocab_sink",
-                        "reason": "day180 focus vocabulary would be promoted into the base lexicon",
-                        "from_focus_path": card_path.relative_to(root).as_posix(),
-                        "status": "promoted",
-                    }
-                )
-                mutations.append(base_mutation)
 
     if mode == "apply":
         if errors:
@@ -572,7 +730,13 @@ def _run_review_material_plan(
     return report
 
 
-def _artifact_mutation(payload: dict[str, Any], *, action: str, reason: str) -> FileMutation | Finding:
+def _artifact_mutation(
+    payload: dict[str, Any],
+    *,
+    action: str,
+    reason: str,
+    default_review_status: str | None = None,
+) -> FileMutation | Finding:
     path = payload.get("path")
     body = payload.get("body")
     title = payload.get("title", "")
@@ -581,7 +745,47 @@ def _artifact_mutation(payload: dict[str, Any], *, action: str, reason: str) -> 
     if not isinstance(body, str) or not body.strip():
         return Finding(code="invalid_artifact_body", message="Artifact body must be a non-empty string.", path=path)
     content = body if body.startswith("---\n") else f"---\ntitle: {title}\nstatus: active\n---\n\n{body}\n"
+    if default_review_status is not None:
+        content = _content_with_default_review_status(content, default_review_status)
+        lifecycle_errors = validate_review_lifecycle(_frontmatter_and_body(content)[0])
+        if lifecycle_errors:
+            error = lifecycle_errors[0]
+            return Finding(code=error.code, message=error.message, path=path)
     return FileMutation(path=path, content=content, action=action, reason=reason)
+
+
+def _content_with_default_review_status(content: str, default_review_status: str) -> str:
+    fields, _ = _frontmatter_and_body(content)
+    if "review_status" in fields:
+        return content
+    updates: dict[str, Any] = {
+        "review_status": default_review_status,
+        "done_today": False,
+    }
+    if default_review_status == "backlog":
+        updates.update({"review_stage": "", "next_review": "", "last_reviewed": ""})
+    return _replace_frontmatter_fields(content, updates, remove_fields=("status",))
+
+
+def _preserve_existing_review_lifecycle(root: Path, mutation: FileMutation) -> FileMutation:
+    target = root / mutation.path
+    if not target.is_file() or not isinstance(mutation.content, str):
+        return mutation
+    existing = _frontmatter(target)
+    status = effective_review_status(existing)
+    updates: dict[str, Any] = {
+        "review_status": status,
+        "done_today": bool(existing.get("done_today")) if status == "queued" else False,
+    }
+    for field in ("review_stage", "next_review", "last_reviewed"):
+        if field in existing:
+            updates[field] = existing[field]
+    return FileMutation(
+        path=mutation.path,
+        content=_replace_frontmatter_fields(mutation.content, updates, remove_fields=("status",)),
+        action=mutation.action,
+        reason=mutation.reason,
+    )
 
 
 def _validate_chunk_candidate_identity(root: Path, mutation: FileMutation) -> tuple[Finding | None, list[str]]:
@@ -637,7 +841,12 @@ def _normalized_chunk_pattern(value: str) -> str:
 def _listening_artifact_mutations(payload: dict[str, Any]) -> list[FileMutation] | Finding:
     files = payload.get("files")
     if files is None:
-        mutation = _artifact_mutation(payload, action="write_listening_note", reason="prepared listening artifact")
+        mutation = _artifact_mutation(
+            payload,
+            action="write_listening_note",
+            reason="prepared listening artifact",
+            default_review_status="backlog",
+        )
         return mutation if isinstance(mutation, Finding) else [mutation]
     if not isinstance(files, list) or not files:
         return Finding(
@@ -676,10 +885,19 @@ def _listening_artifact_mutations(payload: dict[str, Any]) -> list[FileMutation]
                 message="Listening bundle source_path must be a filesystem path.",
                 path=path,
             )
+        normalized_content = content
+        if path.endswith(".md") and isinstance(content, str):
+            if not content.startswith("---\n"):
+                content = f"---\n---\n\n{content}"
+            normalized_content = _content_with_default_review_status(content, "backlog")
+            lifecycle_errors = validate_review_lifecycle(_frontmatter_and_body(normalized_content)[0])
+            if lifecycle_errors:
+                error = lifecycle_errors[0]
+                return Finding(code=error.code, message=error.message, path=path)
         mutations.append(
             FileMutation(
                 path=path,
-                content=content if isinstance(content, (str, bytes)) else None,
+                content=normalized_content if isinstance(normalized_content, (str, bytes)) else None,
                 source_path=source_path,
                 action=str(item.get("action") or "write_listening_artifact"),
                 reason=str(item.get("reason") or "prepared listening bundle"),
@@ -718,7 +936,7 @@ def _review_card_plan(
             message="Review card filenames must be short enough for guarded atomic writes.",
             path=path,
         )
-    if not any(paths.get(role) and _path_is_within_role(path, str(paths[role])) for role in REVIEW_MATERIAL_ROLES):
+    if not any(paths.get(role) and _path_is_within_role(path, str(paths[role])) for role in WRITABLE_REVIEW_MATERIAL_ROLES):
         return Finding(
             code="review_card_outside_role",
             message="Review card path must stay inside a configured review-material role.",
@@ -735,6 +953,12 @@ def _review_card_plan(
     if not isinstance(body, str) or not body.strip():
         return Finding(code="invalid_review_card_body", message="Review card body must contain readable review content.", path=path)
     normalized_fields = dict(fields)
+    if "status" in normalized_fields:
+        return Finding(
+            code="legacy_status_field",
+            message="New review writes must use review_status instead of status.",
+            path="status",
+        )
     source_resolution = _resolve_required_source_links(
         root,
         paths,
@@ -752,10 +976,10 @@ def _review_card_plan(
     for relation_field in ("confusable_with", "contrast_with", "related_items"):
         normalized_fields.pop(relation_field, None)
     normalized_fields.update(relations[0])
-    if not (root / path).exists() and normalized_fields.get("status") != "active":
+    if not (root / path).exists() and normalized_fields.get("review_status") != "queued":
         return Finding(
             code="invalid_new_review_status",
-            message="New review cards must start with status: active.",
+            message="New review cards must start with review_status: queued.",
             path=path,
         )
     validation = validate_review_materials(normalized_fields)
@@ -1001,7 +1225,13 @@ def _review_item_plan(
             relations = _resolve_optional_relation_links(root, paths, item_type, item, target_path=target_path)
             base_fields = _frontmatter(base_match)
             fields = _initialized_review_fields(item_type, title, item, review_date, source_links=source_links)
-            fields.update({key: value for key, value in base_fields.items() if key not in fields and value not in (None, "", [])})
+            fields.update(
+                {
+                    key: value
+                    for key, value in base_fields.items()
+                    if key not in fields and key not in {"status", "review_status"} and value not in (None, "", [])
+                }
+            )
             fields.update(_item_fields(item_type, item, title, relation_links=relations[0]))
             fields["source_notes"] = _merge_link_values(
                 base_fields.get("source_notes"),
@@ -1216,6 +1446,9 @@ def _mutation_for_existing_item(
         and source_is_new
     )
     weakness_reappeared = item_type == "error" or item.get("weakness") is True
+    current_review_status = effective_review_status(fields)
+    fields["review_status"] = current_review_status
+    updates["review_status"] = current_review_status
     fields["source_notes"] = merged_sources
     updates["source_notes"] = merged_sources
     fields["last_seen"] = review_date
@@ -1231,28 +1464,30 @@ def _mutation_for_existing_item(
         updates["error_count"] = error_count
         fields["priority"] = "high"
         updates["priority"] = "high"
-    if fields.get("status") == "mastered":
-        fields["status"] = "active"
+    if current_review_status == "mastered":
+        fields["review_status"] = "queued"
         fields["done_today"] = False
         fields["review_stage"] = "day0"
         fields["next_review"] = review_date
         fields["last_reviewed"] = ""
         updates.update(
             {
-                "status": "active",
+                "review_status": "queued",
                 "done_today": False,
                 "review_stage": "day0",
                 "next_review": review_date,
                 "last_reviewed": "",
             }
         )
-    elif fields.get("status") == "active" and (source_reappeared or weakness_reappeared):
+    elif current_review_status in {"queued", "backlog"} and (source_reappeared or weakness_reappeared):
+        fields["review_status"] = "queued"
         fields["done_today"] = False
         fields["review_stage"] = "day0"
         fields["next_review"] = review_date
         fields["last_reviewed"] = ""
         updates.update(
             {
+                "review_status": "queued",
                 "done_today": False,
                 "review_stage": "day0",
                 "next_review": review_date,
@@ -1264,7 +1499,7 @@ def _mutation_for_existing_item(
         action = "update_focus_card" if action == "update_review_card" else "reactivate_focus_card"
     return FileMutation(
         path=card_path.relative_to(root).as_posix(),
-        content=_replace_frontmatter_fields(text, updates),
+        content=_replace_frontmatter_fields(text, updates, remove_fields=("status",)),
         action=action,
         reason="existing review material matched structured item",
     )
@@ -1282,79 +1517,6 @@ def _path_collision_error(root: Path, relative_path: str, title: str) -> Finding
         message="Target review material path already exists for a different learning point.",
         path=relative_path,
     )
-
-
-def _base_vocab_sink_mutation(
-    root: Path,
-    paths: dict[str, str],
-    focus_path: Path,
-    focus_fields: dict[str, Any],
-) -> FileMutation | Finding | None:
-    base_root = paths.get("base_vocab_root")
-    if not base_root:
-        return Finding(code="missing_path_role", message="Base vocabulary path role is required for day180 vocabulary sink.", path="base_vocab_root")
-    title = str(focus_fields.get("headword") or focus_path.stem)
-    base_match = _single_review_match(root / base_root, title)
-    if isinstance(base_match, Finding):
-        return base_match
-    stable_fields = _base_vocab_fields_from_focus(focus_fields, title)
-    if base_match is not None:
-        base_text = base_match.read_text(encoding="utf-8")
-        base_fields, base_body = _frontmatter_and_body(base_text)
-        merged_fields = dict(base_fields)
-        merged_fields.update(stable_fields)
-        merged_fields["source_notes"] = _merge_link_values(base_fields.get("source_notes"), focus_fields.get("source_notes"))
-        return FileMutation(
-            path=base_match.relative_to(root).as_posix(),
-            content=_render_markdown(merged_fields, base_body),
-            action="sink_focus_vocab_to_base",
-            reason="day180 focus vocabulary completed and updates the base lexicon",
-        )
-
-    target_path = f"{base_root}/{_safe_card_filename(title)}.md"
-    collision_error = _path_collision_error(root, target_path, title)
-    if collision_error is not None:
-        return collision_error
-    generated_body = _generated_review_body("vocab", stable_fields, stable_fields)
-    assert isinstance(generated_body, str)
-    return FileMutation(
-        path=target_path,
-        content=_render_markdown(stable_fields, generated_body),
-        action="sink_focus_vocab_to_base",
-        reason="day180 focus vocabulary completed and creates a base lexicon record",
-    )
-
-
-def _base_vocab_fields_from_focus(focus_fields: dict[str, Any], title: str) -> dict[str, Any]:
-    fields: dict[str, Any] = {
-        "track": "base_vocab",
-        "item_type": "vocab",
-        "status": "promoted",
-        "priority": focus_fields.get("priority", "normal"),
-        "done_today": False,
-        "headword": title,
-    }
-    for key in (
-        "reading",
-        "accent_display",
-        "meaning_zh",
-        "collocations",
-        "confusable_with",
-        "contrast_with",
-        "kanji_diff",
-        "kanji_diff_pairs",
-        "source_notes",
-        "first_seen",
-        "last_seen",
-        "seen_count",
-        "error_count",
-        "last_reviewed",
-        "tags",
-    ):
-        value = focus_fields.get(key)
-        if value not in (None, ""):
-            fields[key] = value
-    return fields
 
 
 def _review_material_validation_error(fields: dict[str, Any], path: str) -> Finding | None:
@@ -1377,7 +1539,7 @@ def _initialized_review_fields(
     fields: dict[str, Any] = {
         "track": track,
         "item_type": item_type,
-        "status": "active",
+        "review_status": "queued",
         "priority": str(item.get("priority") or "normal"),
         "done_today": False,
         "first_seen": review_date,
@@ -2504,7 +2666,12 @@ def _frontmatter(path: Path) -> dict[str, Any]:
     return _parse_frontmatter_fields(parts[1])
 
 
-def _replace_frontmatter_fields(text: str, updates: dict[str, Any]) -> str:
+def _replace_frontmatter_fields(
+    text: str,
+    updates: dict[str, Any],
+    *,
+    remove_fields: tuple[str, ...] = (),
+) -> str:
     if not text.startswith("---\n"):
         return text
     parts = text.split("---\n", 2)
@@ -2525,6 +2692,9 @@ def _replace_frontmatter_fields(text: str, updates: dict[str, Any]) -> str:
             continue
         key, _ = line.split(":", 1)
         clean_key = key.strip()
+        if clean_key in remove_fields:
+            skip_list_items = True
+            continue
         if clean_key in updates:
             updated_lines.extend(_frontmatter_lines(clean_key, updates[clean_key]))
             seen.add(clean_key)

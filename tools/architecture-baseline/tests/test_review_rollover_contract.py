@@ -72,7 +72,6 @@ class ReviewRolloverContractTests(unittest.TestCase):
         self.assertIn("day0-done.md", planned_by_name)
         self.assertIn("day1-overdue.md", planned_by_name)
         self.assertIn("day180-done.md", planned_by_name)
-        self.assertIn("合成完成.md", planned_by_name)
         self.assertNotIn("inactive-done.md", planned_by_name)
         self.assertNotIn("active-not-done.md", planned_by_name)
         self.assertEqual("day1", planned_by_name["day0-done.md"]["to_review_stage"])
@@ -82,7 +81,6 @@ class ReviewRolloverContractTests(unittest.TestCase):
         self.assertTrue(planned_by_name["day1-overdue.md"]["delay_rescheduled"])
         self.assertEqual("mastered", planned_by_name["day180-done.md"]["to_review_stage"])
         self.assertEqual("", planned_by_name["day180-done.md"]["to_next_review"])
-        self.assertEqual("preview_base_vocab_sink", planned_by_name["合成完成.md"]["action"])
 
     def test_apply_updates_done_today_review_stage_next_review_and_mastered_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -91,17 +89,17 @@ class ReviewRolloverContractTests(unittest.TestCase):
 
             day0 = (vault / "synthetic-study/focus-vocab/day0-done.md").read_text(encoding="utf-8")
             day180 = (vault / "synthetic-study/focus-vocab/day180-done.md").read_text(encoding="utf-8")
-            base = (vault / "synthetic-study/base-vocab/合成完成.md").read_text(encoding="utf-8")
+            base = vault / "synthetic-study/base-vocab/合成完成.md"
 
         self.assertTrue(report.accepted, report.to_dict())
         self.assertIn("done_today: false", day0)
         self.assertIn("review_stage: day1", day0)
         self.assertIn("next_review: 2026-06-19", day0)
-        self.assertIn("status: mastered", day180)
+        self.assertIn("review_status: mastered", day180)
+        self.assertNotIn("status: active", day180)
         self.assertIn("review_stage: mastered", day180)
         self.assertIn("next_review: ", day180)
-        self.assertIn("status: promoted", base)
-        self.assertIn("headword: 合成完成", base)
+        self.assertFalse(base.exists())
 
     def test_validation_failure_blocks_planning_before_any_write_is_applied(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

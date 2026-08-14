@@ -1,7 +1,7 @@
 ---
 track: survival_speaking
 item_type: chunk
-status: template
+review_status: backlog
 priority: normal
 done_today: false
 scene: chunk_practice
@@ -20,7 +20,7 @@ first_seen:
 last_seen:
 seen_count: 0
 error_count: 0
-review_stage: day0
+review_stage: ""
 next_review:
 last_reviewed: ""
 tags:

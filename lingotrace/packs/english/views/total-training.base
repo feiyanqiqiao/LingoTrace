@@ -11,8 +11,8 @@ formulas:
   priority_rank: if(priority == "high", 0, 1)
   due_days: if(next_review, (date(next_review) - today()).days, "")
   item_type_label: if(item_type == "chunk", "语块", if(item_type == "speaking_card", "口语卡", item_type))
-  due_flag: 'if(status == "active" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
-  next_day_flag: 'if(status == "active" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
+  due_flag: 'if(review_status == "queued" && next_review && date(next_review) <= today() && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
+  next_day_flag: 'if(review_status == "queued" && next_review && date(next_review) <= today() + "1d" && !(last_reviewed && date(last_reviewed) >= today()), true, false)'
   core_text: 'if(item_type == "vocab", if(ipa, ipa, if(english_definition, english_definition, if(headword, headword, if(meaning_zh, meaning_zh, file.name)))), if(item_type == "grammar", if(meaning_zh, meaning_zh, if(pattern, pattern, file.name)), if(item_type == "error", if(correct_form, correct_form, file.name), if(item_type == "chunk", if(chunk_pattern, chunk_pattern, if(en_text, en_text, file.name)), if(track == "survival_speaking", if(en_text, en_text, file.name), if(track == "listening", if(daily_use_sentences, daily_use_sentences, if(practice_focus, practice_focus, file.name)), if(item_type == "pronunciation", if(target_text, target_text, file.name), file.name)))))))'
   support_text: 'if(item_type == "vocab", if(collocations, collocations, if(meaning_zh, meaning_zh, "")), if(item_type == "grammar", if(formation, formation, ""), if(item_type == "error", if(wrong_form, wrong_form, if(reason, reason, "")), if(item_type == "chunk", if(chunk_meaning_zh, if(en_text, chunk_meaning_zh + " / 例: " + en_text, chunk_meaning_zh), if(en_text, en_text, "")), if(track == "survival_speaking", if(reply_hint, if(meaning_zh, meaning_zh + " / 回应: " + reply_hint, reply_hint), if(meaning_zh, meaning_zh, "")), if(track == "listening", if(practice_focus, practice_focus, if(weak_points, weak_points, "")), if(item_type == "pronunciation", if(issue_tags, issue_tags, ""), "")))))))'
   pressure: if(error_count, error_count, 0) + if(seen_count, seen_count, 0) + if(attempt_count, attempt_count, 0)
@@ -93,7 +93,7 @@ views:
     filters:
       and:
         - track == "class_review"
-        - status == "active"
+        - review_status == "queued"
         - priority == "high" || error_count > 0 || seen_count >= 2
     order:
       - file.name
@@ -108,7 +108,7 @@ views:
     filters:
       and:
         - track == "survival_speaking"
-        - status == "active"
+        - review_status == "queued"
     order:
       - file.name
       - formula.item_type_label
@@ -121,7 +121,7 @@ views:
     filters:
       and:
         - track == "listening"
-        - status == "active"
+        - review_status == "queued"
     order:
       - file.name
       - difficulty
@@ -135,7 +135,7 @@ views:
     filters:
       and:
         - track == "pronunciation"
-        - status == "active"
+        - review_status == "queued"
     order:
       - file.name
       - target_text
@@ -148,7 +148,7 @@ views:
       and:
         - track == "pronunciation"
         - pronunciation_kind == "accent"
-        - status == "active"
+        - review_status == "queued"
     order:
       - file.name
       - target_text
@@ -161,7 +161,7 @@ views:
       and:
         - track == "pronunciation"
         - pronunciation_kind == "phoneme"
-        - status == "active"
+        - review_status == "queued"
     order:
       - file.name
       - target_text
@@ -172,6 +172,7 @@ views:
     name: 最近新增
     filters:
       and:
+        - review_status == "queued"
         - formula.recent_flag == true
     order:
       - file.name
@@ -186,7 +187,10 @@ views:
       file.name: 260
   - type: table
     name: 重复出现 / 反复出错
-    filters: seen_count >= 2 || error_count >= 2 || attempt_count >= 2
+    filters:
+      and:
+        - review_status == "queued"
+        - seen_count >= 2 || error_count >= 2 || attempt_count >= 2
     order:
       - file.name
       - formula.track_label

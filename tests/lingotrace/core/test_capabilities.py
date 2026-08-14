@@ -58,6 +58,7 @@ class CapabilityRegistryTests(unittest.TestCase):
                 "listening_notes",
                 "source_notes",
                 "review_materials",
+                "review_queue",
                 "speaking_cards",
                 "review_rollover",
                 "total_training_dashboard",

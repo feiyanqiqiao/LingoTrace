@@ -4,13 +4,14 @@ import datetime as dt
 from typing import Any
 
 from lingotrace.core.reports import CommandReport, Finding
+from lingotrace.core.review_lifecycle import validate_review_lifecycle
 
 
 def validate_review_materials(card: dict[str, Any]) -> CommandReport:
     required = (
         "track",
         "item_type",
-        "status",
+        "review_status",
         "priority",
         "done_today",
         "source_notes",
@@ -27,8 +28,7 @@ def validate_review_materials(card: dict[str, Any]) -> CommandReport:
     if errors:
         return _validation_report("validate-review-materials", errors)
 
-    if not isinstance(card.get("done_today"), bool):
-        errors.append(Finding(code="invalid_field_type", message="done_today must be a boolean.", path="done_today"))
+    errors.extend(validate_review_lifecycle(card))
     for field in ("seen_count", "error_count"):
         value = card.get(field)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -42,18 +42,6 @@ def validate_review_materials(card: dict[str, Any]) -> CommandReport:
             errors.append(Finding(code="invalid_date", message=f"{field} must use YYYY-MM-DD format.", path=field))
     if card.get("last_reviewed") not in (None, "") and not _valid_date(card.get("last_reviewed")):
         errors.append(Finding(code="invalid_date", message="last_reviewed must be blank or use YYYY-MM-DD format.", path="last_reviewed"))
-    status = card.get("status")
-    review_stage = card.get("review_stage")
-    if status not in {"active", "mastered", "promoted"}:
-        errors.append(Finding(code="invalid_review_status", message="status must be active, mastered, or promoted.", path="status"))
-    elif status == "active":
-        if not _valid_date(card.get("next_review")):
-            errors.append(Finding(code="invalid_date", message="Active review material requires next_review in YYYY-MM-DD format.", path="next_review"))
-        if review_stage not in {"day0", "day1", "day3", "day7", "day14", "day30", "day90", "day180"}:
-            errors.append(Finding(code="invalid_review_stage", message="Active review_stage must use a supported day stage.", path="review_stage"))
-    elif status == "mastered" and (review_stage != "mastered" or card.get("next_review") not in (None, "")):
-        errors.append(Finding(code="invalid_review_stage", message="Mastered review material requires review_stage: mastered and blank next_review.", path="review_stage"))
-
     item_type = str(card.get("item_type", ""))
     if item_type == "vocab":
         errors.extend(_non_empty_field_errors(card, ("headword", "ipa", "meaning_zh")))
@@ -80,8 +68,8 @@ def validate_existing_review_material(card: dict[str, Any]) -> CommandReport:
     """Recognize readable legacy cards without requiring an in-place migration."""
 
     errors = _missing_field_errors(card, ("item_type", "review_stage"))
-    if any(field in card for field in ("status", "done_today", "next_review")):
-        errors.extend(_missing_field_errors(card, ("status", "done_today", "next_review")))
+    if any(field in card for field in ("review_status", "status", "done_today", "next_review")):
+        errors.extend(_missing_field_errors(card, ("done_today", "next_review")))
 
     item_type = str(card.get("item_type", ""))
     if item_type == "vocab":

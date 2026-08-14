@@ -34,6 +34,7 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/grammar-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["templates/error-card.md"]["action"])
         self.assertEqual("copy_pack_artifact", planned_by_path["views/total-training.base"]["action"])
+        self.assertEqual("copy_pack_artifact", planned_by_path["views/material-library.base"]["action"])
 
         self.assertEqual(
             "vault-local-runtime-connection",
@@ -57,6 +58,7 @@ class JapaneseVaultInitializationTests(unittest.TestCase):
                 "listening_notes",
                 "source_notes",
                 "review_materials",
+                "review_queue",
                 "speaking_cards",
                 "review_rollover",
                 "total_training_dashboard",

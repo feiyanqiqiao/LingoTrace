@@ -1,13 +1,24 @@
 ---
 track: survival_speaking
 item_type: speaking_card
-status: active
-review_stage: 0
+review_status: backlog
+priority: normal
+done_today: false
 scene:
 jp_text:
 meaning_zh:
 reply_hint:
-next_review:
+source_notes: []
+first_seen:
+last_seen:
+seen_count: 0
+error_count: 0
+review_stage: ""
+next_review: ""
+last_reviewed: ""
+tags:
+  - jp/survival
+  - jp/speaking
 ---
 
 # {{scene}}

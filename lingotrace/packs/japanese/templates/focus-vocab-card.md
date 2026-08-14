@@ -1,7 +1,7 @@
 ---
 track: class_review
 item_type: vocab
-status: active
+review_status: queued
 priority: normal
 done_today: false
 headword: "{{headword}}"

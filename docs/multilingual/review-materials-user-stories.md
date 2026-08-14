@@ -47,7 +47,7 @@ Labels:
 | `US-3` Preserve source provenance                      | `Required`          | `Covered` | `Covered` | English resolves and appends canonical source links without replacing manual content.          |
 | `US-4` Initialize new active review cards              | `Required`          | `Covered` | `Covered` | Shared SRS initialization fields are expected for active review cards.                        |
 | `US-5` Reactivate known material                       | `Required`          | `Covered` | `Covered` | English restores mastered focus/base vocabulary to day0 through the guarded workflow.          |
-| `US-6` Keep base lexicon sink out of extraction        | `Required`          | `Covered` | `Covered` | English restores a base match into focus rather than mutating the mastery sink.                |
+| `US-6` Keep base lexicon read only in daily workflows  | `Required`          | `Covered` | `Covered` | English restores a base match into focus without mutating the legacy base card.                 |
 | `US-7` Preserve language-specific review cues          | `Language-Specific` | `Covered` | `Covered` | English owns IPA, word stress, English definitions, collocations, and CEFR cues.               |
 | `US-8` Image-backed vocabulary extraction              | `Optional`          | `Covered` | `Covered` | English enforces the same structured visual/manual inspection evidence contract.               |
 | `US-9` Daily checklist separation                      | `Optional`          | `Covered` | `Covered` | English checklist updates are explicit, confirmed, and isolated from SRS fields.               |
@@ -158,13 +158,13 @@ Regression coverage:
 - `test_review_materials_apply_creates_target_card`
 - `test_review_materials_item_resets_reappearing_active_focus_to_day0_without_body_loss`
 
-### 4. Initialize New Active Review Cards Predictably
+### 4. Initialize New Queued Review Cards Predictably
 
 As a learner, I want newly extracted review cards to enter the active review loop with predictable scheduling fields, so they appear in the daily review queue.
 
 Acceptance criteria:
 
-- New active cards are initialized with `status: active`.
+- New review cards are initialized with `review_status: queued`.
 - New active cards start at `review_stage: day0`.
 - `done_today` starts as false unless the user explicitly asks for a different state.
 - `next_review` is initialized to the creation or extraction date according to the language pack's review policy.
@@ -172,7 +172,7 @@ Acceptance criteria:
 
 Japanese reference:
 
-- Focus vocabulary cards use `track: class_review`, `item_type: vocab`, `status`, `priority`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
+- Focus vocabulary cards use `track: class_review`, `item_type: vocab`, `review_status`, `priority`, `done_today`, `review_stage`, `next_review`, and `last_reviewed`.
 - Grammar and error cards use the same active-review scheduling family.
 
 Regression coverage:
@@ -212,27 +212,27 @@ Regression coverage:
 - `test_review_materials_item_resets_reappearing_errors_and_grammar_weaknesses`
 - `test_review_materials_item_reactivates_mastered_focus_card`
 
-### 6. Keep Base Lexicon Sink Out Of Daily Extraction
+### 6. Keep Base Lexicon Read Only During Normal Learning
 
-As a learner, I want ordinary classroom extraction to create active focus cards first, so base vocabulary promotion happens only after review mastery, not during material extraction.
+As a learner, I want ordinary classroom extraction to create canonical focus cards, while the legacy base directory remains read-only compatibility data.
 
 Acceptance criteria:
 
 - Ordinary new vocabulary extraction creates or updates the focus review layer first.
 - A base-only match restores or creates an active focus card instead of treating the item as already handled.
 - Daily extraction must not directly sink new vocabulary into base vocabulary.
-- Focus-to-base promotion is owned by `review_rollover` when a focus vocabulary card completes the full memory curve.
+- Completing the memory curve marks the original focus vocabulary card as mastered without creating a second copy.
 - Extraction must not erase existing base-card manual content.
 
 Japanese reference:
 
-- Completed focus vocabulary can sink into the base lexicon with `status: promoted` during `review_rollover`.
-- `review_materials` only uses base vocabulary for duplicate detection and focus restoration.
+- `review_materials` uses base vocabulary only for duplicate detection and focus restoration during the compatibility period.
+- Consolidation of legacy base vocabulary is an explicit migration, not a daily review or extraction side effect.
 
 Regression coverage:
 
 - `test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base`
-- `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body`
+- `test_review_rollover_mastery_does_not_rewrite_existing_base_vocab`
 
 ### 7. Preserve Language-Specific Review Cues
 
@@ -431,7 +431,7 @@ Regression coverage:
 | Source provenance | `test_review_materials_apply_creates_target_card`; `test_review_materials_item_keeps_distinct_same_basename_source_paths`; `test_review_materials_item_does_not_guess_ambiguous_legacy_source_links` | Covered by the real workflow | Yes |
 | New active card initialization | `test_review_materials_item_creates_initialized_focus_vocab_card` | Covered for structured items | Yes |
 | Base-only restore does not rewrite base card | `test_review_materials_item_restores_base_only_vocab_to_focus_without_touching_base` | Covered | Yes |
-| Focus-to-base sink on mastery | `test_review_rollover_sinks_day180_focus_vocab_to_base_without_losing_manual_body` | Covered by `review_rollover` | Yes |
+| Mastery does not create a base duplicate | `test_review_rollover_does_not_create_base_vocab_after_day180` | Covered by `review_rollover` | Yes |
 | Japanese kanji-difference metadata | `test_vocab_sink_preserves_japanese_fields_srs_state_and_manual_body` | Covered for Japanese | No, language-specific |
 | Image-backed vocabulary extraction | `test_review_materials_item_requires_real_image_inspection_evidence`; `test_review_materials_item_does_not_repeat_vocab_already_written_in_source_text` | Covered for structured items | If supported |
 | Daily checklist separation | `test_review_materials_daily_checklist_requires_explicit_confirmed_structured_update`; `test_review_materials_daily_checklist_replaces_only_managed_block_and_rejects_unsafe_payloads` | Covered for structured updates | If supported |

@@ -20,7 +20,7 @@ Choose an actually runnable Python 3.11+ launcher and refer to it below as `<pyt
 <python-command> -m lingotrace.agent <capability> --vault <current-vault> --payload <temporary-utf8-json> --report-json <temporary-report-json>
 ```
 
-The capability is one of `listening_notes`, `source_notes`, `review_materials`, `speaking_cards`, or `review_rollover`. Build the payload from the natural-language request; never ask the user to prepare this internal JSON. Keep temporary payloads and reports outside the Vault, delete them after use, preview before adding `--apply`, and trust the structured exit report rather than localized console text. The CLI fixes `vault_root` and `mode` from its own arguments, rejects unknown or reserved payload fields, selects the language pack from `.lingotrace/vault-context.json`, and still routes every mutation through the core guard.
+The capability is one of `listening_notes`, `source_notes`, `review_materials`, `review_queue`, `speaking_cards`, or `review_rollover`. Build the payload from the natural-language request; never ask the user to prepare this internal JSON. Keep temporary payloads and reports outside the Vault, delete them after use, preview before adding `--apply`, and trust the structured exit report rather than localized console text. The CLI fixes `vault_root` and `mode` from its own arguments, rejects unknown or reserved payload fields, selects the language pack from `.lingotrace/vault-context.json`, and still routes every mutation through the core guard.
 
 ## Daily Runtime Update
 
@@ -39,6 +39,7 @@ Use these intent families:
 - Audio or video to listening material: create or update a listening note, intensive listening script, extensive listening note, transcript-backed note, or audio slices.
 - Source material to study note: turn an article, transcript, URL, screenshot text, video content, or pasted text into a traceable English study note.
 - Word, grammar, pronunciation, or error to review: add, update, deduplicate, or organize review material.
+- Material lifecycle change: add an existing item to review, remove it from the queue while retaining progress, or restart mastered material.
 - Reviewed chunk or useful sentence to active output: create, merge, or update a speaking card for language the user wants to be able to say.
 - End-of-day review settlement: advance completed review items, update next review dates, or close today's review.
 - Dashboard or view maintenance: update how a table, Base, filter, formula, column, sort order, or view displays learning items.
@@ -67,6 +68,7 @@ Map intuitive study requests to the English pack capabilities:
 | 请把这段音频做成精听稿 / 听力笔记 / 泛听笔记 | Listening note task | `listening_notes` |
 | 帮我把这篇材料整理成英语学习笔记 / 生成学习笔记 | Source note task | `source_notes` |
 | 把这个词加入复习 / 建词卡 / 建语法卡 | Review material task | `review_materials` |
+| 把这些素材加入复习 / 先退出复习队列 / 重新学习这张卡 | Review queue task | `review_queue` |
 | 把我已经 review 的这些语块转入口语库 / 这句话很实用，帮我做成口语卡 | Speaking card task | `speaking_cards` |
 | 今天复习结束了，帮我结算 / 结算复习 / 更新总训练表 / 请更新总训练表 | Review rollover task | `review_rollover` |
 
@@ -85,6 +87,8 @@ Avoid asking users to say implementation phrases such as internal workflow names
 Agent Skill must not write Vault files directly. Vault file changes must route through the LingoTrace core write guard and the English pack capability that matches the task.
 
 Review rollover is card-frontmatter backed: settlement reads and updates the configured review cards directly. The Obsidian total-training Base reads ordinary card frontmatter. Do not create or rely on a parallel review-state JSON store or generated review-state snapshot notes.
+
+New vocabulary, grammar, explicit-error, and pronunciation-weakness cards default to `review_status: queued` with `review_stage: day0`. Listening notes, speaking cards, and chunks default to `review_status: backlog` with no schedule. Only create those material types as `queued/day0` when the user explicitly asks to add them to review in the same request. Never toggle `review_status` by hand: use `review_queue` so resume/restart dates and lifecycle constraints are initialized together.
 
 Before a write-capable task, the agent must confirm the learning library context exists and that the matching capability is enabled. If context or capability checks fail, stop before writing and explain the missing setup in user-facing language.
 
@@ -205,4 +209,4 @@ The extraction and promotion phases must never run in the same user task, even w
 
 For requests such as "今天复习结束了，帮我结算", run an internal preview first. If the preview is accepted and has no errors, apply the rollover immediately and run a second preview to verify no planned review writes remain.
 
-After settlement, report the count of cards advanced, cards that became mastered, day180 focus vocabulary cards promoted into base vocabulary, delayed reschedules, blocked cards, and the second-preview result. Settlement may write base vocabulary only for the controlled day180 vocabulary mastery sink; broad base vocabulary merges, moves, deletions, rewrites, and daily-note summaries require a separate explicit content-maintenance task.
+After settlement, report the count of cards advanced, cards that became mastered, delayed reschedules, blocked cards, and the second-preview result. Mastery updates the canonical card in place. Settlement never writes base vocabulary; legacy base consolidation and daily-note summaries require separate explicit maintenance tasks.
