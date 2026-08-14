@@ -1256,9 +1256,9 @@ def _review_item_plan(
     if item_type == "vocab":
         focus_root = paths.get("focus_vocab_root")
         base_root = paths.get("base_vocab_root")
-        if not focus_root or not base_root:
-            return Finding(code="missing_path_role", message="Vocabulary review requires focus and base path roles.", path="focus_vocab_root")
-        if not _is_safe_role_root(focus_root) or not _is_safe_role_root(base_root):
+        if not focus_root:
+            return Finding(code="missing_path_role", message="Vocabulary review requires focus_vocab_root.", path="focus_vocab_root")
+        if not _is_safe_role_root(focus_root) or (base_root is not None and not _is_safe_role_root(base_root)):
             return Finding(code="invalid_path_role", message="Vocabulary path roles must be safe Vault-relative paths.", path="focus_vocab_root")
         focus_match = _single_review_match(root / focus_root, title)
         if isinstance(focus_match, Finding):
@@ -1267,7 +1267,7 @@ def _review_item_plan(
             target_match = focus_match
             target_role = "focus_vocab_root"
         base_match: Path | None = None
-        if target_match is None:
+        if target_match is None and base_root is not None:
             base_match = _single_review_match(root / base_root, title)
             if isinstance(base_match, Finding):
                 return base_match

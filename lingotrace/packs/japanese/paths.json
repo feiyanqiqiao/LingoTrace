@@ -1,7 +1,6 @@
 {
   "default_path_roles": {
     "focus_vocab_root": "review/focus/vocab",
-    "base_vocab_root": "review/base/vocab",
     "grammar_root": "review/grammar",
     "error_root": "review/errors",
     "speaking_card_root": "speaking/cards",

@@ -3,7 +3,6 @@ filters:
     - file.ext == "md"
     - or:
         - track == "class_review"
-        - track == "base_vocab"
         - track == "survival_speaking"
         - track == "listening"
         - track == "pronunciation"

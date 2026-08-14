@@ -59,7 +59,7 @@ The stable `review_queue` capability accepts exact Vault-relative Markdown paths
 
 `review_rollover` processes only `queued && done_today`. Completing `day180` marks the original card `mastered`; it does not create or update a second base-vocabulary copy.
 
-`base_vocab_root` remains readable for compatibility but accepts no new review-material or rollover writes. Consolidating legacy base cards is a separate explicit migration.
+New and fully migrated Vaults use `focus_vocab_root` as the only vocabulary path role. They do not declare `base_vocab_root`, and the material library does not include archived base-vocabulary records. An older Vault may retain the legacy role temporarily so its explicit consolidation can finish; normal review-material creation and rollover never write there.
 
 ## Legacy Lifecycle Migration
 
@@ -76,7 +76,7 @@ Legacy mapping is conservative:
 
 ## Vocabulary Consolidation
 
-`vocab_consolidation` runs only after lifecycle migration and keeps `focus_vocab_root` as the single canonical vocabulary directory.
+`vocab_consolidation` runs only after lifecycle migration and keeps `focus_vocab_root` as the single canonical vocabulary directory. It is a compatibility operation for older Vaults that still explicitly configure `base_vocab_root`; new Vaults do not create or configure that directory.
 
 - Base-only unscheduled cards become focus backlog cards; legacy promoted cards become focus mastered cards; real schedules remain queued.
 - For a duplicate, focus frontmatter, schedule, and body are authoritative. Base fills only blank scalar fields and contributes deduplicated lists and sources.
@@ -85,3 +85,4 @@ Legacy mapping is conservative:
 - A confirmed focus-body resolution keeps the focus body and schedule, applies the ordinary safe metadata merge, and preserves the original base body in the archived redirect.
 - A successfully consolidated base card is retained at its old path with `review_status: archived`, a canonical-card link, and an in-note redirect. It is never deleted.
 - A second preview after apply must report zero remaining consolidation writes.
+- After that zero-write verification and inbound-link migration, remove `base_vocab_root` from the Vault path configuration. The archived directory may remain on disk until the user chooses a later cleanup.

@@ -19,7 +19,6 @@ PATHS_PATH = PACK_ROOT / "paths.json"
 
 EXPECTED_PATH_ROLES = {
     "focus_vocab_root": "review/focus/vocab",
-    "base_vocab_root": "review/base/vocab",
     "grammar_root": "review/grammar",
     "error_root": "review/errors",
     "speaking_card_root": "speaking/cards",
@@ -96,6 +95,13 @@ def create_target_context(root: Path) -> None:
             ensure_ascii=False,
         ),
     )
+
+
+def remove_base_vocab_role(root: Path) -> None:
+    path = root / ".lingotrace/paths.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["path_roles"] = [entry for entry in payload["path_roles"] if entry["role"] != "base_vocab_root"]
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
 def review_card(
@@ -337,6 +343,7 @@ ipa: /tɛst/
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             create_target_context(root)
+            remove_base_vocab_role(root)
             write(root / "sources/source-note.md", "# Source\n")
 
             preview = workflows.review_materials(
@@ -982,6 +989,8 @@ Review card body.
 
     def test_material_library_surfaces_backlog_and_mastered_without_editable_status_column(self) -> None:
         content = (PACK_ROOT / "views" / "material-library.base").read_text(encoding="utf-8")
+
+        self.assertNotIn('track == "base_vocab"', content)
         for name in ("待加入复习", "听力素材", "生活口语与语块", "词汇语法素材", "已掌握"):
             self.assertIn(f"name: {name}", content)
         self.assertIn('review_status == "backlog"', content)
