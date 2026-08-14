@@ -103,7 +103,7 @@ class ReviewCardMigrationTests(unittest.TestCase):
             with self.subTest(pack=pack), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 prepare(root, pack, language)
-                write(root / "review/base/vocab/backlog.md", {"track": "base_vocab", "item_type": "vocab", "review_status": "backlog", "done_today": False, "review_stage": "", "next_review": "", "headword": "backlog"})
+                write(root / "review/base/vocab/backlog.md", {"review_status": "backlog", "done_today": False, "review_stage": "", "next_review": "", "headword": "backlog"})
                 write(root / "review/base/vocab/mastered.md", {"track": "base_vocab", "item_type": "vocab", "review_status": "mastered", "done_today": False, "review_stage": "mastered", "next_review": "", "headword": "mastered"})
                 write(root / "review/base/vocab/queued.md", {"track": "base_vocab", "item_type": "vocab", "review_status": "queued", "done_today": False, "review_stage": "day30", "next_review": "2026-08-20", "headword": "queued"})
                 focus_fields = queued_vocab("duplicate")
