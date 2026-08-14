@@ -24,6 +24,9 @@ class AgentCliTests(unittest.TestCase):
                 "listening_notes",
                 "source_notes",
                 "review_materials",
+                "review_queue",
+                "review_lifecycle_migration",
+                "vocab_consolidation",
                 "speaking_cards",
                 "review_rollover",
             ):
@@ -39,7 +42,11 @@ class AgentCliTests(unittest.TestCase):
                         ]
                     )
                     report = json.loads(result.stdout)
-                    self.assertEqual(f"{capability}-workflow", report["command"])
+                    expected_command = {
+                        "review_lifecycle_migration": "review-lifecycle-migration",
+                        "vocab_consolidation": "vocab-consolidation",
+                    }.get(capability, f"{capability}-workflow")
+                    self.assertEqual(expected_command, report["command"])
                     self.assertEqual("preview", report["mode"])
                     self.assertIn("accepted", report)
 

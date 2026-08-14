@@ -16,6 +16,10 @@ from lingotrace.core.review_lifecycle import (
     queue_transition_updates,
     validate_review_lifecycle,
 )
+from lingotrace.migration.review_cards import (
+    review_lifecycle_migration as run_review_lifecycle_migration,
+    vocab_consolidation as run_vocab_consolidation,
+)
 from lingotrace.packs.japanese.validators import (
     validate_existing_review_material,
     validate_review_materials,
@@ -44,6 +48,7 @@ ROLLOVER_ROLES = (
     "pronunciation_phoneme_root",
 )
 QUEUE_ROLES = ROLLOVER_ROLES
+MIGRATION_ROLES = tuple(dict.fromkeys((*REVIEW_MATERIAL_ROLES, *ROLLOVER_ROLES)))
 STAGE_ADVANCEMENT = {
     "day0": ("day1", 1),
     "day1": ("day3", 3),
@@ -518,6 +523,58 @@ def review_queue(
             blocked_files=[mutation.path for mutation in mutations],
         )
     return _run_mutations(root, "review_queue", mutations, mode)
+
+
+def review_lifecycle_migration(
+    vault_root: str | Path | None = None,
+    *,
+    change_date: str | None = None,
+    existing_update_confirmed: bool = False,
+    mode: str = "preview",
+) -> CommandReport:
+    if vault_root is None:
+        return _missing_vault_root("review_lifecycle_migration")
+    root = Path(vault_root)
+    errors, read_files = _target_context_errors(root, "review_lifecycle_migration")
+    if errors:
+        return _workflow_report("review-lifecycle-migration", mode, errors=errors, read_files=read_files)
+    return run_review_lifecycle_migration(
+        vault_root=root,
+        manifest_path=MANIFEST_PATH,
+        paths=_path_roles(root),
+        roles=MIGRATION_ROLES,
+        scanner=_cards_for_roles,
+        replace_frontmatter=_replace_frontmatter_fields,
+        change_date=change_date or dt.date.today().isoformat(),
+        existing_update_confirmed=existing_update_confirmed,
+        mode=mode,
+    )
+
+
+def vocab_consolidation(
+    vault_root: str | Path | None = None,
+    *,
+    change_date: str | None = None,
+    existing_update_confirmed: bool = False,
+    mode: str = "preview",
+) -> CommandReport:
+    if vault_root is None:
+        return _missing_vault_root("vocab_consolidation")
+    root = Path(vault_root)
+    errors, read_files = _target_context_errors(root, "vocab_consolidation")
+    if errors:
+        return _workflow_report("vocab-consolidation", mode, errors=errors, read_files=read_files)
+    return run_vocab_consolidation(
+        vault_root=root,
+        manifest_path=MANIFEST_PATH,
+        paths=_path_roles(root),
+        scanner=_cards_for_roles,
+        read_frontmatter_body=_frontmatter_and_body,
+        render_markdown=_render_markdown,
+        change_date=change_date or dt.date.today().isoformat(),
+        existing_update_confirmed=existing_update_confirmed,
+        mode=mode,
+    )
 
 
 def review_rollover(

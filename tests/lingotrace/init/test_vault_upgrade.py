@@ -39,19 +39,24 @@ class VaultUpgradeTests(unittest.TestCase):
         self.assertTrue(preview.accepted, preview.to_dict())
         self.assertTrue(applied.accepted, applied.to_dict())
         self.assertIn("review_queue", context["enabled_capabilities"])
+        self.assertIn("review_lifecycle_migration", context["enabled_capabilities"])
+        self.assertIn("vocab_consolidation", context["enabled_capabilities"])
         self.assertTrue(material_library_exists)
 
-    def test_modified_view_blocks_every_upgrade_write(self) -> None:
+    def test_modified_view_is_preserved_while_safe_upgrade_writes_continue(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._legacy_vault(root, b"manual customization\n")
             before = (root / ".lingotrace/vault-context.json").read_text(encoding="utf-8")
             report = upgrade_vault(root, mode="apply")
             after = (root / ".lingotrace/vault-context.json").read_text(encoding="utf-8")
-        self.assertFalse(report.accepted)
-        self.assertEqual("modified_pack_view", report.errors[0].code)
-        self.assertEqual(before, after)
-        self.assertFalse((root / "views/material-library.base").exists())
+            preserved_view = (root / "views/total-training.base").read_bytes()
+            material_exists = (root / "views/material-library.base").exists()
+        self.assertTrue(report.accepted, report.to_dict())
+        self.assertEqual("modified_pack_view_preserved", report.warnings[0].code)
+        self.assertNotEqual(before, after)
+        self.assertEqual(b"manual customization\n", preserved_view)
+        self.assertTrue(material_exists)
 
 
 if __name__ == "__main__":

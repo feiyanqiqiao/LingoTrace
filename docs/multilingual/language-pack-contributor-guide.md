@@ -56,6 +56,8 @@ The shared capability IDs come from `PUBLIC_CAPABILITY_IDS`:
 - `source_notes`
 - `review_materials`
 - `review_queue`
+- `review_lifecycle_migration`
+- `vocab_consolidation`
 - `speaking_cards`
 - `review_rollover`
 - `total_training_dashboard`

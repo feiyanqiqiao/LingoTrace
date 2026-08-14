@@ -5,6 +5,18 @@
 
 ---
 
+## [20260814-171331]
+### 新增 (Added)
+- 英日语言包新增显式 `review_lifecycle_migration`：先只读列出逐文件、逐字段的旧状态映射，确认后原子应用，并以第二次预览验证无剩余迁移项。
+- 新增 `vocab_consolidation`：以 focus 单词卡为规范，处理 base-only、promoted、异常真实排程和重复卡；合并来源、列表、计数与日期后将旧 base 卡保留为 archived 跳转，不删除旧路径。
+
+### 变更 (Changed)
+- 旧 Vault 升级同步启用生命周期迁移与单词合并能力；人工修改的 Base 会被保留并报告差异，其他安全升级仍可继续。
+- 英日 Agent Skill、生命周期契约、入门说明和操作手册补充状态迁移先于单词合并、逐批确认、人工正文冲突阻断和二次预览归零规则。
+
+### 测试 (Tests)
+- 新增英日共用迁移夹具，覆盖 base-only、focus-only、重复卡、单值/列表来源合并、计数与日期规则、人工正文冲突、异常排程、旧链接保留和批量原子性；通过 core/migration 270、听力 112（1 skipped）、Vault 结构 23、架构 42，共 447 项 unittest。
+
 ## [20260814-165719]
 ### 新增 (Added)
 - 英日语言包新增稳定 `review_queue` 能力，以精确 Vault 相对路径完成入队、退出、续接和重置；共享生命周期统一使用 `review_status: backlog/queued/mastered/archived`，并在批量写入前验证状态组合。
