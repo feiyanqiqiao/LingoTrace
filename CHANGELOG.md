@@ -8,7 +8,7 @@
 ## [20260818-220800]
 ### 文档 (Docs)
 - 修订 `README.md`、`getting-started.md`、`operator-manual.md`、`learner-agent-setup.md` 与 `installation-and-onboarding-design.md`，明确阐述由 AI Agent（执行大脑）、本地 Vault（数据中心）与 Obsidian 桌面端（GUI 看板与点读终端）组成的三位一体架构分工。
-- 在新手指南与操作手册中补充具象化的“日常学习操作动线对照表”（生成在 Agent、自习在 Obsidian、结算在 Agent），校准 Obsidian 桌面端作为官方图形界面的角色说明与预期管理。
+- 在新手指南与操作手册中补充具象化的“日常学习操作动线对照表”（生成在 Agent、自习在 Obsidian、结算在 Agent），并在核心文档中补充 Obsidian 官方网站与下载链接，校准官方图形界面的角色说明与预期管理。
 
 ### 测试 (Tests)
 - 通过 core/migration 270、听力 112（1 skipped）、Vault 结构 23、架构 42，共 447 项 unittest。

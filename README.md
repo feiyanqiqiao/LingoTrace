@@ -1,4 +1,4 @@
-LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自动化的**外语学习工作流引擎（当前完整支持日语与英语）**。
+LingoTrace 是一个完全构建在 [Obsidian](https://obsidian.md) 之上的、高度定制化和自动化的**外语学习工作流引擎（当前完整支持日语与英语）**。
 
 它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**
 
@@ -10,7 +10,7 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 
 - **🧠 AI Agent（大脑与自动化执行器）**：负责听力转写、长文语法解析、自动提炼词汇/口语卡、计算艾宾浩斯记忆周期与每日复习结算。你只需要用自然语言给它下达指令。
 - **📦 Obsidian Vault（本地数据中心）**：所有学习笔记、复习卡片、音频文件均以纯文本 Markdown 和标准 Frontmatter 保存在你本地的 Vault 文件夹中，数据资产 100% 归你所有。
-- **🖥️ Obsidian 桌面端（官方 GUI 看板与多媒体终端）**：作为系统的图形用户界面（GUI），提供精美的双链排版阅读、音频切片点读跟读，以及基于 `.base` 数据库文件的 `Total Training Dashboard`（全景训练看板）。
+- **🖥️ [Obsidian 桌面端](https://obsidian.md)（官方 GUI 看板与多媒体终端）**：作为系统的图形用户界面（GUI），提供精美的双链排版阅读、音频切片点读跟读，以及基于 `.base` 数据库文件的 `Total Training Dashboard`（全景训练看板）。
 
 ## 极简日常学习闭环
 
@@ -26,7 +26,7 @@ LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自�
 
 > 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
 
-Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。安装 ListenKit 时会给出跨平台建议目录并允许自选，确认后把实际位置按平台保存。推荐同时安装 Obsidian 桌面端以获得完整的阅读、看板和音频切片点读体验。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
+Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。安装 ListenKit 时会给出跨平台建议目录并允许自选，确认后把实际位置按平台保存。推荐同时安装 [Obsidian 桌面端](https://obsidian.md/download) 以获得完整的阅读、看板和音频切片点读体验。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
 
 如果你想 fork 并增加语种或功能，把 [开发者初始化协议](docs/developer-agent-setup.md)交给 Agent。它会带你完成 GitHub 账号与 `gh` 检查、fork、remotes、topic branch、测试、推送、上游 PR 和 CI 检查；开发者的实际学习 Vault 仍复用上面的学习者流程。
 

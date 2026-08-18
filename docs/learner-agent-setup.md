@@ -110,7 +110,7 @@ git -C <runtime-root> checkout main
 
 未发现桌面客户端时，向用户解释 Obsidian 桌面端作为**官方图形界面（GUI）与多媒体终端**的作用（提供排版阅读、音频切片点读跟读，以及基于 `.base` 文件的全景复习看板渲染），并询问用户是否现在安装：
 
-- 同意：使用 Obsidian 官方下载或当前系统可信包管理器，安装后重新检测；
+- 同意：使用 [Obsidian 官方下载](https://obsidian.md/download) 或当前系统可信包管理器，安装后重新检测；
 - 暂不安装：继续初始化 Vault，向用户明确说明：底层笔记文件和卡片仍可正常生成，但日常直观查看看板和点击播放音频切片需要 Obsidian Desktop 才能获得完整体验。
 
 ## ListenKit
