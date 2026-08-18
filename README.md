@@ -1,26 +1,36 @@
-# LingoTrace
-
 LingoTrace 是一个完全构建在 Obsidian 之上的、高度定制化和自动化的**外语学习工作流引擎（当前完整支持日语与英语）**。
 
 它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**
 
 本仓库开源 LingoTrace 公共核心、日语与英语语言包、初始化模板、迁移工具和公共验证测试。私人 Vault 中的真实学习资料、音频、每日记录和运行产物不属于本仓库。
 
----
+# 架构分工与日常闭环
 
-## 一句话开始
+为了兼顾“数据完全本地自主”与“极简智能化操作”，LingoTrace 采用 **三位一体** 的协作架构：
+
+- **🧠 AI Agent（大脑与自动化执行器）**：负责听力转写、长文语法解析、自动提炼词汇/口语卡、计算艾宾浩斯记忆周期与每日复习结算。你只需要用自然语言给它下达指令。
+- **📦 Obsidian Vault（本地数据中心）**：所有学习笔记、复习卡片、音频文件均以纯文本 Markdown 和标准 Frontmatter 保存在你本地的 Vault 文件夹中，数据资产 100% 归你所有。
+- **🖥️ Obsidian 桌面端（官方 GUI 看板与多媒体终端）**：作为系统的图形用户界面（GUI），提供精美的双链排版阅读、音频切片点读跟读，以及基于 `.base` 数据库文件的 `Total Training Dashboard`（全景训练看板）。
+
+## 极简日常学习闭环
+
+你的日常学习动线非常清晰，无需在不同工具间迷失：
+
+1. **输入与建卡（在 Agent）**：把文章或音频丢给 AI 助理，说“做成精听稿”或“把生词加入复习”；
+2. **阅读与自测（在 Obsidian）**：打开 Obsidian 桌面端阅读排版好的笔记，点击切片跟读，在看板中自测今日待复习卡片；
+3. **推进与结算（在 Agent）**：自测完成后对 AI 助理说一句“今天复习完了，帮我结算”，系统自动推进记忆阶段。
+
+# 一句话开始
 
 如果你只想使用 LingoTrace 学习，不准备改代码，把下面整句话发给能操作本机文件和命令的 AI Agent：
 
 > 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
 
-Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。安装 ListenKit 时会给出跨平台建议目录并允许自选，确认后把实际位置按平台保存。Obsidian 与 ListenKit 可以延期，但 LingoTrace 运行时、Python 和第一个 Vault 必须完成。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
+Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。安装 ListenKit 时会给出跨平台建议目录并允许自选，确认后把实际位置按平台保存。推荐同时安装 Obsidian 桌面端以获得完整的阅读、看板和音频切片点读体验。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
 
 如果你想 fork 并增加语种或功能，把 [开发者初始化协议](docs/developer-agent-setup.md)交给 Agent。它会带你完成 GitHub 账号与 `gh` 检查、fork、remotes、topic branch、测试、推送、上游 PR 和 CI 检查；开发者的实际学习 Vault 仍复用上面的学习者流程。
 
----
-
-## 🚀 日常入口与核心工作流
+# 🚀 日常入口与核心工作流
 
 LingoTrace 的主要使用方式是：用户用自然语言提出学习任务，由 Codex 或兼容的 AI agent 读取当前 Vault 所选语言包的 Agent Skill，并把任务保存到对应的日语或英语学习库。
 
@@ -44,9 +54,7 @@ Agent Skill 会把这些自然语言请求映射到听力笔记、来源笔记�
 
 新增听力笔记、来源笔记和口语卡时，系统会避免覆盖你已经手工整理过的笔记。复习材料合并、移动、覆盖或非结算状态修改会先让我确认；明确的每日复习结算请求会先内部预览，确认无错误后直接保存并报告结果。
 
----
-
-## 两个目录、两个工作区角色
+# 两个目录、两个工作区角色
 
 普通使用者的推荐结构是：
 
@@ -61,9 +69,7 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 
 每日检查按设备和操作系统分别记录，同一天不会反复联网或反复询问。检查失败、网络不可用、忽略更新或 fork 提示都不会阻止原来的学习任务。详见 [每日首次学习的运行时更新设计](docs/daily-runtime-update-design.md)。
 
----
-
-## 📚 当前文档
+# 📚 当前文档
 
 为了更好地了解本系统的产品哲学、架构约束与适用人群，请参阅 `docs/` 目录下的详细分析报告：
 
@@ -78,9 +84,7 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 - 🧩 **[新语言包贡献指南](docs/multilingual/language-pack-contributor-guide.md)**：项目组成员和其他 Agent 开发 Korean、German 等后续语言包时的接入边界、目录结构、禁止项和验收规则。不要直接复制 Japanese pack 的语言学规则。
 - 🤖 **[新语言包 Agent 交接模板](docs/multilingual/language-pack-agent-handoff-template.md)**：把新语言包任务交给 Codex、Claude Code、Trae 等 Agent 时可直接复用的任务说明模板。
 
----
-
-## 🤝 参与贡献与开源许可
+# 🤝 参与贡献与开源许可
 
 本项目采用 **AGPL v3** 协议开源，鼓励极客自由分发、学习与修改。为了防范未经授权的直接商业化套壳行为，并保障早期参与者的权益，我们制定了严格的开源商业化规则：
 
@@ -88,9 +92,7 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 - **CLA (贡献者许可协议)**：向本项目提交有效代码（Merge PR）即代表您不可撤销地授权核心维护团队在未来的任意场景（含闭源商业化变现产品）中免费使用。
 - **名誉回馈机制**：我们为社区贡献者建立了三级回馈门槛。针对提供有效代码合并的核心贡献者，除了在商业版的“致谢墙”专属展示外，未来还将获赠商业化客户端的终身免费授权（VIP）。
 
----
-
-## 📂 仓库结构
+# 📂 仓库结构
 
 - `lingotrace/`：公共核心、日语与英语语言包、Vault 初始化和迁移支持代码。
 - `tests/lingotrace/`：核心、语言包、初始化和迁移行为测试。
@@ -99,9 +101,7 @@ LingoTrace-English/       # 私人 Obsidian Vault，用于每天学习
 - `tools/listening-transcribe-official/`：听力链相关的公共工具和测试。
 - `docs/`：当前产品、架构、使用和语言包契约文档。
 
----
-
-## ⚠️ 隐私、版权与使用声明
+# ⚠️ 隐私、版权与使用声明
 
 本仓库**仅开源系统的自动化框架、理念设计和执行脚本**，绝不包含个人金库内的实际笔记。在使用本系统构建你自己的学习库时，请务必遵守以下原则：
 
