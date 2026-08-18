@@ -26,6 +26,20 @@ Every batch validates all proposed records before any file is written.
 
 ## Queue Transitions
 
+```mermaid
+stateDiagram-v2
+    [*] --> backlog: 新建听力/口语/语块卡 (默认素材池)
+    [*] --> queued_day0: 新建词汇/语法/错题卡 (默认入队)
+
+    backlog --> queued_day0: 指令: '加入复习'
+    queued_day0 --> queued_active: 每日复习结算推进 (Day1..Day180)
+    queued_active --> queued_active: 结算成功晋级 / 逾期降级
+    queued_active --> backlog: 指令: '退出复习'
+
+    queued_active --> mastered: 完成 Day180 最终阶段 (已掌握)
+    queued_active --> archived: 词汇合并/废弃归档
+```
+
 The stable `review_queue` capability accepts exact Vault-relative Markdown paths. Applying an existing-file change requires confirmation.
 
 ```json

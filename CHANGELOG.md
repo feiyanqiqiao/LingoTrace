@@ -5,6 +5,16 @@
 
 ---
 
+## [20260818-220800]
+### 文档 (Docs)
+- 修订 `README.md`、`getting-started.md`、`operator-manual.md`、`learner-agent-setup.md` 与 `installation-and-onboarding-design.md`，明确阐述由 AI Agent（执行大脑）、本地 Vault（数据中心）与 Obsidian 桌面端（GUI 看板与点读终端）组成的三位一体架构分工。
+- 在新手指南与操作手册中补充具象化的“日常学习操作动线对照表”（生成在 Agent、自习在 Obsidian、结算在 Agent），强调 Obsidian 桌面端为完整使用 LingoTrace 的必备官方图形终端（非可选依赖），并在核心文档中补充 Obsidian 官方网站与下载链接。
+- 在新手指南与操作手册的语种说明中明确界定单纯学习者开箱即用支持日语与英语，并指明开发者扩展新语种的指南路径（贡献指南与 Agent 交接模板）。
+- 在 `README.md`、`getting-started.md`、`operator-manual.md`、`installation-and-onboarding-design.md` 与 `review-lifecycle-and-queue.md` 中全面引入 7 幅 Mermaid 图表（三位一体协作模型、极简日常闭环流转、语言漏斗内化模型、五大学习任务流向、听力链协作时序、双用户旅程架构、复习队列状态机），大幅提升架构与流程的可读性。
+
+### 测试 (Tests)
+- 通过 core/migration 270、听力 112（1 skipped）、Vault 结构 23、架构 42，共 447 项 unittest。
+
 ## [20260815-080855]
 ### 变更 (Changed)
 - 英日语言包不再为新 Vault 声明或创建 `base_vocab_root`；`focus_vocab_root` 成为唯一默认单词目录，素材库也不再纳入已归档的旧 base 卡。
