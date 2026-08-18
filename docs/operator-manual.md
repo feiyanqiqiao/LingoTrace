@@ -197,7 +197,7 @@ Japanese 与 English 语言包提供可复用模板和默认视图，例如总�
 - 听力转写语言参数和后处理规则。
 - 示例句、标签、路径角色和默认视图。
 
-英语用户应让 Agent 读取 `lingotrace/packs/english/agent_skills/SKILL.md`；其自然语言入口与日语一致，语言特有字段改为 IPA、单词重音、英英释义、搭配与英语语块。后续语言建议先选择一个小范围试点，不要一次性把日语或英语规则改成通用规则。
+英语用户应让 Agent 读取 `lingotrace/packs/english/agent_skills/SKILL.md`；其自然语言入口与日语一致，语言特有字段改为 IPA、单词重音、英英释义、搭配与英语语块。后续开发者若需增加德语、韩语等新语言包，请走开发者路径，参考 [新语言包贡献指南](multilingual/language-pack-contributor-guide.md) 和 [新语言包 Agent 交接模板](multilingual/language-pack-agent-handoff-template.md)，建议先选择一个小范围试点，不要一次性把日语或英语规则改成通用规则。
 
 # 8. 推荐上手路径
 
