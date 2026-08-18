@@ -73,3 +73,7 @@ __pycache__/
 *.jpeg
 *.png
 *.heic
+
+# Public documentation branding assets
+!docs/assets/
+!docs/assets/*

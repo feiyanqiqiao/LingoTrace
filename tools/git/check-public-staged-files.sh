@@ -49,6 +49,7 @@ if [ -z "$files" ]; then
 fi
 
 allowed_re='^(\.github/dependabot\.yml|\.github/workflows/[^/]+\.ya?ml|\.gitattributes|\.gitignore|AGENTS\.md|README\.md|CHANGELOG\.md|CONTRIBUTING\.md|LICENSE|SECURITY\.md|docs/|lingotrace/|tests/lingotrace/|tools/README\.md|tools/architecture-baseline/|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/)'
+public_asset_re='^docs/assets/[^/]+\.(png|jpg|jpeg|svg|webp|gif|ico)$'
 private_path_re='(^|/)(\.obsidian|tmp|学习系统|系统配置|codex-skills|筆記|笔记)(/|$)'
 private_ext_re='\.(mp3|m4a|wav|flac|mp4|mov|webm|pdf|jpg|jpeg|png|heic)$'
 generated_re='(^|/)__pycache__(/|$)|\.pyc$|\.pyo$'
@@ -57,6 +58,10 @@ bad_files=""
 
 while IFS= read -r file; do
   [ -z "$file" ] && continue
+
+  if [[ "$file" =~ $public_asset_re ]]; then
+    continue
+  fi
 
   if [[ "$file" =~ $private_path_re ]] || [[ "$file" =~ $private_ext_re ]] || [[ "$file" =~ $generated_re ]]; then
     bad_files="${bad_files}${file} :: private or generated path is never allowed"$'\n'
