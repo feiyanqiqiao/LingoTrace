@@ -76,6 +76,22 @@ Agent Skill 会根据请求选择合适的能力，并保存到你的日语或�
 
 # 4. 五个学习任务
 
+```mermaid
+flowchart TD
+    Media["🎧 本地音频 / URL"] -->|听力任务| LN["📝 听力笔记 (Listening Note)<br/>含音频切片嵌入"]
+    Text["📰 文章 / 采访 / 课文"] -->|阅读任务| SN["📑 来源笔记 (Source Note)<br/>保留原文追溯链接"]
+
+    LN -->|提炼生词/语法| RM["🗃️ 复习材料 (Review Materials)<br/>词汇卡 / 语法卡 / 错题卡"]
+    SN -->|提炼生词/语法| RM
+    LN -->|提炼高频地道表达| SC["🗣️ 生活口语卡 (Speaking Cards)<br/>看到母语直接反射外语"]
+    SN -->|提炼高频地道表达| SC
+
+    RM --> Dashboard["📊 全景训练看板<br/>(Total Training Dashboard)"]
+    SC --> Dashboard
+
+    Dashboard -->|每日复习完成后| Rollover["⚙️ 每日结算 (Review Rollover)<br/>更新 Frontmatter 下次复习日期"]
+```
+
 ## 听力笔记
 
 用于把本地音频或媒体 URL 变成泛听笔记或精听稿。
@@ -139,6 +155,23 @@ Agent 会先查重，再决定是否新建。涉及合并、移动、覆盖或�
 # 5. 听力链与 ListenKit
 
 如果你要处理音频或视频，推荐把 ListenKit 放在 LingoTrace 旁边。ListenKit 负责音视频导入、转写和切片，LingoTrace 负责把结果整理成学习笔记和复习材料。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 学习者
+    participant Agent as AI Agent
+    participant ListenKit as ListenKit (转写引擎)
+    participant Vault as 私人 Vault
+    participant Obsidian as Obsidian 桌面端
+
+    User->>Agent: "请把 23.mp3 做成精听稿"
+    Agent->>ListenKit: 调用 Whisper ASR + VAD 切片
+    ListenKit-->>Agent: 返回转写文本与 .slices.json
+    Agent->>Vault: 写入切片音频 & 精听 Markdown
+    Vault-->>Obsidian: 文件就绪
+    User->>Obsidian: 打开精听稿，点击切片点读 & 影子跟读
+```
 
 首次确认 ListenKit 目录后，用 `connect-listenkit --listenkit-root <path> --apply` 保存设备级默认连接。英语、日语和未来语种 Vault 都会使用它；只有某个 Vault 明确需要不同 checkout 时才使用 `--scope vault --vault <path>` 保存覆盖。
 

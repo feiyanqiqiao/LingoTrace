@@ -8,6 +8,21 @@ LingoTrace 是一个完全构建在 [Obsidian](https://obsidian.md) 之上的、
 
 为了兼顾“数据完全本地自主”与“极简智能化操作”，LingoTrace 采用 **三位一体** 的协作架构：
 
+```mermaid
+graph TD
+    User["🧑 学习者"]
+    Agent["🧠 AI Agent<br/>(自动化大脑 / 终端窗口)"]
+    Vault[("📦 Obsidian Vault<br/>(本地纯文本 Markdown 数据中心)")]
+    Obsidian["🖥️ Obsidian 桌面端<br/>(官方 GUI 看板 / 多媒体点读终端)"]
+
+    User -- "① 自然语言指令<br/>(整理笔记 / 建卡 / 结算)" --> Agent
+    Agent -- "② 解析语法/打轴切片<br/>原子写入本地卡片" --> Vault
+    Vault -. "③ 实时加载数据" .-> Obsidian
+    User -- "④ 沉浸排版阅读<br/>音频跟读 / 看板自测" --> Obsidian
+    Obsidian -. "⑤ 确认今日复习完毕" .-> User
+    User -- "⑥ 下达每日结算指令" --> Agent
+```
+
 - **🧠 AI Agent（大脑与自动化执行器）**：负责听力转写、长文语法解析、自动提炼词汇/口语卡、计算艾宾浩斯记忆周期与每日复习结算。你只需要用自然语言给它下达指令。
 - **📦 Obsidian Vault（本地数据中心）**：所有学习笔记、复习卡片、音频文件均以纯文本 Markdown 和标准 Frontmatter 保存在你本地的 Vault 文件夹中，数据资产 100% 归你所有。
 - **🖥️ [Obsidian 桌面端](https://obsidian.md)（官方 GUI 看板与多媒体终端）**：作为系统的图形用户界面（GUI），提供精美的双链排版阅读、音频切片点读跟读，以及基于 `.base` 数据库文件的 `Total Training Dashboard`（全景训练看板）。
@@ -15,6 +30,26 @@ LingoTrace 是一个完全构建在 [Obsidian](https://obsidian.md) 之上的、
 ## 极简日常学习闭环
 
 你的日常学习动线非常清晰，无需在不同工具间迷失：
+
+```mermaid
+flowchart LR
+    subgraph S1["1. 输入与建卡 (Agent 窗口)"]
+        A1["丢入音频 / 文章"] --> A2["自然语言指令: '整理笔记 / 加入复习'"]
+        A2 --> A3["Agent 生成 Markdown 笔记与卡片"]
+    end
+
+    subgraph S2["2. 沉浸自习与自测 (Obsidian 桌面端)"]
+        B1["打开笔记阅读"] --> B2["点击音频切片影子跟读"]
+        B2 --> B3["打开 Total Training 看板自测"]
+    end
+
+    subgraph S3["3. 推进与结算 (Agent 窗口)"]
+        C1["说一句: '今天复习完了，帮我结算'"] --> C2["Agent 推进艾宾浩斯复习周期"]
+        C2 --> C3["输出今日结算复盘报告"]
+    end
+
+    S1 --> S2 --> S3 --> S1
+```
 
 1. **输入与建卡（在 Agent）**：把文章或音频丢给 AI 助理，说“做成精听稿”或“把生词加入复习”；
 2. **阅读与自测（在 Obsidian）**：打开 Obsidian 桌面端阅读排版好的笔记，点击切片跟读，在看板中自测今日待复习卡片；

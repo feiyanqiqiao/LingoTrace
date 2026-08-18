@@ -9,6 +9,23 @@ LingoTrace 面向两类用户：
 
 开发者也是学习者。两类用户使用相同的运行时安装、Vault 初始化和日常学习入口；开发者只是在此基础上额外拥有源码仓库、测试、分支与协作流程。
 
+```mermaid
+graph TD
+    Entry["🚀 用户开启 LingoTrace"] --> Choice{"是否需要修改源码 / 增加语种？"}
+
+    Choice -- "否 (只想日常学习)" --> Learner["🧑‍🎓 学习者路径"]
+    Learner --> L1["执行 learner-agent-setup.md"]
+    L1 --> L2["安装最小 Sparse 运行时"]
+    L2 --> L3["安装 Obsidian 桌面端 & 初始化 Vault"]
+    L3 --> L4["在 Obsidian 中打开 Vault 开始日常学习"]
+
+    Choice -- "是 (贡献者/深度开发者)" --> Dev["🧑‍💻 开发者路径"]
+    Dev --> D1["执行 developer-agent-setup.md"]
+    D1 --> D2["Fork 完整仓库 + 创建 Topic 分支"]
+    D2 --> D3["开发新语言包 / 运行 447+ 单元测试"]
+    D3 --> D4["提交 PR 到上游 main 并通过 CI 检查"]
+```
+
 # 2. 目标体验与角色模型
 
 系统的整体体验基于三位一体协作模型：**Agent 大脑与执行器 + 本地 Vault 知识库 + Obsidian 桌面端 GUI 看板与播放器**。
