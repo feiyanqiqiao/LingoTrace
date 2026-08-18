@@ -31,7 +31,7 @@ Agent 必须从上游 `main` 读取最新引导，而不是依赖模型记忆。
 8. 验证 Vault 能解析运行时和目标语言 Agent Skill；
 9. 告诉用户以 Vault 为日常 Agent 工作区，并在 Obsidian 桌面端打开该 Vault，给出第一条学习请求。
 
-Obsidian 桌面客户端负责提供可视化的 Markdown 渲染、音频切片点读跟读与 `.base` 全景复习看板。虽然可以延期安装，但 Agent 必须清楚说明延期影响（缺少图形看板与音频点读体验），并在用户首次需要对应能力时再次提示。LingoTrace 运行时、可用 Python 和完成初始化的 Vault 是开始使用的必要条件。
+Obsidian 桌面客户端负责提供可视化的 Markdown 渲染、音频切片点读跟读与 `.base` 全景复习看板，是完整学习闭环的必备官方图形端。Agent 必须清楚向用户说明并引导安装。LingoTrace 运行时、可用 Python、Obsidian 桌面端和完成初始化的 Vault 是获得完整体验的标配条件。
 
 ## 2.2 开发者
 

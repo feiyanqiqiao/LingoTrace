@@ -16,7 +16,7 @@
 2. 检测和只读检查可以直接执行。
 3. 下载、克隆、安装软件、创建目录、写入 Vault、打开桌面应用前，先说明动作和影响并取得用户同意。
 4. 不覆盖已有文件，不删除用户资料，不把 Vault 初始化到 LingoTrace 运行时内部。
-5. 缺少 Obsidian 或 ListenKit 时允许用户选择“现在安装”或“以后再装”；说明角色影响并继续可行部分。
+5. 缺少 Obsidian 时明确说明其为必备图形终端并引导安装；缺少 ListenKit 时允许用户选择“现在安装”或“以后再装”；
 6. LingoTrace 运行时、Python 和成功初始化的 Vault 是开始使用的必要条件。
 7. 命令失败时先报告真实错误并诊断，不要用降低安全性的替代命令绕过。
 
@@ -104,14 +104,14 @@ git -C <runtime-root> checkout main
 
 不要因为 Obsidian、GitHub CLI 或 ListenKit 缺失而谎称整个初始化失败。GitHub CLI 只对开发协作有用，学习者不需要它。
 
-# 第 5 步：可选安装 Obsidian 与 ListenKit
+# 第 5 步：安装 Obsidian 与可选的 ListenKit
 
 ## Obsidian Desktop
 
-未发现桌面客户端时，向用户解释 Obsidian 桌面端作为**官方图形界面（GUI）与多媒体终端**的作用（提供排版阅读、音频切片点读跟读，以及基于 `.base` 文件的全景复习看板渲染），并询问用户是否现在安装：
+未发现桌面客户端时，向用户说明 Obsidian 桌面端是流畅使用 LingoTrace 的**必备官方图形界面（GUI）与多媒体终端**（用于 Markdown 排版渲染、音频切片点读跟读，以及基于 `.base` 文件的全景复习看板渲染），引导用户安装：
 
 - 同意：使用 [Obsidian 官方下载](https://obsidian.md/download) 或当前系统可信包管理器，安装后重新检测；
-- 暂不安装：继续初始化 Vault，向用户明确说明：底层笔记文件和卡片仍可正常生成，但日常直观查看看板和点击播放音频切片需要 Obsidian Desktop 才能获得完整体验。
+- 暂不安装：明确告知用户若未安装 Obsidian Desktop，将无法查看全景复习看板并失去音频切片点读跟读体验；若用户坚持暂不安装，仅继续初始化底层 Vault 文件。
 
 ## ListenKit
 
@@ -187,4 +187,4 @@ LingoTrace 与 ListenKit 应使用独立运行环境，不要把彼此的 Python
 3. LingoTrace 运行时目录只用于程序更新，不用于存放私人学习资料；
 4. 可以从“帮我把这篇英文材料整理成学习笔记”或“请把这段日语音频做成精听稿”开始。
 
-如果用户暂缓了 Obsidian 或 ListenKit，明确列出待办项和受影响能力，不要把“基础初始化完成”描述成“所有视觉与多媒体能力已就绪”。
+如果用户仍未安装 Obsidian Desktop 或暂缓了 ListenKit，明确列出待办项和受影响能力，提醒用户尽快安装 Obsidian 桌面端以获得完整看板与点读体验，不要把“基础初始化完成”描述成“所有视觉与多媒体能力已就绪”。

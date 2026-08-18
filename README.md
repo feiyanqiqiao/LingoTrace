@@ -26,7 +26,7 @@ LingoTrace 是一个完全构建在 [Obsidian](https://obsidian.md) 之上的、
 
 > 请阅读并严格执行 https://raw.githubusercontent.com/feiyanqiqiao/LingoTrace/main/docs/learner-agent-setup.md ，帮我安装 LingoTrace 并初始化第一个学习 Vault。
 
-Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。安装 ListenKit 时会给出跨平台建议目录并允许自选，确认后把实际位置按平台保存。推荐同时安装 [Obsidian 桌面端](https://obsidian.md/download) 以获得完整的阅读、看板和音频切片点读体验。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
+Agent 会询问语种与存放位置，检测 Python、Git、Obsidian 桌面客户端和 ListenKit；任何安装或下载都先征得你的同意。要用好 LingoTrace，必须安装 [Obsidian 桌面端](https://obsidian.md/download) 作为官方图形交互界面，以获得完整的排版阅读、全景看板和音频切片点读体验；ListenKit 负责音视频导入与转写，可按需选装。详细的人类版说明见 [学习者入门](docs/getting-started.md)。
 
 如果你想 fork 并增加语种或功能，把 [开发者初始化协议](docs/developer-agent-setup.md)交给 Agent。它会带你完成 GitHub 账号与 `gh` 检查、fork、remotes、topic branch、测试、推送、上游 PR 和 CI 检查；开发者的实际学习 Vault 仍复用上面的学习者流程。
 

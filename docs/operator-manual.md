@@ -26,9 +26,9 @@ LingoTrace 不是课程、教材内容仓库或通用背单词 App。它提供�
 
 你需要：
 
-- **[Obsidian 桌面客户端](https://obsidian.md/download)**：作为视觉阅读、音频跟读与 `.base` 看板渲染的桌面终端。
-- **Codex 或兼容的 AI agent**：作为日常下达指令的工作助手。
-- **一个自己的私人 Obsidian 日语或英语学习库（Vault）**。
+- **[Obsidian 桌面客户端](https://obsidian.md/download)**（必需）：作为视觉阅读、音频跟读与 `.base` 看板渲染的官方桌面终端。
+- **Codex 或兼容的 AI agent**（必需）：作为日常下达指令的工作助手。
+- **一个自己的私人 Obsidian 日语或英语学习库（Vault）**（必需）。
 - **可选：ListenKit**：用于音视频导入与 ASR 语音转写。
 - **可选：Git**：用于获取和更新 LingoTrace 公共运行时。
 
