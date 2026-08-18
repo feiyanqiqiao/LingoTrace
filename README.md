@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="docs/assets/banner.png" alt="LingoTrace Banner" width="100%">
+</p>
+
+<p align="center">
+  <img src="docs/assets/logo.png" alt="LingoTrace Logo" width="100">
+</p>
+
 LingoTrace 是一个完全构建在 [Obsidian](https://obsidian.md) 之上的、高度定制化和自动化的**外语学习工作流引擎（当前完整支持日语与英语）**。
 
 它剥离了底层的语音识别与音视频爬取技术（已交由子项目 [ListenKit](https://github.com/feiyanqiqiao/ListenKit) 负责），专注于解决一个核心痛点：**如何将泛听素材、外语播客和视频自动化转化为结构化的个人知识图谱，并将其内化为长时记忆和主动口语输出能力。**

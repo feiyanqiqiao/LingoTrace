@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="LingoTrace Banner" width="100%">
+</p>
+
 欢迎来到 LingoTrace！如果你正准备将外语学习真正融入日常生活，而不再是仅仅为了应付考试，那么你来对地方了。
 
 本指南是专门为你——普通外语学习者——准备的。这里没有晦涩的代码、没有复杂的内部逻辑说明，只有最真实的学习场景和最直觉的交流方式。
