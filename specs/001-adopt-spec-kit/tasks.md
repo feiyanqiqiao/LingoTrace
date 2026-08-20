@@ -51,7 +51,7 @@
 - [x] T015 [US3] 运行 runtime、architecture baseline、vault structure 和 listening 四组 unittest，并记录结果
 - [x] T016 [US3] 运行 `git diff --check` 与 `bash tools/git/check-public-staged-files.sh`，确认公共文件边界
 - [x] T017 [US3] 在测试通过后更新 `CHANGELOG.md`，记录 Spec Kit 初始化、中文治理规则和迁移验证证据
-- [ ] T018 [US3] 提交 topic branch，推送到 `origin`，并创建指向上游 `main` 的 PR
+- [x] T018 [US3] 提交 topic branch，推送到 `origin`，并创建指向上游 `main` 的 PR
 
 ## 依赖与执行顺序
 
