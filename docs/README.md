@@ -18,6 +18,11 @@
 - [安装与双用户旅程设计](installation-and-onboarding-design.md)
 - [项目贡献规则](../CONTRIBUTING.md)
 
+## 工程规格与治理
+
+- [项目宪章](../.specify/memory/constitution.md)：Spec Kit 项目的稳定原则、边界和质量门禁
+- [Spec Kit 迁移基线规格](../specs/001-adopt-spec-kit/spec.md)：本项目纳入 Spec Kit 的需求、验收标准和验证范围
+
 ## 产品与架构
 
 - [产品与能力说明](lingotrace_product_document.md)

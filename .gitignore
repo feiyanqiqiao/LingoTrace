@@ -44,13 +44,18 @@
 !tools/vault-structure/**
 !tools/git/
 !tools/git/**
+!tools/spec-kit-governance/
+!tools/spec-kit-governance/**
 tools/vault-structure/**/__pycache__/
 tools/vault-structure/**/*.pyc
+tools/spec-kit-governance/**/__pycache__/
+tools/spec-kit-governance/**/*.pyc
 
 # Always keep local/editor/cache/media/private material out of Git.
 .DS_Store
 **/.DS_Store
 .obsidian/
+.spec-kit-governance/
 tmp/
 学习系统/
 笔记/
@@ -77,3 +82,17 @@ __pycache__/
 # Public documentation branding assets
 !docs/assets/
 !docs/assets/*
+
+# Shared Spec Kit project infrastructure.
+!.specify/
+!.specify/**
+.specify/feature.json
+.specify/extensions/*/local-config.yml
+!specs/
+!specs/**
+
+# Shared Codex Spec Kit skills. Keep other agent-local state private.
+!.agents/
+!.agents/skills/
+!.agents/skills/speckit-*/
+!.agents/skills/speckit-*/SKILL.md

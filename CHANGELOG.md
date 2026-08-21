@@ -3,6 +3,37 @@
 版本号规则：`年月日-时分秒`（如 `20260606-065513`）。
 后续开始迭代本项目时，所有的功能演进、修复与架构变动都会记录于此。
 
+## [20260821-152500]
+### 新增
+- 部署自包含的 Spec Kit 项目级可移植治理包 `docs/spec-kit/`（含 `START_HERE.md`、`POLICY.md`、`REFERENCE.md`、`OPERATING_PROTOCOL.md`、`AGENT_ONBOARDING.md`、`LOCAL_OVERRIDES.md`、`PROJECT_CONFIG.json`、`ADAPTERS.json`、`MANIFEST.json`）与本地管理器 `tools/spec-kit-governance/governance.py`。
+- 在 `docs/spec-kit/ADAPTERS.json` 中登记上下文锚点 `AGENTS.md` 与 Codex Native 集成绑定及验证凭据。
+
+### 变更
+- 在上下文锚点 `AGENTS.md` 中嵌入标准受管治理 Loader 区块（`<!-- PROJECT-SPEC-KIT-GOVERNANCE:START -->` ... `<!-- PROJECT-SPEC-KIT-GOVERNANCE:END -->`），声明中文文档语言（`zh`），并保证锚点内原有项目业务规则与学习指令 100% 逐字节保真。
+- 在 `docs/spec-kit/PROJECT_CONFIG.json` 中显式持久化 `zh` 文档语言策略与默认集成固定策略。
+- 更新 `.gitignore` 与 `tools/git/check-public-staged-files.sh`，放行 `docs/spec-kit/` 与 `tools/spec-kit-governance/`，并忽略与拦截 `.spec-kit-governance/` 运行时临时状态。
+
+### 测试
+- `tools/spec-kit-governance/governance.py verify` 与 `doctor`：状态为 `READY`，校验和与包结构全部验证通过。
+- `specify integration status --json`：Codex 集成正常，managed files 0 缺失 0 修改。
+- `bash tools/git/check-public-staged-files.sh`：公共文件白名单检查全部通过。
+- 业务测试套件：通过 runtime 270、architecture baseline 42、Vault structure 23、listening 112（1 skipped），共 447 项 unittest。
+
+---
+
+## [20260821-024039]
+### 新增
+- 使用当前 Spec Kit CLI 初始化 Codex 项目集成，纳入 `.specify/` shared infrastructure 和受管的 `.agents/skills/speckit-*` skills。
+- 新增中文项目宪章、Spec Kit 迁移基线规格、研究记录、数据模型、quickstart、需求质量检查单和任务清单。
+
+### 变更
+- 在 `AGENTS.md` 中明确项目维护文档统一使用中文，并定义技术标识符和上游受管 skill 的语言边界。
+- 在 `docs/README.md` 增加 Spec Kit 宪章与迁移规格入口，并在 `.gitignore` 中放行可共享的 Spec Kit 工件、忽略本机 feature 指针。
+
+### 测试
+- `specify integration status --json`：Codex integration 正常，managed files、manifest paths 和 shared templates 均通过。
+- runtime 270、architecture baseline 42、Vault structure 23、listening 112（1 skipped）项 unittest 全部通过。
+
 ---
 
 ## [20260818-220800]

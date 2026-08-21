@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "default_integration": {
+    "policy": "pinned",
+    "key": "codex",
+    "allow_change": false
+  },
+  "onboarding": {
+    "requires_current_user_approval": true,
+    "allow_unsafe_multi_install": false
+  },
+  "generic": {
+    "policy": "deny",
+    "maximum_bindings": 1
+  },
+  "catalogs": {
+    "allowed_sources": []
+  },
+  "context": {
+    "default_delivery_mode": "loader",
+    "allow_materialized_after_loader_failure": true
+  },
+  "documentation": {
+    "language_tag": "zh",
+    "selection_source": "explicit-user-selection",
+    "scope": "new-and-substantively-rewritten-project-documentation"
+  },
+  "upgrade": {
+    "review_mode": "pull-request-required"
+  },
+  "quality_gates": {
+    "clarify": "risk-triggered",
+    "checklist": "risk-triggered",
+    "analyze": "risk-triggered",
+    "validate": "required",
+    "converge": "required"
+  }
+}
