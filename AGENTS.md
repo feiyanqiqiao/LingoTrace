@@ -1,8 +1,6 @@
-# AGENTS.md
-
 This repository is the public LingoTrace runtime outside users' private Obsidian Vaults. Treat notes, frontmatter, wikilinks, Bases, public templates, Vault initialization, runtime connections, and language-pack agent skills as part of the user-facing study system.
 
-## Primary Entry Points
+# Primary Entry Points
 
 Use `lingotrace/packs/japanese/agent_skills/SKILL.md` as the natural-language operating entry for Japanese daily learning tasks.
 
@@ -20,7 +18,7 @@ Do not ask users to mention workflow entrypoints, function names, data envelopes
 
 Do not copy full schemas or workflow details into this document. Read the agent skill, the relevant `lingotrace/packs/japanese/` module, and public tests before changing the matching subsystem.
 
-## User Journeys
+# User Journeys
 
 - A learner who only wants to study starts from `docs/learner-agent-setup.md`. Install only the minimal public runtime, keep the private Vault outside it, and use the Vault as the daily Agent workspace.
 - A developer starts from `docs/developer-agent-setup.md`, uses a full checkout and a topic branch, and then reuses the learner setup for their real Vault.
@@ -28,11 +26,11 @@ Do not copy full schemas or workflow details into this document. Read the agent 
 - Before changing onboarding behavior, read `docs/installation-and-onboarding-design.md` and keep the learner and developer routes distinct.
 - Both journeys perform the non-blocking daily update check defined in `docs/daily-runtime-update-design.md`. Official runtimes may update only after explicit consent; personal forks must be left for the user to synchronize in the developer workspace.
 
-## Path Roles
+# Path Roles
 
 Do not treat folder paths in prose as the source of truth. Runtime path roles live in each target Vault's `.lingotrace/paths.json`; pack defaults live in `lingotrace/packs/japanese/paths.json`. Update the pack default only when changing the shared Japanese template, and update private Vault config only during an explicit local operation.
 
-## Operating Rules
+# Operating Rules
 
 - Prefer Obsidian-aware and Markdown-aware workflows for note search, note edits, frontmatter, wikilinks, and `.base` files.
 - Search before editing vocabulary. Check the focus review layer before the base lexicon so duplicate cards are not created.
@@ -46,7 +44,7 @@ Do not treat folder paths in prose as the source of truth. Runtime path roles li
   - *Exclusion*: Do not write changelogs for daily user-content creation tasks (e.g., generating notes or vocabulary cards in the Vault).
   - *Appropriate Timing*: Write the changelog entry only after all code changes are fully implemented and automated tests pass, but *before* executing the final `git commit`. This ensures the changelog reflects the true final state and is committed atomically with the code.
 
-## Git Workflow
+# Git Workflow
 
 - Treat `main` as the protected public branch for the LingoTrace public repository.
 - For every public repository update, including documentation-only changes, create a topic branch, commit there, push the branch, and merge through a pull request.
@@ -65,7 +63,7 @@ Do not treat folder paths in prose as the source of truth. Runtime path roles li
 - Run `bash tools/git/check-public-staged-files.sh` before committing public changes. When GitHub Actions is available for this repository, use the same allowlist check against pull request diffs.
 - Do not bypass failing GitHub checks when they exist unless the failure is understood, documented in the pull request, and unrelated to the proposed change.
 
-## Verification
+# Verification
 
 For documentation-only changes, verify that referenced paths exist and that the new guidance does not contradict the relevant `SKILL.md` files.
 
