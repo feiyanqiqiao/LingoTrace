@@ -1,0 +1,43 @@
+{
+  "anchors": [
+    {
+      "delivery_mode": "loader",
+      "format": "markdown",
+      "id": "anchor-a54ff182c7e8acf5",
+      "managed": true,
+      "managed_content_sha256": "5ef6ae18249e1f529db8b2f3bcf0ee35071bdbee1c21702e77d5ba5df7422c23",
+      "marker_end": "<!-- PROJECT-SPEC-KIT-GOVERNANCE:END -->",
+      "marker_start": "<!-- PROJECT-SPEC-KIT-GOVERNANCE:START -->",
+      "path": "AGENTS.md",
+      "status": "rendered"
+    }
+  ],
+  "bindings": [
+    {
+      "anchor_ids": [
+        "anchor-a54ff182c7e8acf5"
+      ],
+      "capabilities": {
+        "core_workflow": "verified",
+        "events": "not-applicable",
+        "extensions": "not-applicable",
+        "presets": "not-applicable"
+      },
+      "default_integration_changed": false,
+      "display_name": "Codex CLI",
+      "integration_key": "codex",
+      "integration_mode": "native",
+      "runtime_id": "codex",
+      "status_evidence_sha256": "59e5c612b3520f6e768fce614f3aa6715636b44720090be9f794c14084f5ce0f",
+      "verification": {
+        "evidence": "docs/spec-kit/START_HERE.md",
+        "method": "fresh-session-loader",
+        "product_version": "codex",
+        "specify_version": "0.16.6.dev0",
+        "status": "active",
+        "verified_at": "2026-08-21T07:16:36Z"
+      }
+    }
+  ],
+  "schema_version": 1
+}

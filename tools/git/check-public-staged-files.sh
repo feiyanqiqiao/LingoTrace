@@ -48,9 +48,9 @@ if [ -z "$files" ]; then
   exit 0
 fi
 
-allowed_re='^(\.github/dependabot\.yml|\.github/workflows/[^/]+\.ya?ml|\.gitattributes|\.gitignore|AGENTS\.md|README\.md|CHANGELOG\.md|CONTRIBUTING\.md|LICENSE|SECURITY\.md|\.specify/|\.agents/|specs/|docs/|lingotrace/|tests/lingotrace/|tools/README\.md|tools/architecture-baseline/|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/)'
+allowed_re='^(\.github/dependabot\.yml|\.github/workflows/[^/]+\.ya?ml|\.gitattributes|\.gitignore|AGENTS\.md|README\.md|CHANGELOG\.md|CONTRIBUTING\.md|LICENSE|SECURITY\.md|\.specify/|\.agents/|specs/|docs/|lingotrace/|tests/lingotrace/|tools/README\.md|tools/architecture-baseline/|tools/listening-transcribe-official/|tools/vault-structure/|tools/git/|tools/spec-kit-governance/)'
 public_asset_re='^docs/assets/[^/]+\.(png|jpg|jpeg|svg|webp|gif|ico)$'
-private_path_re='(^|/)(\.obsidian|tmp|学习系统|系统配置|codex-skills|筆記|笔记)(/|$)'
+private_path_re='(^|/)(\.obsidian|\.spec-kit-governance|tmp|学习系统|系统配置|codex-skills|筆記|笔记)(/|$)'
 private_ext_re='\.(mp3|m4a|wav|flac|mp4|mov|webm|pdf|jpg|jpeg|png|heic)$'
 generated_re='(^|/)__pycache__(/|$)|\.pyc$|\.pyo$'
 specify_private_re='^\.specify/feature\.json$|^\.specify/extensions/.*/local-config\.yml$'

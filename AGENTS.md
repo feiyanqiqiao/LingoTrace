@@ -20,12 +20,6 @@ Do not ask users to mention workflow entrypoints, function names, data envelopes
 
 Do not copy full schemas or workflow details into this document. Read the agent skill, the relevant `lingotrace/packs/japanese/` module, and public tests before changing the matching subsystem.
 
-## Documentation Language and Spec Kit
-
-本项目维护的文档统一使用中文，包括 `README.md`、`docs/`、`AGENTS.md`、`CONTRIBUTING.md`、`CHANGELOG.md`，以及 `.specify/` 下的项目宪章、规格、计划、任务和检查单。代码、命令、文件路径、协议字段、测试名称、外部引用和用户提供的原文可以保留其必要的英文或其他语言内容。
-
-Spec Kit 生成的 `.agents/skills/` 是上游受管的 Agent 工具指令，不属于本项目维护的说明文档；不得手工翻译或改写这些文件，必须通过当前 `specify` CLI 更新。所有 substantive engineering work 必须以 `.specify/memory/constitution.md` 为治理依据，并按当前 CLI 支持的生命周期维护 `specs/` 下的规格、计划、任务和验证工件。已有英文能力契约在未被对应功能改动时不做机械重写；若改动其用户可见内容，必须在同一变更中提供中文维护版本或将内容迁移到中文规范工件，并保留必要的领域术语和原始字段。
-
 ## User Journeys
 
 - A learner who only wants to study starts from `docs/learner-agent-setup.md`. Install only the minimal public runtime, keep the private Vault outside it, and use the Vault as the daily Agent workspace.
@@ -76,3 +70,19 @@ Do not treat folder paths in prose as the source of truth. Runtime path roles li
 For documentation-only changes, verify that referenced paths exist and that the new guidance does not contradict the relevant `SKILL.md` files.
 
 For note or workflow changes, prefer a small targeted check over broad vault scans. When a script has a dry-run mode, use that as the first verification step.
+
+<!-- PROJECT-SPEC-KIT-GOVERNANCE:START -->
+
+# Spec Kit Governance
+
+This repository uses the committed project-local Spec Kit governance package.
+
+Read `docs/spec-kit/START_HERE.md` before substantive engineering work.
+
+Do not replace the project baseline with personal global rules or a local Reference.
+
+Project documentation language: `zh`.
+
+Write new and substantively rewritten project documentation, including Spec Kit artifacts, in this language unless an explicit user or more specific project instruction overrides it. Do not translate existing documentation solely because this setting was selected.
+
+<!-- PROJECT-SPEC-KIT-GOVERNANCE:END -->

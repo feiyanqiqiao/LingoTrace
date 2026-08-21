@@ -44,13 +44,18 @@
 !tools/vault-structure/**
 !tools/git/
 !tools/git/**
+!tools/spec-kit-governance/
+!tools/spec-kit-governance/**
 tools/vault-structure/**/__pycache__/
 tools/vault-structure/**/*.pyc
+tools/spec-kit-governance/**/__pycache__/
+tools/spec-kit-governance/**/*.pyc
 
 # Always keep local/editor/cache/media/private material out of Git.
 .DS_Store
 **/.DS_Store
 .obsidian/
+.spec-kit-governance/
 tmp/
 学习系统/
 笔记/
