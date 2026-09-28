@@ -62,21 +62,21 @@
 
 ## 每个新会话的入口
 
-只要项目存在 `.specify/`，Agent 必须在首次实质性操作前最多运行一次只读 CLI 版本检查：
+项目存在 `.specify/` 时，Agent 在首次实质性操作前只读取 `.agent-state/spec_kit_component_update_cache.json` 中的 `last_full_check`：
 
-~~~bash
-specify self check
+- 若 `status` 为 `success`，且 `checked_at_utc` 距当前不足 7×24 小时，Agent 不运行更新助手，直接开始用户任务。
+- 若记录缺失、已过期、状态不是 `success`、时间在未来或无法解析，Agent 才运行更新助手：
+
+~~~text
+Windows：python .agent-support\spec_kit_component_updater.py
+macOS/Linux：python3 .agent-support/spec_kit_component_updater.py
 ~~~
 
-- CLI 缺失时，询问用户是否从官方来源安装。用户拒绝时返回 `HANDOFF_TO_AGENT`，不得假称已检查或初始化。
-- CLI 报告有更新时，告知用户可用版本和当前版本；只有用户明确批准后才运行 `specify self upgrade`。用户拒绝、离线、超时或无更新后，本会话不重复询问。
-- 无论 CLI 是否升级，都用当前 CLI 实际支持的 `help`、`status` 和 `list` 命令检查活动集成及已安装扩展、工作流；不存在新鲜度字段时，以官方更新命令的实际结果为准。
-- 对已安装的官方集成和扩展执行强制刷新：集成使用 `specify integration upgrade <key> --force`；扩展使用 `specify extension add <id> --force`，以官方目录版本覆盖现有扩展文件。不要把扩展更新命令的“已是最新”当作文件内容校验。
-- 工作流命令不支持 `--force`。为覆盖现有官方工作流并取得可更新的 catalog 来源，先用官方 CLI 移除该工作流，再按官方 catalog ID 重新添加；不得使用本地副本或自建来源替代。
-- 本项目已授权覆盖官方管理的集成技能、脚本、扩展和目录工作流。若命令支持 `--force`，必须使用；不支持时使用上述官方移除后重装流程。此授权不适用于本规则块、`specs/**`、业务文件或本地来源组件。每次刷新后重新检查 CLI 帮助和项目状态，记录实际结果。
-- 当前任务需要的官方集成或扩展缺失时，先询问用户是否安装。只有当前 Agent 的官方原生集成可用时，才可在获准后运行 `specify integration install <native-key>`；缺少原生集成时停止并报告，不得改用 `generic`。拒绝安装时返回 `HANDOFF_TO_AGENT`。
-- Bug Fix 需要而 `bug` 扩展缺失时，询问是否运行 `specify extension add bug`；用户选择 Assessment 且 `assess` 缺失时，询问是否运行 `specify extension add assess`。
-- 刷新后重新检查 CLI 帮助和项目状态。离线、超时、失败或组件被跳过时，说明哪些内容无法核实；不得把未检查或被跳过的组件报告为最新。
+- 用户明确要求立即检查时，Agent 运行更新助手并加 `--recheck`。这会重新检查远端版本，不会强制覆盖文件。
+- 更新助手只在整轮检查没有失败或未知状态时写入成功时间。发现 CLI 更新但需用户批准仍视为检查完成；Agent 本次会话说明候选版本。用户批准并完成 CLI 升级后，Agent 立即再运行一次助手以检查新 CLI 对应的组件。助手无法启动或退出非零时，Agent 说明原因。
+- 若本机找不到 `specify`，Agent 询问用户是否从官方来源安装；用户拒绝时返回 `HANDOFF_TO_AGENT`。若 Python 低于 3.10 或更新助手缺失，Agent 说明检查未完成，不假称已检查。
+- 更新助手的组件范围、官方来源校验、失败处理和 CLI 交互由脚本执行；Agent 按脚本报告处理需要用户决定的事项。
+- 当前任务需要的官方集成或扩展缺失时，Agent 先询问用户是否安装；只使用当前 Agent 可用的官方原生集成，不改用 `generic`。Bug Fix 需要 `bug` 时，或用户选择 Assessment 且缺少 `assess` 时，Agent 询问是否运行对应的 `specify extension add` 命令。
 
 ## 选择工作流程
 
@@ -120,6 +120,7 @@ Assessment 可以用于软件或非软件想法，不要求已有源代码，不
 
 - Feature SDD、Bug Fix、Assessment 是三类不同工作入口；短路径和完整路径是 Feature SDD 内的两种模式。不得把三类入口串成一条强制流程。
 - 按官方 CLI 安装需要的官方集成或扩展；每个阶段使用当前集成提供的官方技能。官方能力不可用时，说明缺失内容和受影响步骤，不安装本地替代品。
+- 官方目录列出某个工作流不代表维护者审计了其 shell 内容。首次运行或更新后的首次运行前，Agent 必须检查 `.specify/workflows/<id>/workflow.yml` 中 shell 步骤的 `run` 字段；不得仅凭目录来源认定工作流安全。
 - 不增加本地自建生命周期、工作流、预设、Bundle、额外 Discovery 阶段、审批台账或任务状态机。
 - 不把未运行的 CLI 检查、技能或扩展报告为已完成；操作结果、阶段产物和验证证据须如实汇报。
 <!-- PROJECT-SPEC-KIT-GOVERNANCE:END -->

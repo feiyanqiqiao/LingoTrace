@@ -93,3 +93,6 @@ __pycache__/
 !.agents/skills/
 !.agents/skills/speckit-*/
 !.agents/skills/speckit-*/SKILL.md
+!.agent-support/
+!.agent-support/spec_kit_component_updater.py
+/.agent-state/spec_kit_component_update_cache.json
