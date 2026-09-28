@@ -3,9 +3,11 @@ name: speckit-governance-discovery-cold-start-review
 description: Request isolated cold-start validation of representative tiny-model tasks
 compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: github-spec-kit
-  source: governance-discovery:commands/speckit.governance.cold-start-review.md
+  author: SpecKitReference maintainers
+  source: extension:governance-discovery
 ---
+
+# Governance Discovery Cold Start Review Skill
 
 # Cold-start review
 

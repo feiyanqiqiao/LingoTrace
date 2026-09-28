@@ -1,11 +1,14 @@
 ---
 name: speckit-governance-discovery-discovery
-description: Collect and review the mandatory Discovery snapshot before upstream specification authoring
+description: Collect and review the mandatory Discovery snapshot before upstream specification
+  authoring
 compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: github-spec-kit
-  source: governance-discovery:commands/speckit.governance.discovery.md
+  author: SpecKitReference maintainers
+  source: extension:governance-discovery
 ---
+
+# Governance Discovery Discovery Skill
 
 # Discovery protocol
 

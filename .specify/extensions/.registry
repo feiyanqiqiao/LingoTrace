@@ -15,7 +15,12 @@
           "speckit.governance-discovery.validate"
         ]
       },
-      "registered_skills": [],
+      "registered_skills": [
+        "speckit-governance-discovery-discovery",
+        "speckit-governance-discovery-task-readiness",
+        "speckit-governance-discovery-cold-start-review",
+        "speckit-governance-discovery-validate"
+      ],
       "installed_at": "2026-09-04T06:07:36.726690+00:00"
     },
     "assess": {
@@ -33,7 +38,13 @@
           "speckit.assess.decide"
         ]
       },
-      "registered_skills": [],
+      "registered_skills": [
+        "speckit-assess-intake",
+        "speckit-assess-research",
+        "speckit-assess-define",
+        "speckit-assess-shape",
+        "speckit-assess-decide"
+      ],
       "installed_at": "2026-09-26T12:59:11.736489+00:00"
     },
     "bug": {
@@ -49,7 +60,11 @@
           "speckit.bug.test"
         ]
       },
-      "registered_skills": [],
+      "registered_skills": [
+        "speckit-bug-assess",
+        "speckit-bug-fix",
+        "speckit-bug-test"
+      ],
       "installed_at": "2026-09-26T13:00:35.910921+00:00"
     }
   }

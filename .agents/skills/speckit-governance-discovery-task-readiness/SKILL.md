@@ -3,9 +3,11 @@ name: speckit-governance-discovery-task-readiness
 description: Run the read-only task-package readiness audit before implementation
 compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: github-spec-kit
-  source: governance-discovery:commands/speckit.governance.task-readiness.md
+  author: SpecKitReference maintainers
+  source: extension:governance-discovery
 ---
+
+# Governance Discovery Task Readiness Skill
 
 # Task-package readiness
 

@@ -3,9 +3,11 @@ name: speckit-governance-discovery-validate
 description: Run feature validation and produce evidence without claiming final approval
 compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
-  author: github-spec-kit
-  source: governance-discovery:commands/speckit.governance.validate.md
+  author: SpecKitReference maintainers
+  source: extension:governance-discovery
 ---
+
+# Governance Discovery Validate Skill
 
 # Feature validation
 
