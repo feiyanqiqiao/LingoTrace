@@ -7,4 +7,3 @@ feature.json
 
 # Per-machine extension config overrides.
 extensions/*/local-config.yml
-extensions/.cache/

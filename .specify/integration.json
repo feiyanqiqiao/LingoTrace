@@ -1,12 +1,12 @@
 {
-  "version": "0.16.6.dev0",
+  "version": "1.0.12",
   "integration_state_schema": 1,
   "installed_integrations": [
     "codex"
   ],
   "integration_settings": {
     "codex": {
-      "script": "sh",
+      "script": "py",
       "invoke_separator": "-"
     }
   },

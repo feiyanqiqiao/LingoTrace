@@ -1,11 +1,14 @@
 ---
 name: speckit-assess-define
-description: 'Define the problem: who is affected, what hurts, goals, non-goals, and success metrics'
+description: 'Define the problem: who is affected, what hurts, goals, non-goals, and
+  success metrics'
 compatibility: Requires spec-kit project structure with .specify/ directory
 metadata:
   author: spec-kit-core
-  source: assess:commands/speckit.assess.define.md
+  source: extension:assess
 ---
+
+# Assess Define Skill
 
 # Define the Problem
 

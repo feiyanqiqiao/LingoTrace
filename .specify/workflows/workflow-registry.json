@@ -3,19 +3,13 @@
   "workflows": {
     "speckit": {
       "name": "Full SDD Cycle",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Runs specify \u2192 plan \u2192 tasks \u2192 implement with review gates",
-      "source": "bundled",
-      "installed_at": "2026-08-20T18:30:27.545396+00:00",
-      "updated_at": "2026-08-20T18:30:27.545401+00:00"
-    },
-    "governed-sdd": {
-      "name": "Governed Spec-Driven Development",
-      "version": "2.0.0",
-      "description": "Discovery-first SDD with mandatory human gates, readiness review, and stable overlay anchors.",
-      "source": "/Users/jiezhengj/Documents/Project/SpecKitReference/governance/spec-kit-native/workflows/governed-sdd",
-      "installed_at": "2026-09-04T06:07:37.094040+00:00",
-      "updated_at": "2026-09-04T06:07:37.094174+00:00"
+      "source": "catalog",
+      "catalog_name": "default",
+      "url": "https://raw.githubusercontent.com/github/spec-kit/main/workflows/speckit/workflow.yml",
+      "installed_at": "2026-09-28T09:00:48.774821+00:00",
+      "updated_at": "2026-09-28T09:00:48.774821+00:00"
     }
   }
 }
