@@ -1,7 +1,6 @@
 installed:
 - assess
 - bug
-- governance-discovery
 settings:
   auto_execute_hooks: true
 hooks: {}
