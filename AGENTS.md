@@ -60,6 +60,12 @@
 - `.specify/**` 和 Agent 集成文件由官方 CLI 管理；`specs/**` 中的流程产物由官方技能生成。不要重新初始化已有 `.specify/` 的项目，也不要手工覆盖 CLI 托管文件。
 - 细节以本项目当前 CLI 的实际帮助和已安装官方技能为准。若它们与本规则存在差异，先说明受影响的步骤，再按当前工具实际支持的操作处理；不得臆造替代命令或以本地仿制品替代官方能力。
 
+## Spec Kit 文档语言
+
+- 本项目 Spec Kit 流程文档语言：中文。
+- Constitution、Feature SDD、Bug Fix 和 Assessment 流程产生的新文档或实质性改写内容均使用中文；命令、路径、代码标识符、产品名和官方术语保留原文。
+- 用户在单项任务中明确指定其他语言时，按该次要求处理；用户明确更改项目默认语言时，更新本规则。
+
 ## 每个新会话的入口
 
 项目存在 `.specify/` 时，Agent 在首次实质性操作前只读取 `.agent-state/spec_kit_component_update_cache.json` 中的 `last_full_check`：
